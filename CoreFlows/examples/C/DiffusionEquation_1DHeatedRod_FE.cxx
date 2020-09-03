@@ -10,9 +10,9 @@ void power_field_diffusionTest(Field & Phi){
 	double phi=1e5;
 	double x;
 	Mesh M = Phi.getMesh();
-	int nbCells = M.getNumberOfCells();
-	for (int j = 0; j < nbCells; j++) {
-		x=M.getCell(j).x();
+	int nbNodes = M.getNumberOfNodes();
+	for (int j = 0; j < nbNodes; j++) {
+		x=M.getNode(j).x();
 		Phi(j) = phi*cos(PI*(x-L/2)/(L+lambda));
 	}
 }
@@ -36,9 +36,9 @@ int main(int argc, char** argv)
 	double rho_ur=10000;//Uranium density
 	double lambda_ur=5;
  
-    bool FEcalculation=false;
+    bool FEcalculation=true;
 	DiffusionEquation  myProblem(spaceDim,FEcalculation,rho_ur,cp_ur,lambda_ur);
-	Field VV("Solid temperature", CELLS, M, 1);
+	Field VV("Solid temperature", NODES, M, 1);
 
 	//Set fluid temperature (temperature du fluide)
 	double fluidTemp=573;//fluid mean temperature
@@ -46,7 +46,7 @@ int main(int argc, char** argv)
 	myProblem.setFluidTemperature(fluidTemp);
 	myProblem.setHeatTransfertCoeff(heatTransfertCoeff);
 	//Set heat source
-	Field Phi("Heat power field", CELLS, M, 1);
+	Field Phi("Heat power field", NODES, M, 1);
 	power_field_diffusionTest(Phi);
 	myProblem.setHeatPowerField(Phi);
 	Phi.writeVTK("1DheatPowerField");
@@ -62,10 +62,10 @@ int main(int argc, char** argv)
 	myProblem.setNeumannBoundaryCondition("Neumann");
 
 	// set the numerical method
-	myProblem.setNumericalScheme(upwind, Explicit);
+	myProblem.setTimeScheme( Explicit);
 
 	// name result file
-	string fileName = "1DRodTemperature_FV";
+	string fileName = "1DRodTemperature_FE";
 
 	// parameters calculation
 	unsigned MaxNbOfTimeStep =3;

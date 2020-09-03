@@ -84,7 +84,7 @@ Either of these latter commands results in the creation of a directory `~/worksp
 
 In the following steps we assume that [PETSC](https://www.mcs.anl.gov/petsc/) (version 3.4 or more recent) has been installed with CDMATH with the process described above.
 You need to set the following variables 
-- `CDMATH_DIR`, the path to your CDMATH installation, for example  `~/workspace/cdmath/cdmath_install//share/petsc-3.8.3 `
+- `CDMATH_INSTALL`, the path to your CDMATH installation, for example  `~/workspace/cdmath/cdmath_install//share/petsc-3.8.3 `
 - `PETSC_DIR`, the path to your PETSc installation. If [PETSC](https://www.mcs.anl.gov/petsc/) was installed by CDMATH then [CDMATH-Toolbox](https://github.com/ndjinga/CDMATH) can be defined as `~/workspace/cdmath/cdmath_install`
 - `PETSC_ARCH`, the type of installation used (usually arch-linux2-c-opt or linux-gnu-c-opt)
 
@@ -98,7 +98,7 @@ Go to the build directory
 - `cd CoreFlows_build `
 
 Then run the command
-- `../CDMATH-CoreFlows-master/configure  --prefix=../CDMATH-CoreFlows_install/ --with-petsc-dir=$PETSC_DIR --with-petsc-arch=$PETSC_ARCH --with-cdmath-dir=$CDMATH_DIR --with-python --with-doc`
+- `../CDMATH-CoreFlows-master/configure  --prefix=../CDMATH-CoreFlows_install/ --with-petsc-dir=$PETSC_DIR --with-petsc-arch=$PETSC_ARCH --with-cdmath-dir=$CDMATH_INSTALL --with-python --with-doc`
 - `make doc install`
 
 You can add the following optional commands

@@ -1,4 +1,5 @@
 #include "StationaryDiffusionEquation.hxx"
+#include "Node.hxx"
 #include "math.h"
 #include <assert.h>
 

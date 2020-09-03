@@ -18,7 +18,7 @@ def DiffusionEquation_1DHeatedRod():
 	rho_ur=10000
 	lambda_ur=5
 
-	FECalculation=False    
+	FECalculation=True    
 	myProblem = cf.DiffusionEquation(spaceDim,FECalculation,rho_ur,cp_ur,lambda_ur);
 	nVar = myProblem.getNumberOfVariables();
 
@@ -41,11 +41,11 @@ def DiffusionEquation_1DHeatedRod():
 	myProblem.setNeumannBoundaryCondition("Neumann");
 
     # set the numerical method
-	myProblem.setNumericalScheme(cf.upwind, cf.Explicit);
+	myProblem.setTimeScheme( cf.Explicit);
 	# myProblem.setLinearSolver(GMRES,ILU,True);
 
     # name of result file
-	fileName = "1DRodTemperature";
+	fileName = "1DRodTemperature_FE";
 
     # computation parameters
 	MaxNbOfTimeStep = 3 ;

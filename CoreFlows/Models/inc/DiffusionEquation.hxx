@@ -20,6 +20,23 @@
 
 using namespace std;
 
+//! enumeration BoundaryType
+/*! Boundary condition type  */
+enum BoundaryTypeDiffusion	{ NeumannDiffusion, DirichletDiffusion, NoneBCDiffusion};
+
+/** \struct LimitField
+ * \brief value of some fields on the boundary  */
+struct LimitFieldDiffusion{
+	LimitFieldDiffusion(){bcType=NoneBCDiffusion; T=0; normalFlux=0;}
+	LimitFieldDiffusion(BoundaryTypeDiffusion _bcType, double _T,	double _normalFlux){
+		bcType=_bcType; T=_T; normalFlux=_normalFlux;
+	}
+
+	BoundaryTypeDiffusion bcType;
+	double T; //for Dirichlet
+	double normalFlux; //for Neumann
+};
+
 class DiffusionEquation: public ProblemCoreFlows
 {
 
@@ -45,7 +62,7 @@ public :
 	void validateTimeStep();
 
     /* Boundary conditions */
-	void setBoundaryFields(map<string, LimitField> boundaryFields){
+	void setBoundaryFields(map<string, LimitFieldDiffusion> boundaryFields){
 		_limitField = boundaryFields;
     };
 	/** \fn setDirichletBoundaryCondition
@@ -56,7 +73,7 @@ public :
 			 * \param [out] void
 			 *  */
 	void setDirichletBoundaryCondition(string groupName,double Temperature){
-		_limitField[groupName]=LimitField(Dirichlet,-1,vector<double>(_Ndim,0),vector<double>(_Ndim,0),vector<double>(_Ndim,0),Temperature,-1,-1,-1);
+		_limitField[groupName]=LimitFieldDiffusion(DirichletDiffusion,Temperature,-1);
 	};
 	/** \fn setNeumannBoundaryCondition
 			 * \brief adds a new boundary condition of type Neumann
@@ -64,9 +81,8 @@ public :
 			 * \param [in] string : the name of the boundary
 			 * \param [out] void
 			 *  */
-	void setNeumannBoundaryCondition(string groupName){
-		_limitField[groupName]=LimitField(Neumann,-1, vector<double>(0),vector<double>(0),
-                                                      vector<double>(0),-1,-1,-1,-1);
+	void setNeumannBoundaryCondition(string groupName, double normalFlux=0){
+		_limitField[groupName]=LimitFieldDiffusion(NeumannDiffusion,-1, normalFlux);
 	};
 
 	void setRodDensity(double rho){
@@ -79,18 +95,26 @@ public :
 		_fluidTemperatureField=coupledTemperatureField;
 		_fluidTemperatureFieldSet=true;
 	};
+
+	void setDiffusiontensor(Matrix DiffusionTensor){
+		_DiffusionTensor=DiffusionTensor;
+	};
+
 	void setFluidTemperature(double fluidTemperature){
 	_fluidTemperature=fluidTemperature;
 	}
+
+	//get output fields for postprocessing or coupling
+	vector<string> getOutputFieldsNames() ;//liste tous les champs que peut fournir le code pour le postraitement
+	Field&         getOutputField(const string& nameField );//Renvoie un champs pour le postraitement
+
 	Field& getRodTemperatureField(){
 		return _VV;
 	}
 	Field& getFluidTemperatureField(){
 		return _fluidTemperatureField;
 	}
-	void setDiffusiontensor(Matrix DiffusionTensor){
-		_DiffusionTensor=DiffusionTensor;
-	};
+
 protected :
 	double computeDiffusionMatrix(bool & stop);
 	double computeDiffusionMatrixFV(bool & stop);
@@ -121,6 +145,8 @@ protected :
     int unknownNodeIndex(int globalIndex, std::vector< int > dirichletNodes);
     int globalNodeIndex(int unknownIndex, std::vector< int > dirichletNodes);
 
+	TimeScheme _timeScheme;
+	map<string, LimitFieldDiffusion> _limitField;
 };
 
 #endif /* DiffusionEquation_HXX_ */

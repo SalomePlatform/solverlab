@@ -17,21 +17,21 @@ int main(int argc, char** argv)
 	int spaceDim = M.getSpaceDimension();
 
 	// Boundary conditions
-	map<string, LimitField> boundaryFields;
+	map<string, LimitFieldTransport> boundaryFields;
 
-	LimitField limitNeumann;
-	limitNeumann.bcType=Neumann;
+	LimitFieldTransport limitNeumann;
+	limitNeumann.bcType=NeumannTransport;
 	boundaryFields["Neumann"] = limitNeumann;
 
-	LimitField limitInlet;
-	limitInlet.bcType=Inlet;
+	LimitFieldTransport limitInlet;
+	limitInlet.bcType=InletTransport;
 	limitInlet.h =1.3e6;//Inlet water enthalpy
 	boundaryFields["Inlet"] = limitInlet;
 
 	//Set the fluid transport velocity
 	vector<double> transportVelocity(1,5);//fluid velocity vector
 
-	TransportEquation  myProblem(Liquid,around155bars600K,transportVelocity);
+	TransportEquation  myProblem(LiquidPhase,around155bars600KTransport,transportVelocity);
 	Field VV("Enthalpy", CELLS, M, 1);
 
 	//Set rod temperature and heat exchamge coefficient
@@ -53,7 +53,7 @@ int main(int argc, char** argv)
 	myProblem.setBoundaryFields(boundaryFields);
 
 	// set the numerical method
-	myProblem.setNumericalScheme(upwind, Explicit);
+	myProblem.setTimeScheme( Explicit);
 
 	// name result file
 	string fileName = "1DFluidEnthalpy";

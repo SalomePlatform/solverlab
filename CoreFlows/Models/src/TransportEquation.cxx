@@ -5,10 +5,10 @@
 
 using namespace std;
 
-TransportEquation::TransportEquation(phaseType fluid, pressureEstimate pEstimate,vector<double> vitesseTransport){
-	if(pEstimate==around1bar300K){
+TransportEquation::TransportEquation(phase fluid, pressureMagnitude pEstimate,vector<double> vitesseTransport){
+	if(pEstimate==around1bar300KTransport){
 		_Tref=300;
-		if(fluid==Gas){//Nitrogen pressure 1 bar and temperature 27°C
+		if(fluid==GasPhase){//Nitrogen pressure 1 bar and temperature 27°C
 			_href=3.11e5; //nitrogen enthalpy at 1 bar and 300K
 			_cpref=1041;//nitrogen specific heat at constant pressure 1 bar and 300K
 			//saturation data for nitrogen at 1 bar and 77K
@@ -30,7 +30,7 @@ TransportEquation::TransportEquation(phaseType fluid, pressureEstimate pEstimate
 	}
 	else{//around155bars600K
 		_Tref=618;//=Tsat
-		if(fluid==Gas){
+		if(fluid==GasPhase){
 			_href=2.675e6; //Gas enthalpy at 155 bars and 618K
 			_cpref=14001;//Gas specific heat at 155 bar and 618K
 		}
@@ -179,10 +179,10 @@ double TransportEquation::computeTransportMatrix(){
 			}
 			nameOfGroup = Fj.getGroupName();
 
-			if (_limitField[nameOfGroup].bcType==Neumann){
+			if (_limitField[nameOfGroup].bcType==NeumannTransport){
 				MatSetValue(_A,idm,idm,inv_dxi*un, ADD_VALUES);
 			}
-			else if(_limitField[nameOfGroup].bcType==Inlet){
+			else if(_limitField[nameOfGroup].bcType==InletTransport){
 				if(un>0){
 					MatSetValue(_A,idm,idm,inv_dxi*un, ADD_VALUES);
 				}
@@ -194,7 +194,7 @@ double TransportEquation::computeTransportMatrix(){
 			else {
 				cout<<"!!!!!!!!!!!!!!! Error TransportEquation::computeTransportMatrix() !!!!!!!!!!"<<endl;
 				cout<<"!!!!!!!!! Boundary condition not treated for boundary named "<<nameOfGroup<< ", _limitField[nameOfGroup].bcType= "<<_limitField[nameOfGroup].bcType<<" !!!!!!!!!!!!!! "<<endl;
-				cout<<"Accepted boundary conditions are Neumann "<<Neumann<< " and Inlet "<< Inlet <<endl;
+				cout<<"Accepted boundary conditions are NeumannTransport "<<NeumannTransport<< " and InletTransport "<< InletTransport <<endl;
 				throw CdmathException("Boundary condition not accepted");
 			}
 			// if Fj is inside the domain
@@ -454,7 +454,9 @@ void TransportEquation::save(){
 	_Rho.setTime(_time,_nbTimeStep);
 
 	// create mesh and component info
-	if (_nbTimeStep ==0){
+	if (_nbTimeStep ==0 || _restartWithNewFileName){
+		if (_restartWithNewFileName)
+			_restartWithNewFileName=false;
 		string suppress ="rm -rf "+resultFile+"_*";
 		system(suppress.c_str());//Nettoyage des précédents calculs identiques
 
@@ -505,3 +507,27 @@ void TransportEquation::save(){
 		}
 	}
 }
+
+vector<string> TransportEquation::getOutputFieldsNames()
+{
+	vector<string> result(2);
+	
+	result[0]="Enthalpy";
+	result[1]="FluidTemperature";
+	
+	return result;
+}
+
+Field& TransportEquation::getOutputField(const string& nameField )
+{
+	if(nameField=="FluidTemperature" || nameField=="FLUIDTEMPERATURE" )
+		return getFluidTemperatureField();
+	else if(nameField=="Enthalpy" || nameField=="ENTHALPY" || nameField=="Enthalpie" || nameField=="ENTHALPY" )
+		return getEnthalpyField();
+    else
+    {
+        cout<<"Error : Field name "<< nameField << " does not exist, call getOutputFieldsNames first" << endl;
+        throw CdmathException("TransportEquation::getOutputField error : Unknown Field name");
+    }
+}
+

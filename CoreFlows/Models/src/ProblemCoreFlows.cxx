@@ -11,6 +11,8 @@
 //============================================================================
 
 #include "ProblemCoreFlows.hxx"
+#include "SparseMatrixPetsc.hxx"
+
 #include <limits.h>
 #include <unistd.h>
 
@@ -39,9 +41,11 @@ ProblemCoreFlows::ProblemCoreFlows()
 	_freqSave = 1;
 	_initialDataSet=false;
 	_initializedMemory=false;
-	_spaceScheme=upwind;
+	_restartWithNewTimeScheme=false;
+	_restartWithNewFileName=false;
 	_timeScheme=Explicit;
 	_wellBalancedCorrection=false;
+    _FECalculation=false;
 	_maxPetscIts=50;
 	_MaxIterLinearSolver=0;//During several newton iterations, stores the max petssc interations
 	_maxNewtonIts=50;
@@ -64,6 +68,18 @@ ProblemCoreFlows::ProblemCoreFlows()
 	getcwd(result, PATH_MAX );
 	_path=string( result );
 	_saveFormat=VTK;
+}
+
+TimeScheme ProblemCoreFlows::getTimeScheme()
+{
+	return _timeScheme;
+}
+
+void ProblemCoreFlows::setTimeScheme(TimeScheme timeScheme)
+{
+	if( _nbTimeStep>0 && timeScheme!=_timeScheme)//This is a change of time scheme during a simulation
+		_restartWithNewTimeScheme=true;
+	_timeScheme = timeScheme;
 }
 
 bool ProblemCoreFlows::isStationary() const
@@ -93,11 +109,6 @@ void ProblemCoreFlows::setPrecision(double precision)
 {
 	_precision=precision;
 }
-void ProblemCoreFlows::setNumericalScheme(SpaceScheme spaceScheme, TimeScheme timeScheme){
-	_timeScheme = timeScheme;
-	_spaceScheme = spaceScheme;
-}
-
 void ProblemCoreFlows::setInitialField(const Field &VV)
 {
 
@@ -351,14 +362,6 @@ double ProblemCoreFlows::getPrecision()
 {
 	return _precision;
 }
-SpaceScheme ProblemCoreFlows::getSpaceScheme()
-{
-	return _spaceScheme;
-}
-TimeScheme ProblemCoreFlows::getTimeScheme()
-{
-	return _timeScheme;
-}
 Mesh ProblemCoreFlows::getMesh()
 {
 	return _mesh;
@@ -404,7 +407,7 @@ void ProblemCoreFlows::setLinearSolver(linearSolver kspType, preconditioner pcTy
 // Elle peut etre utilisee si le probleme n'est couple a aucun autre.
 // (s'il n'a besoin d'aucun champ d'entree).
 // Precondition: initialize
-// Seule la methode terminate peut etre appelee apres
+// Seule la methode terminate peut etre appelée apres
 bool ProblemCoreFlows::run()
 {
 	if(!_initializedMemory)
@@ -448,12 +451,15 @@ bool ProblemCoreFlows::run()
 
 			if (!ok)   // The resolution failed, try with a new time interval.
 			{
-				abortTimeStep();
 				if(_dt>_precision){
-					cout << "Failed solving time step "<<_nbTimeStep<<", time = " << _time <<" _dt= "<<_dt<<", cfl= "<<_cfl<<", trying again with cfl/2"<< endl;
-					*_runLogFile << "Failed solving time step "<<_nbTimeStep<<", time = " << _time <<" _dt= "<<_dt<<", cfl= "<<_cfl<<", trying again with cfl/2"<< endl;
-					_dt*=0.5;
-					_cfl*=0.5;
+					cout<<"ComputeTimeStep returned _dt="<<_dt<<endl;
+					cout << "Failed solving time step "<<_nbTimeStep<<", time = " << _time <<" _dt= "<<_dt<<", cfl= "<<_cfl<<", trying again with dt/2"<< endl;
+					*_runLogFile << "Failed solving time step "<<_nbTimeStep<<", time = " << _time <<" _dt= "<<_dt<<", cfl= "<<_cfl<<", trying again with dt/2"<< endl;
+					double dt=_dt/2;//We chose to divide the time step by 2
+					abortTimeStep();//Cancel the initTimeStep
+					_dt=dt;//new value of time step is previous time step divided by 2 (we do not call computeTimeStep
+					//_cfl*=0.5;//If we change the cfl, we must compute the new time step with computeTimeStep
+					//_dt=computeTimeStep(stop);
 				}
 				else{
 					cout << "Failed solving time step "<<_nbTimeStep<<", _time = " << _time<<" _dt= "<<_dt<<", cfl= "<<_cfl <<", stopping calculation"<< endl;
@@ -519,6 +525,8 @@ void ProblemCoreFlows::displayVector(double *vector, int size, string name)
 	cout << endl;
 }
 void ProblemCoreFlows::setFileName(string fileName){
+	if( _nbTimeStep>0 && fileName!=_fileName)//This is a change of file name during a simulation
+		_restartWithNewFileName=true;
 	_fileName = fileName;
 }
 
@@ -577,4 +585,39 @@ ProblemCoreFlows::~ProblemCoreFlows()
 		PetscFinalize();
 	 */
 	delete _runLogFile;
+}
+
+double 
+ProblemCoreFlows::getConditionNumber(bool isSingular, double tol) const
+{
+  SparseMatrixPetsc A = SparseMatrixPetsc(_A);
+  return A.getConditionNumber( isSingular, tol);
+}
+std::vector< double > 
+ProblemCoreFlows::getEigenvalues(int nev, EPSWhich which, double tol) const
+{
+  SparseMatrixPetsc A = SparseMatrixPetsc(_A);
+  return A.getEigenvalues( nev, which, tol);
+}
+std::vector< Vector > 
+ProblemCoreFlows::getEigenvectors(int nev, EPSWhich which, double tol) const
+{
+  SparseMatrixPetsc A = SparseMatrixPetsc(_A);
+  return A.getEigenvectors( nev, which, tol);
+}
+Field 
+ProblemCoreFlows::getEigenvectorsField(int nev, EPSWhich which, double tol) const
+{
+  SparseMatrixPetsc A = SparseMatrixPetsc(_A);
+  MEDCoupling::DataArrayDouble * d = A.getEigenvectorsDataArrayDouble( nev, which, tol);
+  Field my_eigenfield;
+  
+  if(_FECalculation)
+    my_eigenfield = Field("Eigenvectors field", NODES, _mesh, nev);
+  else
+    my_eigenfield = Field("Eigenvectors field", CELLS, _mesh, nev);
+
+  my_eigenfield.setFieldByDataArrayDouble(d);
+  
+  return my_eigenfield;
 }

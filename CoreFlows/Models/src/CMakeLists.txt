@@ -1,10 +1,6 @@
 
 INCLUDE_DIRECTORIES(
-  ${PETSC_INCLUDES} 
-  ${CDMATH_INCLUDES} 
-  ${CDMATH_INCLUDES}/med											    #
-  ${CDMATH_INCLUDES}/medcoupling											    #
-  ${CoreFlows_SRC}/inc      
+  ${CoreFlows_INCLUDES}											    #
   )
 
 SET(src_models_CXX
@@ -22,6 +18,6 @@ SET(src_models_CXX
   )
 
 ADD_LIBRARY(CoreFlows SHARED ${src_models_CXX})
-target_link_libraries(CoreFlows ${CDMATH_LIBRARIES} ${PETSC_LIBRARIES})
+target_link_libraries(CoreFlows ${CDMATH_LIBRARIES} ${PETSC_LIBRARIES} ${SLEPC_LIBRARIES})
 
 INSTALL(TARGETS CoreFlows DESTINATION lib)

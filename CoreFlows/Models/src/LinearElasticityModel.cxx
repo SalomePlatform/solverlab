@@ -1,6 +1,6 @@
-#include "StationaryDiffusionEquation.hxx"
-#include "Node.hxx"
+#include "LinearElasticityModel.hxx"
 #include "SparseMatrixPetsc.hxx"
+#include "Node.hxx"
 #include "math.h"
 #include <algorithm> 
 #include <fstream>
@@ -8,11 +8,11 @@
 
 using namespace std;
 
-int StationaryDiffusionEquation::fact(int n)
+int LinearElasticityModel::fact(int n)
 {
   return (n == 1 || n == 0) ? 1 : fact(n - 1) * n;
 }
-int StationaryDiffusionEquation::unknownNodeIndex(int globalIndex, std::vector< int > dirichletNodes) const
+int LinearElasticityModel::unknownNodeIndex(int globalIndex, std::vector< int > dirichletNodes)
 {//assumes Dirichlet node numbering is strictly increasing
     int j=0;//indice de parcours des noeuds frontière avec CL Dirichlet
     int boundarySize=dirichletNodes.size();
@@ -23,10 +23,10 @@ int StationaryDiffusionEquation::unknownNodeIndex(int globalIndex, std::vector< 
     else if (dirichletNodes[j]>globalIndex)
         return globalIndex-j;
     else
-        throw CdmathException("StationaryDiffusionEquation::unknownNodeIndex : Error : node is a Dirichlet boundary node");
+        throw CdmathException("LinearElasticityModel::unknownNodeIndex : Error : node is a Dirichlet boundary node");
 }
 
-int StationaryDiffusionEquation::globalNodeIndex(int unknownNodeIndex, std::vector< int > dirichletNodes) const
+int LinearElasticityModel::globalNodeIndex(int unknownNodeIndex, std::vector< int > dirichletNodes)
 {//assumes Dirichlet boundary node numbering is strictly increasing
     int boundarySize=dirichletNodes.size();
     /* trivial case where all boundary nodes are Neumann BC */
@@ -44,11 +44,11 @@ int StationaryDiffusionEquation::globalNodeIndex(int unknownNodeIndex, std::vect
 
     if(j+1==boundarySize)
         return unknownNodeIndex+boundarySize;
-    else //unknownNodeMax>=unknownNodeIndex, hence our node global number is between dirichletNodes[j-1] and dirichletNodes[j]
+    else //unknownNodeMax>=unknownNodeIndex) hence our node global number is between dirichletNodes[j-1] and dirichletNodes[j]
         return unknownNodeIndex - unknownNodeMax + dirichletNodes[j]-1;
 }
 
-StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalculation, double lambda){
+LinearElasticityModel::LinearElasticityModel(int dim, bool FECalculation,  double rho, double lambda, double mu){
 	PetscBool petscInitialized;
 	PetscInitialized(&petscInitialized);
 	if(!petscInitialized)
@@ -56,12 +56,17 @@ StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalcula
 
     if(lambda < 0.)
     {
-        std::cout<<"Conductivity="<<lambda<<endl;
-        throw CdmathException("Error : conductivity parameter lambda cannot  be negative");
+        std::cout<<"First Lamé coefficient="<<lambda<<endl;
+        throw CdmathException("Error : First Lamé coefficient lambda cannot  be negative");
+    }
+    if(2*mu+dim*lambda < 0.)
+    {
+        std::cout<<"First Lamé coefficient="<<lambda<<", second Lamé coefficient="<<mu<<", 2*mu+dim*lambda= "<<2*mu+dim*lambda<<endl;
+        throw CdmathException("Error : 2*mu+dim*lambda cannot  be negative");
     }
     if(dim<=0)
     {
-        std::cout<<"Space dimension="<<dim<<endl;
+        std::cout<<"space dimension="<<dim<<endl;
         throw CdmathException("Error : parameter dim cannot  be negative");
     }
 
@@ -69,9 +74,7 @@ StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalcula
     _onlyNeumannBC=false;    
     
 	_Ndim=dim;
-	_nVar=1;//scalar prolem
-	_dt_src=0;
-	_diffusionMatrixSet=false;
+	_nVar=dim;
 	_initializedMemory=false;
 
     //Mesh data
@@ -86,15 +89,12 @@ StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalcula
     _NdirichletNodes=0;
     _NunknownNodes=0;
     _dirichletValuesSet=false;   
-    _neumannValuesSet=false;   
     
     //Linear solver data
 	_precision=1.e-6;
 	_precision_Newton=_precision;
 	_MaxIterLinearSolver=0;//During several newton iterations, stores the max petssc interations
 	_maxPetscIts=50;
-	_maxNewtonIts=50;
-	_NEWTON_its=0;
 	int _PetscIts=0;//the number of iterations of the linear solver
 	_ksptype = (char*)&KSPGMRES;
 	_pctype = (char*)&PCLU;
@@ -107,7 +107,7 @@ StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalcula
 	_runLogFile=new ofstream;
 
 	//result save parameters
-	_fileName = "StationaryDiffusionProblem";
+	_fileName = "LinearElasticityProblem";
 	char result[ PATH_MAX ];//extracting current directory
 	getcwd(result, PATH_MAX );
 	_path=string( result );
@@ -115,24 +115,22 @@ StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalcula
     _computationCompletedSuccessfully=false;
     
     //heat transfer parameters
-	_conductivity=lambda;
-	_fluidTemperatureFieldSet=false;
-	_fluidTemperature=0;
-	_heatPowerFieldSet=false;
-	_heatTransfertCoeff=0;
-	_heatSource=0;
+	_lambda= lambda;
+	_mu    = mu;
+	_rho   = rho;
+	_densityFieldSet=false;
 }
 
-void StationaryDiffusionEquation::initialize()
+void LinearElasticityModel::initialize()
 {
 	_runLogFile->open((_fileName+".log").c_str(), ios::out | ios::trunc);;//for creation of a log file to save the history of the simulation
 
 	if(!_meshSet)
-		throw CdmathException("StationaryDiffusionEquation::initialize() set mesh first");
+		throw CdmathException("LinearElasticityModel::initialize() set mesh first");
 	else
     {
-		cout<<"!!!! Initialisation of the computation of the temperature diffusion in a solid using ";
-        *_runLogFile<<"!!!!! Initialisation of the computation of the temperature diffusion in a solid using ";
+		cout<<"!!!! Initialisation of the computation of the elastic deformation of a solid using ";
+        *_runLogFile<<"!!!!! Initialisation of the computation of the elastic deformation of a solid using ";
         if(!_FECalculation)
         {
             cout<< "Finite volumes method"<<endl<<endl;
@@ -144,38 +142,21 @@ void StationaryDiffusionEquation::initialize()
             *_runLogFile<< "Finite elements method"<<endl<<endl;
         }
     }
-    
-	_DiffusionTensor=Matrix(_Ndim);
-	for(int idim=0;idim<_Ndim;idim++)
-		_DiffusionTensor(idim,idim)=1;
 	/**************** Field creation *********************/
 
-	if(!_heatPowerFieldSet){
+	if(!_densityFieldSet){
         if(_FECalculation){
-            _heatPowerField=Field("Heat power",NODES,_mesh,1);
+            _densityField=Field("Density",NODES,_mesh,1);
             for(int i =0; i<_Nnodes; i++)
-                _heatPowerField(i) = _heatSource;
+                _densityField(i) = _rho;
         }
         else{
-            _heatPowerField=Field("Heat power",CELLS,_mesh,1);
+            _densityField=Field("Density",CELLS,_mesh,1);
             for(int i =0; i<_Nmailles; i++)
-                _heatPowerField(i) = _heatSource;
+                _densityField(i) = _rho;
         }
-        _heatPowerFieldSet=true;
+        _densityFieldSet=true;
     }
-	if(!_fluidTemperatureFieldSet){
-        if(_FECalculation){
-            _fluidTemperatureField=Field("Fluid temperature",NODES,_mesh,1);
-            for(int i =0; i<_Nnodes; i++)
-                _fluidTemperatureField(i) = _fluidTemperature;
-        }
-        else{
-            _fluidTemperatureField=Field("Fluid temperature",CELLS,_mesh,1);
-            for(int i =0; i<_Nmailles; i++)
-                _fluidTemperatureField(i) = _fluidTemperature;
-        }
-        _fluidTemperatureFieldSet=true;
-	}
 
     /* Détection des noeuds frontière avec une condition limite de Dirichlet */
     if(_FECalculation)
@@ -190,28 +171,26 @@ void StationaryDiffusionEquation::initialize()
                 _dirichletNodeIds.push_back(_boundaryNodeIds[i]);
             else if( _mesh.getNode(_boundaryNodeIds[i]).getGroupNames().size()==0 )
             {
-                cout<<"!!! No boundary group set for boundary node" << _boundaryNodeIds[i]<< endl;
-                *_runLogFile<< "!!! No boundary group set for boundary node" << _boundaryNodeIds[i]<<endl;
+                cout<<"!!! No boundary value set for boundary node" << _boundaryNodeIds[i]<< endl;
+                *_runLogFile<< "!!! No boundary value set for boundary node" << _boundaryNodeIds[i]<<endl;
                 _runLogFile->close();
-                throw CdmathException("Missing boundary group");
+                throw CdmathException("Missing boundary value");
             }
-            else if(_limitField[_mesh.getNode(_boundaryNodeIds[i]).getGroupName()].bcType==NoneBCStationaryDiffusion)
+            else if(_limitField[_mesh.getNode(_boundaryNodeIds[i]).getGroupName()].bcType==NoTypeSpecified)
             {
                 cout<<"!!! No boundary condition set for boundary node " << _boundaryNodeIds[i]<< endl;
-                cout<<"!!! Accepted boundary conditions are DirichletStationaryDiffusion "<< DirichletStationaryDiffusion <<" and NeumannStationaryDiffusion "<< NeumannStationaryDiffusion << endl;
-                *_runLogFile<< "!!! No boundary condition set for boundary node " << _boundaryNodeIds[i]<<endl;
-                *_runLogFile<< "!!! Accepted boundary conditions are DirichletStationaryDiffusion "<< DirichletStationaryDiffusion <<" and NeumannStationaryDiffusion "<< NeumannStationaryDiffusion <<endl;
+                *_runLogFile<< "!!!No boundary condition set for boundary node " << _boundaryNodeIds[i]<<endl;
                 _runLogFile->close();
                 throw CdmathException("Missing boundary condition");
             }
-            else if(_limitField[_mesh.getNode(_boundaryNodeIds[i]).getGroupName()].bcType==DirichletStationaryDiffusion)
+            else if(_limitField[_mesh.getNode(_boundaryNodeIds[i]).getGroupName()].bcType==Dirichlet)
                 _dirichletNodeIds.push_back(_boundaryNodeIds[i]);
-            else if(_limitField[_mesh.getNode(_boundaryNodeIds[i]).getGroupName()].bcType!=NeumannStationaryDiffusion)
+            else if(_limitField[_mesh.getNode(_boundaryNodeIds[i]).getGroupName()].bcType!=Neumann)
             {
                 cout<<"!!! Wrong boundary condition "<< _limitField[_mesh.getNode(_boundaryNodeIds[i]).getGroupName()].bcType<< " set for boundary node " << _boundaryNodeIds[i]<< endl;
-                cout<<"!!! Accepted boundary conditions are DirichletStationaryDiffusion "<< DirichletStationaryDiffusion <<" and NeumannStationaryDiffusion "<< NeumannStationaryDiffusion << endl;
-                *_runLogFile<< "!!! Wrong boundary condition "<< _limitField[_mesh.getNode(_boundaryNodeIds[i]).getGroupName()].bcType<< " set for boundary node " << _boundaryNodeIds[i]<<endl;
-                *_runLogFile<< "!!! Accepted boundary conditions are DirichletStationaryDiffusion "<< DirichletStationaryDiffusion <<" and NeumannStationaryDiffusion "<< NeumannStationaryDiffusion <<endl;
+                cout<<"!!! Accepted boundary conditions are Dirichlet "<< Dirichlet <<" and Neumann "<< Neumann << endl;
+                *_runLogFile<< "Wrong boundary condition "<< _limitField[_mesh.getNode(_boundaryNodeIds[i]).getGroupName()].bcType<< " set for boundary node " << _boundaryNodeIds[i]<<endl;
+                *_runLogFile<< "Accepted boundary conditions are Dirichlet "<< Dirichlet <<" and Neumann "<< Neumann <<endl;
                 _runLogFile->close();
                 throw CdmathException("Wrong boundary condition");
             }
@@ -224,21 +203,13 @@ void StationaryDiffusionEquation::initialize()
 
 	//creation de la matrice
     if(!_FECalculation)
-        MatCreateSeqAIJ(PETSC_COMM_SELF, _Nmailles, _Nmailles, (1+_neibMaxNbCells), PETSC_NULL, &_A);
+        MatCreateSeqAIJ(PETSC_COMM_SELF, _Nmailles*_nVar, _Nmailles*_nVar, (1+_neibMaxNbCells), PETSC_NULL, &_A);
     else
-        MatCreateSeqAIJ(PETSC_COMM_SELF, _NunknownNodes, _NunknownNodes, (1+_neibMaxNbNodes), PETSC_NULL, &_A);
+        MatCreateSeqAIJ(PETSC_COMM_SELF, _NunknownNodes*_nVar, _NunknownNodes*_nVar, (1+_neibMaxNbNodes), PETSC_NULL, &_A);
 
-	VecCreate(PETSC_COMM_SELF, &_Tk);
+	VecCreate(PETSC_COMM_SELF, &_displacments);
 
-    if(!_FECalculation)
-        VecSetSizes(_Tk,PETSC_DECIDE,_Nmailles);
-    else
-        VecSetSizes(_Tk,PETSC_DECIDE,_NunknownNodes);
-
-	VecSetFromOptions(_Tk);
-	VecDuplicate(_Tk, &_Tkm1);
-	VecDuplicate(_Tk, &_deltaT);
-	VecDuplicate(_Tk, &_b);//RHS of the linear system
+	VecDuplicate(_displacements, &_b);//RHS of the linear system
 
 	//Linear solver
 	KSPCreate(PETSC_COMM_SELF, &_ksp);
@@ -248,30 +219,18 @@ void StationaryDiffusionEquation::initialize()
 	KSPGetPC(_ksp, &_pc);
 	PCSetType(_pc, _pctype);
 
-    //Checking whether all boundary conditions are Neumann boundary condition
-    //if(_FECalculation) _onlyNeumannBC = _NdirichletNodes==0;
-    if(!_neumannValuesSet)//Boundary conditions set via LimitField structure
-    {
-        map<string, LimitFieldStationaryDiffusion>::iterator it = _limitField.begin();
-        while(it != _limitField.end() and (it->second).bcType == NeumannStationaryDiffusion)
-            it++;
-        _onlyNeumannBC = (it == _limitField.end() && _limitField.size()>0);//what if _limitField.size()==0 ???
-    }
-    else
-        if(_FECalculation)
-            _onlyNeumannBC = _neumannBoundaryValues.size()==_NboundaryNodes;
-        else
-            _onlyNeumannBC = _neumannBoundaryValues.size()==_mesh.getBoundaryFaceIds().size();
-
+    //Checking whether all boundaries are Neumann boundaries
+    map<string, LimitField>::iterator it = _limitField.begin();
+    while(it != _limitField.end() and (it->second).bcType == Neumann)
+        it++;
+    _onlyNeumannBC = (it == _limitField.end() && _limitField.size()>0);
     //If only Neumann BC, then matrix is singular and solution should be sought in space of mean zero vectors
     if(_onlyNeumannBC)
     {
-        std::cout<<"### Warning : all boundary conditions are Neumann. System matrix is not invertible since constant vectors are in the kernel."<<std::endl;
-        std::cout<<"### Check the compatibility condition between the right hand side and the boundary data. For homogeneous Neumann BCs, the right hand side must have integral equal to zero."<<std::endl;
-        std::cout<<"### The system matrix being singular, we seek a zero sum solution, and exact (LU and CHOLESKY) and incomplete factorisations (ILU and ICC) may fail."<<std::endl<<endl;
-        *_runLogFile<<"### Warning : all boundary condition are Neumann. System matrix is not invertible since constant vectors are in the kernel."<<std::endl;
-        *_runLogFile<<"### The system matrix being singular, we seek a zero sum solution, and exact (LU and CHOLESKY) and incomplete factorisations (ILU and ICC) may fail."<<std::endl<<endl;
-        *_runLogFile<<"### Check the compatibility condition between the right hand side and the boundary data. For homogeneous Neumann BCs, the right hand side must have integral equal to zero."<<std::endl;
+        std::cout<<"## Warning all boundary conditions are Neumann. System matrix is not invertible since constant vectors are in the kernel."<<std::endl;
+        std::cout<<"## As a consequence we seek a zero sum solution, and exact (LU and CHOLESKY) and incomplete factorisations (ILU and ICC) may fail."<<std::endl<<endl;
+        *_runLogFile<<"## Warning all boundary condition are Neumann. System matrix is not invertible since constant vectors are in the kernel."<<std::endl;
+        *_runLogFile<<"## As a consequence we seek a zero sum solution, and exact (LU and CHOLESKY) and incomplete factorisations (ILU and ICC) may fail."<<std::endl<<endl;
 
 		//Check that the matrix is symmetric
 		PetscBool isSymetric;
@@ -294,16 +253,7 @@ void StationaryDiffusionEquation::initialize()
 
 }
 
-double StationaryDiffusionEquation::computeTimeStep(bool & stop){
-	if(!_diffusionMatrixSet)//The diffusion matrix is computed once and for all time steps
-		computeDiffusionMatrix(stop);
-
-	_dt_src=computeRHS(stop);
-	stop=false;
-	return _dt_src;
-}
-
-Vector StationaryDiffusionEquation::gradientNodal(Matrix M, vector< double > values){
+Vector LinearElasticityModel::gradientNodal(Matrix M, vector< double > values){
     vector< Matrix > matrices(_Ndim);
     
     for (int idim=0; idim<_Ndim;idim++){
@@ -319,7 +269,7 @@ Vector StationaryDiffusionEquation::gradientNodal(Matrix M, vector< double > val
 	return result;    
 }
 
-double StationaryDiffusionEquation::computeDiffusionMatrix(bool & stop)
+double LinearElasticityModel::computeDiffusionMatrix(bool & stop)
 {
     double result;
     
@@ -328,21 +278,16 @@ double StationaryDiffusionEquation::computeDiffusionMatrix(bool & stop)
     else
         result=computeDiffusionMatrixFV(stop);
 
-    //Contribution from the solid/fluid heat exchange with assumption of constant heat transfer coefficient
-    //update value here if variable  heat transfer coefficient
-    if(_heatTransfertCoeff>_precision)
-        MatShift(_A,_heatTransfertCoeff);//Contribution from the liquit/solid heat transfer
-        
     if(_verbose or _system)
         MatView(_A,PETSC_VIEWER_STDOUT_SELF);
 
     return  result;
 }
 
-double StationaryDiffusionEquation::computeDiffusionMatrixFE(bool & stop){
+double LinearElasticityModel::computeDiffusionMatrixFE(bool & stop){
 	Cell Cj;
 	string nameOfGroup;
-	double dn, coeff;
+	double dn;
 	MatZeroEntries(_A);
 	VecZeroEntries(_b);
     
@@ -358,7 +303,7 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFE(bool & stop){
         values[idim][idim]=1;
 
     /* parameters for boundary treatment */
-    vector< double > valuesBorder(_Ndim+1);
+    vector< Vector > valuesBorder(_Ndim+1);
     Vector GradShapeFuncBorder(_Ndim+1);
     
 	for (int j=0; j<_Nmailles;j++)
@@ -397,16 +342,16 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFE(bool & stop){
 							std::map<int,double>::iterator it=_dirichletBoundaryValues.find(nodeIds[kdim]);
 							if( it != _dirichletBoundaryValues.end() )
                             {
-                                if( _dirichletValuesSet )
+                                if( _dirichletValuesSet )//New way of storing BC
                                     valuesBorder[kdim]=_dirichletBoundaryValues[it->second];
-                                else    
-                                    valuesBorder[kdim]=_limitField[_mesh.getNode(nodeIds[kdim]).getGroupName()].T;
+                                else    //old way of storing BC
+                                    valuesBorder[kdim]=_limitField[_mesh.getNode(nodeIds[kdim]).getGroupName()].Displacements;
                             }
                             else
-                                valuesBorder[kdim]=0;                            
+                                valuesBorder[kdim]=Vector(_Ndim);                            
                         }
                         GradShapeFuncBorder=gradientNodal(M,valuesBorder)/fact(_Ndim);
-                        coeff =-_conductivity*(_DiffusionTensor*GradShapeFuncBorder)*GradShapeFuncs[idim]/Cj.getMeasure();
+                        double coeff =-_conductivity*(_DiffusionTensor*GradShapeFuncBorder)*GradShapeFuncs[idim]/Cj.getMeasure();
                         VecSetValue(_b,i_int,coeff, ADD_VALUES);                        
                     }
                 }
@@ -414,40 +359,17 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFE(bool & stop){
         }            
 	}
     
-    //Calcul de la contribution de la condition limite de Neumann au second membre
-    if( _NdirichletNodes !=_NboundaryNodes)
-    {
-        vector< int > boundaryFaces = _mesh.getBoundaryFaceIds();
-        int NboundaryFaces=boundaryFaces.size();
-        for(int i = 0; i< NboundaryFaces ; i++)//On parcourt les faces du bord
-        {
-            Face Fi = _mesh.getFace(i);
-            for(int j = 0 ; j<_Ndim ; j++)//On parcourt les noeuds de la face
-            {
-                if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),Fi.getNodeId(j))==_dirichletNodeIds.end())//node j is an Neumann BC node (not a Dirichlet BC node)
-                {
-                    j_int=unknownNodeIndex(Fi.getNodeId(j), _dirichletNodeIds);//indice du noeud j en tant que noeud inconnu
-                    if( _neumannValuesSet )
-                        coeff =Fi.getMeasure()/_Ndim*_neumannBoundaryValues[Fi.getNodeId(j)];
-                    else    
-                        coeff =Fi.getMeasure()/_Ndim*_limitField[_mesh.getNode(Fi.getNodeId(j)).getGroupName()].normalFlux;
-                    VecSetValue(_b, j_int, coeff, ADD_VALUES);
-                }
-            }
-        }
-    }
     MatAssemblyBegin(_A, MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(_A, MAT_FINAL_ASSEMBLY);
 	VecAssemblyBegin(_b);
 	VecAssemblyEnd(_b);
 
-	_diffusionMatrixSet=true;
     stop=false ;
 
 	return INFINITY;
 }
 
-double StationaryDiffusionEquation::computeDiffusionMatrixFV(bool & stop){
+double LinearElasticityModel::computeDiffusionMatrixFV(bool & stop){
 	long nbFaces = _mesh.getNumberOfFaces();
 	Face Fj;
 	Cell Cell1,Cell2;
@@ -503,19 +425,18 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFV(bool & stop){
             {
                 nameOfGroup = Fj.getGroupName();
     
-                if (_limitField[nameOfGroup].bcType==NeumannStationaryDiffusion){
-                    VecSetValue(_b,idm,    -dn*inv_dxi*_limitField[nameOfGroup].normalFlux, ADD_VALUES);
+                if (_limitField[nameOfGroup].bcType==Neumann){//Nothing to do
                 }
-                else if(_limitField[nameOfGroup].bcType==DirichletStationaryDiffusion){
+                else if(_limitField[nameOfGroup].bcType==Dirichlet){
                     barycenterDistance=Cell1.getBarryCenter().distance(Fj.getBarryCenter());
                     MatSetValue(_A,idm,idm,dn*inv_dxi/barycenterDistance                           , ADD_VALUES);
                     VecSetValue(_b,idm,    dn*inv_dxi/barycenterDistance*_limitField[nameOfGroup].T, ADD_VALUES);
                 }
                 else {
                     stop=true ;
-                    cout<<"!!!!!!!!!!!!!!! Error StationaryDiffusionEquation::computeDiffusionMatrixFV !!!!!!!!!!"<<endl;
+                    cout<<"!!!!!!!!!!!!!!! Error LinearElasticityModel::computeDiffusionMatrixFV !!!!!!!!!!"<<endl;
                     cout<<"!!!!!! Boundary condition not accepted for boundary named !!!!!!!!!!"<<nameOfGroup<< ", _limitField[nameOfGroup].bcType= "<<_limitField[nameOfGroup].bcType<<endl;
-                    cout<<"Accepted boundary conditions are NeumannStationaryDiffusion "<<NeumannStationaryDiffusion<< " and DirichletStationaryDiffusion "<<DirichletStationaryDiffusion<<endl;
+                    cout<<"Accepted boundary conditions are Neumann "<<Neumann<< " and Dirichlet "<<Dirichlet<<endl;
                     *_runLogFile<<"!!!!!! Boundary condition not accepted for boundary named !!!!!!!!!!"<<nameOfGroup<< ", _limitField[nameOfGroup].bcType= "<<_limitField[nameOfGroup].bcType<<endl;
                     _runLogFile->close();
                     throw CdmathException("Boundary condition not accepted");
@@ -547,8 +468,8 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFV(bool & stop){
 		}
 		else
         {
-            *_runLogFile<<"StationaryDiffusionEquation::computeDiffusionMatrixFV(): incompatible number of cells around a face"<<endl;
-			throw CdmathException("StationaryDiffusionEquation::computeDiffusionMatrixFV(): incompatible number of cells around a face");
+            *_runLogFile<<"LinearElasticityModel::computeDiffusionMatrixFV(): incompatible number of cells around a face"<<endl;
+			throw CdmathException("LinearElasticityModel::computeDiffusionMatrixFV(): incompatible number of cells around a face");
         }
 	}
 
@@ -557,19 +478,19 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFV(bool & stop){
 	VecAssemblyBegin(_b);
 	VecAssemblyEnd(_b);
     
-	_diffusionMatrixSet=true;
     stop=false ;
 	
     return INFINITY;
 }
 
-double StationaryDiffusionEquation::computeRHS(bool & stop)//Contribution of the PDE RHS to the linear systemm RHS (boundary conditions do contribute to the system RHS via the function computeDiffusionMatrix)
+double LinearElasticityModel::computeRHS(bool & stop)//Contribution of the PDE RHS to the linear systemm RHS (boundary conditions do contribute to the system RHS via the function computeStiffnessMatrix)
 {
 	VecAssemblyBegin(_b);
 
     if(!_FECalculation)
         for (int i=0; i<_Nmailles;i++)
-            VecSetValue(_b,i,_heatTransfertCoeff*_fluidTemperatureField(i) + _heatPowerField(i),ADD_VALUES);
+			for (int j=0; j<_Ndim;j++)
+				VecSetValue(_b,i*nVar+j,_gravity(j)*_densityField(i),ADD_VALUES);
     else
         {
             Cell Ci;
@@ -579,11 +500,9 @@ double StationaryDiffusionEquation::computeRHS(bool & stop)//Contribution of the
                 Ci=_mesh.getCell(i);
                 nodesId=Ci.getNodesId();
                 for (int j=0; j<nodesId.size();j++)
-                    if(!_mesh.isBorderNode(nodesId[j])) 
-                    {
-                        double coeff = _heatTransfertCoeff*_fluidTemperatureField(nodesId[j]) + _heatPowerField(nodesId[j]);
-                        VecSetValue(_b,unknownNodeIndex(nodesId[j], _dirichletNodeIds), coeff*Ci.getMeasure()/(_Ndim+1),ADD_VALUES);
-                    }
+                    if(!_mesh.isBorderNode(nodesId[j]))
+						for (int k=0; k<_Ndim; k++)
+							VecSetValue(_b,unknownNodeIndex(nodesId[j], _dirichletNodeIds)*nVar+k, _gravity(k)*_densityField(j)*Ci.getMeasure()/(_Ndim+1),ADD_VALUES);
             }
         }
     
@@ -596,9 +515,9 @@ double StationaryDiffusionEquation::computeRHS(bool & stop)//Contribution of the
 	return INFINITY;
 }
 
-bool StationaryDiffusionEquation::iterateNewtonStep(bool &converged)
+bool LinearElasticityModel::solveLinearSystem()
 {
-	bool stop;
+	bool resolutionOK;
 
     //Only implicit scheme considered
     MatAssemblyBegin(_A, MAT_FINAL_ASSEMBLY);
@@ -612,7 +531,7 @@ bool StationaryDiffusionEquation::iterateNewtonStep(bool &converged)
 
     if(_conditionNumber)
         KSPSetComputeEigenvalues(_ksp,PETSC_TRUE);
-    KSPSolve(_ksp, _b, _Tk);
+    KSPSolve(_ksp, _b, displacements);
 
 	KSPConvergedReason reason;
 	KSPGetConvergedReason(_ksp,&reason);
@@ -628,59 +547,30 @@ bool StationaryDiffusionEquation::iterateNewtonStep(bool &converged)
         *_runLogFile<<"!!!!!!!!!!!!! Itérations maximales "<<_maxPetscIts<<" atteintes, résidu="<<residu<<", précision demandée= "<<_precision<<endl;
         *_runLogFile<<"Solver used "<<  _ksptype<<", preconditioner "<<_pctype<<", Final number of iteration= "<<_PetscIts<<endl;
 		_runLogFile->close();
-        converged = false;
-        stop = true;
+		
+		resolutionOK = false;
     }
     else{
         if( _MaxIterLinearSolver < _PetscIts)
             _MaxIterLinearSolver = _PetscIts;
         cout<<"## Système linéaire résolu en "<<_PetscIts<<" itérations par le solveur "<<  _ksptype<<" et le preconditioneur "<<_pctype<<", précision demandée= "<<_precision<<endl<<endl;
 		*_runLogFile<<"## Système linéaire résolu en "<<_PetscIts<<" itérations par le solveur "<<  _ksptype<<" et le preconditioneur "<<_pctype<<", précision demandée= "<<_precision<<endl<<endl;
-        VecCopy(_Tk, _deltaT);//ici on a deltaT=Tk
-        VecAXPY(_deltaT,  -1, _Tkm1);//On obtient deltaT=Tk-Tkm1
-
-        _erreur_rel= 0;
-        double Ti, dTi;
-
-        VecAssemblyBegin(_Tk);
-        VecAssemblyEnd(  _Tk);
-        VecAssemblyBegin(_deltaT);
-        VecAssemblyEnd(  _deltaT);
-
-        if(!_FECalculation)
-            for(int i=0; i<_Nmailles; i++)
-            {
-                VecGetValues(_deltaT, 1, &i, &dTi);
-                VecGetValues(_Tk, 1, &i, &Ti);
-                if(_erreur_rel < fabs(dTi/Ti))
-                    _erreur_rel = fabs(dTi/Ti);
-            }
-        else
-            for(int i=0; i<_NunknownNodes; i++)
-            {
-                VecGetValues(_deltaT, 1, &i, &dTi);
-                VecGetValues(_Tk, 1, &i, &Ti);
-                if(_erreur_rel < fabs(dTi/Ti))
-                    _erreur_rel = fabs(dTi/Ti);
-            }
-        stop=false;
-        converged = (_erreur_rel <= _precision) ;//converged=convergence des iterations de Newton
+        
+        resolutionOK = true;
     }
 
-	VecCopy(_Tk, _Tkm1);
-
-	return stop;
+	return resolutionOK;
 }
 
-void StationaryDiffusionEquation::setMesh(const Mesh &M)
+void LinearElasticityModel::setMesh(const Mesh &M)
 {
 	if(_Ndim != M.getSpaceDimension() or _Ndim!=M.getMeshDimension())//for the moment we must have space dim=mesh dim
 	{
         cout<< "Problem : dimension defined is "<<_Ndim<< " but mesh dimension= "<<M.getMeshDimension()<<", and space dimension is "<<M.getSpaceDimension()<<endl;
 		*_runLogFile<< "Problem : dim = "<<_Ndim<< " but mesh dim= "<<M.getMeshDimension()<<", mesh space dim= "<<M.getSpaceDimension()<<endl;
-		*_runLogFile<<"StationaryDiffusionEquation::setMesh: mesh has incorrect dimension"<<endl;
+		*_runLogFile<<"LinearElasticityModel::setMesh: mesh has incorrect dimension"<<endl;
 		_runLogFile->close();
-		throw CdmathException("StationaryDiffusionEquation::setMesh: mesh has incorrect  dimension");
+		throw CdmathException("LinearElasticityModel::setMesh: mesh has incorrect  dimension");
 	}
 
 	_mesh=M;
@@ -693,7 +583,7 @@ void StationaryDiffusionEquation::setMesh(const Mesh &M)
 	// find  maximum nb of neibourghs
     if(!_FECalculation)
     {
-    	_VV=Field ("Temperature", CELLS, _mesh, 1);
+    	_VV=Field ("Displacements", CELLS, _mesh, _Ndim);
         _neibMaxNbCells=_mesh.getMaxNbNeighbours(CELLS);
     }
     else
@@ -709,9 +599,9 @@ void StationaryDiffusionEquation::setMesh(const Mesh &M)
 			else
 			{
 				cout<<"Error Finite element with Space dimension "<<_Ndim<< ", and mesh dimension  "<<_mesh.getMeshDimension()<< ", mesh should be either triangular either 1D network"<<endl;
-				*_runLogFile<<"StationaryDiffusionEquation::setMesh: mesh has incorrect dimension"<<endl;
+				*_runLogFile<<"LinearElasticityModel::setMesh: mesh has incorrect dimension"<<endl;
 				_runLogFile->close();
-				throw CdmathException("StationaryDiffusionEquation::setMesh: mesh has incorrect cell types");
+				throw CdmathException("LinearElasticityModel::setMesh: mesh has incorrect cell types");
 			}
         }
         else if(_Ndim==3)
@@ -725,13 +615,13 @@ void StationaryDiffusionEquation::setMesh(const Mesh &M)
 			else
 			{
 				cout<<"Error Finite element with Space dimension "<<_Ndim<< ", and mesh dimension  "<<_mesh.getMeshDimension()<< ", mesh should be either tetrahedral, either a triangularised surface or 1D network"<<endl;
-				*_runLogFile<<"StationaryDiffusionEquation::setMesh: mesh has incorrect dimension"<<endl;
+				*_runLogFile<<"LinearElasticityModel::setMesh: mesh has incorrect dimension"<<endl;
 				_runLogFile->close();
-				throw CdmathException("StationaryDiffusionEquation::setMesh: mesh has incorrect cell types");
+				throw CdmathException("LinearElasticityModel::setMesh: mesh has incorrect cell types");
 			}
         }
 
-		_VV=Field ("Temperature", NODES, _mesh, 1);
+		_VV=Field ("Temperature", NODES, _mesh, _Ndim);
 
         _neibMaxNbNodes=_mesh.getMaxNbNeighbours(NODES);
         _boundaryNodeIds = _mesh.getBoundaryNodeIds();
@@ -741,7 +631,7 @@ void StationaryDiffusionEquation::setMesh(const Mesh &M)
 	_meshSet=true;
 }
 
-void StationaryDiffusionEquation::setLinearSolver(linearSolver kspType, preconditioner pcType)
+void LinearElasticityModel::setLinearSolver(linearSolver kspType, preconditioner pcType)
 {
 	//_maxPetscIts=maxIterationsPetsc;
 	// set linear solver algorithm
@@ -776,7 +666,7 @@ void StationaryDiffusionEquation::setLinearSolver(linearSolver kspType, precondi
 	}
 }
 
-bool StationaryDiffusionEquation::solveStationaryProblem()
+bool LinearElasticityModel::solveStationaryProblem()
 {
 	if(!_initializedMemory)
 	{
@@ -785,7 +675,6 @@ bool StationaryDiffusionEquation::solveStationaryProblem()
 		throw CdmathException("ProblemCoreFlows::run() call initialize() first");
 	}
 	bool stop=false; // Does the Problem want to stop (error) ?
-	bool converged=false; // has the newton scheme converged (end) ?
 
 	cout<< "!!! Running test case "<< _fileName << " using ";
 	*_runLogFile<< "!!! Running test case "<< _fileName<< " using ";
@@ -801,20 +690,20 @@ bool StationaryDiffusionEquation::solveStationaryProblem()
 		*_runLogFile<< "Finite elements method"<< endl<<endl;
 	}
 
-    computeDiffusionMatrix( stop);//For the moment the conductivity does not depend on the temperature (linear LHS)
+    computeDiffusionMatrix( stop);
     if (stop){
         cout << "Error : failed computing diffusion matrix, stopping calculation"<< endl;
         *_runLogFile << "Error : failed computing diffusion matrix, stopping calculation"<< endl;
  		_runLogFile->close();
        throw CdmathException("Failed computing diffusion matrix");
     }
-    computeRHS(stop);//For the moment the heat power does not depend on the unknown temperature (linear RHS)
+    computeRHS(stop);
     if (stop){
         cout << "Error : failed computing right hand side, stopping calculation"<< endl;
         *_runLogFile << "Error : failed computing right hand side, stopping calculation"<< endl;
         throw CdmathException("Failed computing right hand side");
     }
-    stop = iterateNewtonStep(converged);
+    stop = !solveLinearSystem();
     if (stop){
         cout << "Error : failed solving linear system, stopping calculation"<< endl;
         *_runLogFile << "Error : failed linear system, stopping calculation"<< endl;
@@ -824,44 +713,18 @@ bool StationaryDiffusionEquation::solveStationaryProblem()
     
     _computationCompletedSuccessfully=true;
     save();
-
-	// Newton iteration loop for non linear problems
-    /*
-	while(!stop and !converged and _NEWTON_its<_maxNewtonIts)
-	{
-        computeDiffusionMatrix( stop);//case when the conductivity depends on the temperature (nonlinear LHS)
-        computeRHS(stop);//case the heat power depends on the unknown temperature (nonlinear RHS)
-        stop = iterateNewtonStep(converged);
-        _NEWTON_its++;
-	}
-    if (stop){
-        cout << "Error : failed solving Newton iteration "<<_NEWTON_its<<", stopping calculation"<< endl;
-        *_runLogFile << "Error : failed solving Newton iteration "<<_NEWTON_its<<", stopping calculation"<< endl;
-        throw CdmathException("Failed solving a Newton iteration");
-    }
-    else if(_NEWTON_its==_maxNewtonIts){
-        cout << "Error : no convergence of Newton scheme. Maximum Newton iterations "<<_maxNewtonIts<<" reached, stopping calculation"<< endl;
-        *_runLogFile << "Error : no convergence of Newton scheme. Maximum Newton iterations "<<_maxNewtonIts<<" reached, stopping calculation"<< endl;
-        throw CdmathException("No convergence of Newton scheme");
-    }
-    else{
-        cout << "Convergence of Newton scheme at iteration "<<_NEWTON_its<<", end of calculation"<< endl;
-        *_runLogFile << "Convergence of Newton scheme at iteration "<<_NEWTON_its<<", end of calculation"<< endl;
-        save();
-    }
-    */
     
-    *_runLogFile<< "!!!!!! Computation successful !!!!!!"<< endl;
+    *_runLogFile<< "!!!!!! Computation successful"<< endl;
 	_runLogFile->close();
 
 	return !stop;
 }
 
-void StationaryDiffusionEquation::save(){
+void LinearElasticityModel::save(){
     cout<< "Saving numerical results"<<endl<<endl;
     *_runLogFile<< "Saving numerical results"<< endl<<endl;
 
-	string resultFile(_path+"/StationaryDiffusionEquation");//Results
+	string resultFile(_path+"/LinearElasticityModel");//Results
 
 	resultFile+="_";
 	resultFile+=_fileName;
@@ -871,23 +734,31 @@ void StationaryDiffusionEquation::save(){
     system(suppress.c_str());//Nettoyage des précédents calculs identiques
     
     if(_verbose or _system)
-        VecView(_Tk,PETSC_VIEWER_STDOUT_SELF);
+        VecView(_displacements,PETSC_VIEWER_STDOUT_SELF);
 
-    double Ti; 
+    double uk; 
     if(!_FECalculation)
         for(int i=0; i<_Nmailles; i++)
             {
-                VecGetValues(_Tk, 1, &i, &Ti);
-                _VV(i)=Ti;
+				for(int j=0; j<_nVar; j++)
+				{
+					int k=i*_nVar+j;
+					VecGetValues(_displacements, 1, &k, &uk);
+					_VV(i,j)=uk;
+				}
             }
     else
     {
         int globalIndex;
         for(int i=0; i<_NunknownNodes; i++)
         {
-            VecGetValues(_Tk, 1, &i, &Ti);
-            globalIndex = globalNodeIndex(i, _dirichletNodeIds);
-            _VV(globalIndex)=Ti;
+			globalIndex = globalNodeIndex(i, _dirichletNodeIds);
+			for(int j=0; j<_nVar; j++)
+			{
+				int k=i*_nVar+j;
+				VecGetValues(_displacements, 1, &k, &uk);
+				_VV(globalIndex,j)=uk;
+			}
         }
 
         Node Ni;
@@ -896,11 +767,11 @@ void StationaryDiffusionEquation::save(){
         {
             Ni=_mesh.getNode(_dirichletNodeIds[i]);
             nameOfGroup = Ni.getGroupName();
-            _VV(_dirichletNodeIds[i])=_limitField[nameOfGroup].T;
+			for(int j=0; j<_nVar; j++)
+				_VV(_dirichletNodeIds[i])=_limitField[nameOfGroup].displacement[i];
         }
     }
 
-    _VV.setInfoOnComponent(0,"Temperature_(K)");
     switch(_saveFormat)
     {
         case VTK :
@@ -915,89 +786,30 @@ void StationaryDiffusionEquation::save(){
     }
 }
 Field 
-StationaryDiffusionEquation::getOutputTemperatureField()
+LinearElasticityModel::getOutputDisplacementField()
 {
     if(!_computationCompletedSuccessfully)
-        throw("Computation not performed yet or failed. No temperature field available");
+        throw("Computation not performed yet or failed. No displacement field available");
     else
         return _VV;
 }
 
-void StationaryDiffusionEquation::terminate()
+void LinearElasticityModel::terminate()
 {
-	VecDestroy(&_Tk);
-	VecDestroy(&_Tkm1);
-	VecDestroy(&_deltaT);
+	VecDestroy(&_displacements);
 	VecDestroy(&_b);
 	MatDestroy(&_A);
 }
 void 
-StationaryDiffusionEquation::setDirichletValues(map< int, double> dirichletBoundaryValues)
+LinearElasticityModel::setDirichletValues(map< int, double> dirichletBoundaryValues)
 {
     _dirichletValuesSet=true;
     _dirichletBoundaryValues=dirichletBoundaryValues;
 }
 
-void 
-StationaryDiffusionEquation::setNeumannValues(map< int, double> neumannBoundaryValues)
-{
-    _neumannValuesSet=true;
-    _neumannBoundaryValues=neumannBoundaryValues;
-}
-
 double 
-StationaryDiffusionEquation::getConditionNumber(bool isSingular, double tol) const
+LinearElasticityModel::getConditionNumber(bool isSingular, double tol) const
 {
   SparseMatrixPetsc A = SparseMatrixPetsc(_A);
   return A.getConditionNumber( isSingular, tol);
-}
-std::vector< double > 
-StationaryDiffusionEquation::getEigenvalues(int nev, EPSWhich which, double tol) const
-{
-  SparseMatrixPetsc A = SparseMatrixPetsc(_A);
-  
-  if(_FECalculation)//We need to scale the FE matrix, otherwise the eigenvalues go to zero as the mesh is refined
-  {
-      Vector nodal_volumes(_NunknownNodes);
-      int j_int;
-      for(int i = 0; i< _Nmailles ; i++)//On parcourt les cellules du maillage
-      {
-        Cell Ci = _mesh.getCell(i);
-        for(int j = 0 ; j<_Ndim+1 ; j++)//On parcourt les noeuds de la cellule
-        {
-            if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),Ci.getNodeId(j))==_dirichletNodeIds.end())//node j is an unknown node (not a Dirichlet node)
-			{
-                j_int=unknownNodeIndex(Ci.getNodeId(j), _dirichletNodeIds);//indice du noeud j en tant que noeud inconnu
-                nodal_volumes[j_int]+=Ci.getMeasure()/(_Ndim+1);
-            }
-        }
-       }
-      for( j_int = 0; j_int< _NunknownNodes ; j_int++)
-        nodal_volumes[j_int]=1/nodal_volumes[j_int];
-      A.leftDiagonalScale(nodal_volumes);
-  }
-
-  return A.getEigenvalues( nev, which, tol);
-}
-std::vector< Vector > 
-StationaryDiffusionEquation::getEigenvectors(int nev, EPSWhich which, double tol) const
-{
-  SparseMatrixPetsc A = SparseMatrixPetsc(_A);
-  return A.getEigenvectors( nev, which, tol);
-}
-Field 
-StationaryDiffusionEquation::getEigenvectorsField(int nev, EPSWhich which, double tol) const
-{
-  SparseMatrixPetsc A = SparseMatrixPetsc(_A);
-  MEDCoupling::DataArrayDouble * d = A.getEigenvectorsDataArrayDouble( nev, which, tol);
-  Field my_eigenfield;
-  
-  if(_FECalculation)
-    my_eigenfield = Field("Eigenvectors field", NODES, _mesh, nev);
-  else
-    my_eigenfield = Field("Eigenvectors field", CELLS, _mesh, nev);
-
-  my_eigenfield.setFieldByDataArrayDouble(d);
-  
-  return my_eigenfield;
 }

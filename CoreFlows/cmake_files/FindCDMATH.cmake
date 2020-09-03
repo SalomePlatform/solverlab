@@ -54,6 +54,14 @@ set(CDMATH_INCLUDES ${CDMATH_DIR}/include)
 if (NOT (IS_DIRECTORY  ${CDMATH_INCLUDES}) )
   message (SEND_ERROR "CDMATH_INCLUDES can not be used, ${CDMATH_INCLUDES} does not exist.")
 endif () 
+set(MED_INCLUDES $ENV{MEDFILE_INCLUDE_DIRS})
+if (NOT (IS_DIRECTORY  ${MED_INCLUDES}) )
+  message (SEND_ERROR "MED_INCLUDES can not be used, ${MED_INCLUDES} does not exist.")
+endif () 
+set(MEDCOUPLING_INCLUDES $ENV{MEDCOUPLING_INCLUDE_DIR})
+if (NOT (IS_DIRECTORY  ${MEDCOUPLING_INCLUDES}) )
+  message (SEND_ERROR "MEDCOUPLING_INCLUDES can not be used, ${MEDCOUPLING_INCLUDES} does not exist.")
+endif () 
 
 # CDMATH libraries against which to link
 # This sets the variable ${CDMATH_LIBRARIES}.
@@ -61,19 +69,17 @@ set(CDMATH_LIBDIR ${CDMATH_DIR}/lib)
 if ( NOT (IS_DIRECTORY  ${CDMATH_LIBDIR}) )
   message (SEND_ERROR "CDMATH_LIBDIR can not be used, ${CDMATH_LIBDIR} does not exist.")
 endif () 
-find_library (INTERPKERNEL_LIB NAMES interpkernel PATHS ${CDMATH_LIBDIR}/medcoupling)
-find_library (MEDC_LIB NAMES medC PATHS ${CDMATH_LIBDIR})
-find_library (MEDLOADER_LIB NAMES medloader PATHS ${CDMATH_LIBDIR}/medcoupling)
-find_library (MEDCOUPLING_LIB NAMES medcoupling PATHS ${CDMATH_LIBDIR}/medcoupling)
 find_library (CDMATHBASE_LIB NAMES base PATHS ${CDMATH_LIBDIR})
 find_library (CDMATHMESH_LIB NAMES mesh PATHS ${CDMATH_LIBDIR})
-#find_library (CDMATHLINEARSOLVER_LIB NAMES linearsolver PATHS ${CDMATH_LIBDIR})
+find_library (MEDC_LIB NAMES medC PATHS $ENV{MEDFILE_LIBRARIES})
+find_library (MEDLOADER_LIB NAMES medloader PATHS $ENV{MEDCOUPLING_LIBRARIES})
+find_library (MEDCOUPLING_LIB NAMES medcoupling PATHS $ENV{MEDCOUPLING_LIBRARIES})
+find_library (CDMATHLINEARSOLVER_LIB NAMES linearsolver PATHS ${CDMATH_LIBDIR})
 set (CDMATH_LIBRARIES
-	${INTERPKERNEL_LIB} 
 	${MEDC_LIB} 
 	${MEDLOADER_LIB} 
 	${MEDCOUPLING_LIB}
 	${CDMATHBASE_LIB} 
 	${CDMATHMESH_LIB} 
-#	${CDMATHLINEARSOLVER_LIB}
+	${CDMATHLINEARSOLVER_LIB}
 	)

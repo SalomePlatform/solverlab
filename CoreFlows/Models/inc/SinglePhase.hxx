@@ -27,6 +27,15 @@ public :
 	 * \param [in] bool : There are two possible equations of state for the fluid
 	 *  */
 	SinglePhase(phaseType fluid, pressureEstimate pEstimate,int dim,bool useDellacherieEOS=false);
+
+	/** \fn setViscosity
+	 * \brief sets the viscosity
+	 * @param viscosite : value of the dynamic viscosity
+	 * 	 * */
+	void setViscosityConstant( double viscosite ){
+		_fluides[0]->setViscosity(viscosite);
+	};
+
 	//! system initialisation
 	void initialize();
 
@@ -125,9 +134,20 @@ public :
 
 	double getReferencePressure()    { return _Pref; };
 	double getReferenceTemperature() { return _Tref; };
+	
+	//get output fields for postprocessing or coupling
+	vector<string> getOutputFieldsNames() ;//liste tous les champs que peut fournir le code pour le postraitement
+	Field&         getOutputField(const string& nameField );//Renvoie un champs pour le postraitement
+	Field& getPressureField();
+	Field& getVelocityField();
+	Field& getVelocityXField();
+	Field& getTemperatureField();
+	Field& getDensityField();
+	Field& getMomentumField();
+	Field& getTotalEnergyField();
+	Field& getEnthalpyField();
 
 protected :
-	Field _Vitesse;
 	double  _drho_sur_dp,   _drho_sur_dT;//derivatives of the density rho wrt cv, p, T
 	double  _drhoE_sur_dp,  _drhoE_sur_dT;//derivatives of the total energy rho E wrt cv, p, T
 	bool _useDellacherieEOS;
@@ -188,5 +208,8 @@ protected :
 	*/
 	void getDensityDerivatives( double pressure, double temperature, double v2);
 
-};
+	bool _saveAllFields;
+	Field _Enthalpy, _Pressure, _Density, _Temperature, _Momentum, _TotalEnergy, _Vitesse, _VitesseX, _VitesseY, _VitesseZ;
+
+	};
 #endif /* SINGLEPHASE_HXX_*/

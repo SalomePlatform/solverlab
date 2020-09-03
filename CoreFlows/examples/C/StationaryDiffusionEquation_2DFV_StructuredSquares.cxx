@@ -1,4 +1,5 @@
 #include "StationaryDiffusionEquation.hxx"
+#include "Node.hxx"
 #include "math.h"
 #include <assert.h>
 
@@ -9,19 +10,23 @@ int main(int argc, char** argv)
 {
 	int spaceDim = 2;
 
-    /* Square mesh and groups loading */
-    string filename="resources/squareWithTriangles.med";
-	cout << "Loading mesh and groups from file" << filename<<endl;
-	Mesh M(filename);//unstructured triangular mesh
+	/* Mesh data */
+	double xinf=0.0;
+	double xsup=1.0;
+	double yinf=0.0;
+	double ysup=1.0;
+	int nx=30;
+	int ny=30;
+
+    /* Mesh construction */
+	Mesh M(xinf,xsup,nx,yinf,ysup,ny); //Regular square mesh
 
 	/* set the limit field for each boundary */
 	double eps=1e-6;
-	M.setGroupAtPlan(0,0,eps,"Bord1");
-	M.setGroupAtPlan(1,0,eps,"Bord2");
-	M.setGroupAtPlan(0,1,eps,"Bord3");
-	M.setGroupAtPlan(1,1,eps,"Bord4");
-
-	cout<< "Loaded unstructured 2D mesh with "<< M.getNumberOfCells()<<" cells and " <<M.getNumberOfNodes()<< " nodes"<<endl;
+	M.setGroupAtPlan(xsup,0,eps,"Bord1");
+	M.setGroupAtPlan(xinf,0,eps,"Bord2");
+	M.setGroupAtPlan(ysup,1,eps,"Bord3");
+	M.setGroupAtPlan(yinf,1,eps,"Bord4");
 
     /* set the boundary values for each boundary */
 	double T1=0;
@@ -29,8 +34,10 @@ int main(int argc, char** argv)
 	double T3=0;
 	double T4=0;
 
+	cout<< "Built a regular square 2D mesh with "<< nx<<"x" <<ny<< " cells"<<endl;
+
     /* Create the problem */
-    bool FEComputation=true;
+    bool FEComputation=false;
 	StationaryDiffusionEquation myProblem(spaceDim,FEComputation);
 	myProblem.setMesh(M);
 
@@ -41,14 +48,14 @@ int main(int argc, char** argv)
 	myProblem.setDirichletBoundaryCondition("Bord4",T4);
 
 	/* Set the right hand side function*/
-	Field my_RHSfield("RHS_field", NODES, M, 1);
-    Node Ni; 
+	Field my_RHSfield("RHS_field", CELLS, M, 1);
+    Cell Ci; 
     double x, y;
-	for(int i=0; i< M.getNumberOfNodes(); i++)
+	for(int i=0; i< M.getNumberOfCells(); i++)
     {
-		Ni= M.getNode(i);
-		x = Ni.x();
-		y = Ni.y();
+		Ci= M.getCell(i);
+		x = Ci.x();
+		y = Ci.y();
 
 		my_RHSfield[i]=2*pi*pi*sin(pi*x)*sin(pi*y);//mettre la fonction definie au second membre de l'edp
 	}
@@ -56,7 +63,7 @@ int main(int argc, char** argv)
 	myProblem.setLinearSolver(GMRES,ILU);
 
     /* name the result file */
-	string fileName = "StationnaryDiffusion_2DEF_UnstructuredTriangles";
+	string fileName = "StationnaryDiffusion_2DFV_StructuredSquares";
 	myProblem.setFileName(fileName);
 
 	/* Run the computation */
@@ -73,7 +80,7 @@ int main(int argc, char** argv)
 		double max_sol_num=my_ResultField.max();
 		double min_sol_num=my_ResultField.min();
 		double erreur_abs=0;
-		for(int i=0; i< M.getNumberOfNodes() ; i++)
+		for(int i=0; i< M.getNumberOfCells() ; i++)
 			if( erreur_abs < abs(my_RHSfield[i]/(2*pi*pi) - my_ResultField[i]) )
 				erreur_abs = abs(my_RHSfield[i]/(2*pi*pi) - my_ResultField[i]);
 		

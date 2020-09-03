@@ -6,6 +6,7 @@
  * \date June 2019
  * \brief Stationary heat diffusion equation solved with either finite elements or finite volume method. 
  * -\lambda\Delta T=\Phi + \lambda_{sf} (T_{fluid}-T)
+ * Dirichlet (imposed temperature) or Neumann (imposed normal flux) boundary conditions
  * */
 //============================================================================
 
@@ -18,9 +19,29 @@
 #define StationaryDiffusionEquation_HXX_
 
 #include "ProblemCoreFlows.hxx"
-#include "Node.hxx"
+
+/* for the laplacian spectrum */
+#include <slepceps.h>
+#include <slepcsvd.h>
 
 using namespace std;
+
+//! enumeration BoundaryType
+/*! Boundary condition type  */
+enum BoundaryTypeStationaryDiffusion	{ NeumannStationaryDiffusion, DirichletStationaryDiffusion, NoneBCStationaryDiffusion};
+
+/** \struct LimitField
+ * \brief value of some fields on the boundary  */
+struct LimitFieldStationaryDiffusion{
+	LimitFieldStationaryDiffusion(){bcType=NoneBCStationaryDiffusion; T=0; normalFlux=0;}
+	LimitFieldStationaryDiffusion(BoundaryTypeStationaryDiffusion _bcType, double _T,	double _normalFlux){
+		bcType=_bcType; T=_T; normalFlux=_normalFlux;
+	}
+
+	BoundaryTypeStationaryDiffusion bcType;
+	double T; //for Dirichlet
+	double normalFlux; //for Neumann
+};
 
 class StationaryDiffusionEquation
 {
@@ -29,21 +50,25 @@ public :
 	/** \fn StationaryDiffusionEquation
 			 * \brief Constructor for the temperature diffusion in a solid
 			 * \param [in] int : space dimension
-			 * \param [in] double : solid density
-			 * \param [in] double : solid specific heat at constant pressure
 			 * \param [in] double : solid conductivity
 			 *  */
 
 	StationaryDiffusionEquation( int dim,bool FECalculation=true,double lambda=1);
 
     void setMesh(const Mesh &M);
-    void setLinearSolver(linearSolver kspType, preconditioner pcType);
     void setFileName(string fileName){
 	_fileName = fileName;
     }
     bool solveStationaryProblem();
     Field getOutputTemperatureField();
     
+    //Linear system and spectrum
+    void setLinearSolver(linearSolver kspType, preconditioner pcType);
+    double getConditionNumber(bool isSingular=false, double tol=1e-6) const;
+    std::vector< double > getEigenvalues (int nev, EPSWhich which=EPS_SMALLEST_MAGNITUDE, double tol=1e-6) const;
+    std::vector< Vector > getEigenvectors(int nev, EPSWhich which=EPS_SMALLEST_MAGNITUDE, double tol=1e-6) const;
+    Field getEigenvectorsField(int nev, EPSWhich which=EPS_SMALLEST_MAGNITUDE, double tol=1e-6) const;
+
 	//Gestion du calcul
 	void initialize();
 	void terminate();//vide la mémoire et enregistre le résultat final
@@ -53,7 +78,7 @@ public :
 	void save();
 
     /* Boundary conditions */
-	void setBoundaryFields(map<string, LimitField> boundaryFields){
+	void setBoundaryFields(map<string, LimitFieldStationaryDiffusion> boundaryFields){
 		_limitField = boundaryFields;
     };
 	/** \fn setDirichletBoundaryCondition
@@ -64,8 +89,7 @@ public :
 			 * \param [out] void
 			 *  */
 	void setDirichletBoundaryCondition(string groupName,double Temperature){
-		_limitField[groupName]=LimitField(Dirichlet,-1, vector<double>(_Ndim,0),vector<double>(_Ndim,0),
-                                                        vector<double>(_Ndim,0),Temperature,-1,-1,-1);
+		_limitField[groupName]=LimitFieldStationaryDiffusion(DirichletStationaryDiffusion,Temperature,-1);
 	};
 
 	/** \fn setNeumannBoundaryCondition
@@ -74,12 +98,12 @@ public :
 			 * \param [in] string : the name of the boundary
 			 * \param [out] void
 			 *  */
-	void setNeumannBoundaryCondition(string groupName){
-		_limitField[groupName]=LimitField(Neumann,-1, vector<double>(0),vector<double>(0),
-                                                      vector<double>(0),-1,-1,-1,-1);
+	void setNeumannBoundaryCondition(string groupName, double normalFlux=0){
+		_limitField[groupName]=LimitFieldStationaryDiffusion(NeumannStationaryDiffusion,-1, normalFlux);
 	};
 
 	void setDirichletValues(map< int, double> dirichletBoundaryValues);
+	void setNeumannValues  (map< int, double>   neumannBoundaryValues);
 	
 	void setConductivity(double conductivite){
 		_conductivity=conductivite;
@@ -158,7 +182,7 @@ protected :
 	double _MaxIterLinearSolver;//nombre maximum d'iteration gmres obtenu au cours par les resolution de systemes lineaires au cours d'un pas de tmeps
 	bool _conditionNumber;//computes an estimate of the condition number
 
-	map<string, LimitField> _limitField;
+	map<string, LimitFieldStationaryDiffusion> _limitField;
     bool _onlyNeumannBC;//if true then the linear system is singular and should be solved up to a constant vector
     
 	bool _diffusionMatrixSet;
@@ -198,12 +222,14 @@ protected :
     Vector gradientNodal(Matrix M, vector< double > v);//gradient of nodal shape functions
 	double computeDiffusionMatrixFE(bool & stop);
     int fact(int n);
-    int unknownNodeIndex(int globalIndex, std::vector< int > dirichletNodes);
-    int globalNodeIndex(int unknownIndex, std::vector< int > dirichletNodes);
+    int unknownNodeIndex(int globalIndex, std::vector< int > dirichletNodes) const;
+    int globalNodeIndex(int unknownIndex, std::vector< int > dirichletNodes) const;
 
-    /********* Possibility to set a boundary field as Dirichlet boundary condition *********/
+    /********* Possibility to set a boundary field as DirichletNeumann boundary condition *********/
     bool _dirichletValuesSet;
+    bool _neumannValuesSet;
     std::map< int, double> _dirichletBoundaryValues;
+    std::map< int, double> _neumannBoundaryValues;
 };
 
 #endif /* StationaryDiffusionEquation_HXX_ */

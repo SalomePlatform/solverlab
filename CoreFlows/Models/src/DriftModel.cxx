@@ -116,7 +116,7 @@ void DriftModel::initialize(){
 bool DriftModel::iterateTimeStep(bool &converged)
 {
 	if(_timeScheme == Explicit || !_usePrimitiveVarsInNewton)
-		ProblemFluid::iterateTimeStep(converged);
+		return ProblemFluid::iterateTimeStep(converged);
 	else
 	{
 		bool stop=false;
@@ -3505,7 +3505,9 @@ void DriftModel::save(){
 	}
 	_VV.setTime(_time,_nbTimeStep);
 	// create mesh and component info
-	if (_nbTimeStep ==0){
+	if (_nbTimeStep ==0 || _restartWithNewFileName){
+		if (_restartWithNewFileName)
+			_restartWithNewFileName=false;
 		string suppress_previous_runs ="rm -rf *"+_fileName+"_*";
 		system(suppress_previous_runs.c_str());//Nettoyage des précédents calculs identiques
 
@@ -3596,7 +3598,7 @@ void DriftModel::save(){
 				_Vitesse(i,j)=0;
 		}
 		_Vitesse.setTime(_time,_nbTimeStep);
-		if (_nbTimeStep ==0){
+		if (_nbTimeStep ==0 || _restartWithNewFileName){		
 			_Vitesse.setInfoOnComponent(0,"Velocity_x_(m/s)");
 			_Vitesse.setInfoOnComponent(1,"Velocity_y_(m/s)");
 			_Vitesse.setInfoOnComponent(2,"Velocity_z_(m/s)");
@@ -3696,7 +3698,7 @@ void DriftModel::save(){
 			if(_Ndim>2)
 				_VitesseZ.setTime(_time,_nbTimeStep);
 		}
-		if (_nbTimeStep ==0){
+		if (_nbTimeStep ==0 || _restartWithNewFileName){		
 			switch(_saveFormat)
 			{
 			case VTK :
@@ -3934,6 +3936,9 @@ void DriftModel::save(){
 			}
 		}
 	}
+
+	if (_restartWithNewFileName)
+		_restartWithNewFileName=false;
 }
 
 void DriftModel::testConservation()

@@ -16,6 +16,7 @@ SinglePhase::SinglePhase(phaseType fluid, pressureEstimate pEstimate, int dim, b
 	_dragCoeffs=vector<double>(1,0);
 	_fluides.resize(1);
 	_useDellacherieEOS=useDellacherieEOS;
+	_saveAllFields=false;
 
 	if(pEstimate==around1bar300K){//EOS at 1 bar and 300K
 		_Tref=300;
@@ -59,8 +60,23 @@ void SinglePhase::initialize(){
 		_gravite[i+1]=_GravityField3d[i];
 
 	_GravityImplicitationMatrix = new PetscScalar[_nVar*_nVar];
-	if(_saveVelocity)
+	if(_saveVelocity || _saveAllFields)
 		_Vitesse=Field("Velocity",CELLS,_mesh,3);//Forcement en dimension 3 pour le posttraitement des lignes de courant
+
+	if(_saveAllFields)
+	{
+		_Enthalpy=Field("Enthalpy",CELLS,_mesh,1);
+		_Pressure=Field("Pressure",CELLS,_mesh,1);
+		_Density=Field("Density",CELLS,_mesh,1);
+		_Temperature=Field("Temperature",CELLS,_mesh,1);
+		_VitesseX=Field("Velocity x",CELLS,_mesh,1);
+		if(_Ndim>1)
+		{
+			_VitesseY=Field("Velocity y",CELLS,_mesh,1);
+			if(_Ndim>2)
+				_VitesseZ=Field("Velocity z",CELLS,_mesh,1);
+		}
+	}
 
 	if(_entropicCorrection)
 		_entropicShift=vector<double>(3,0);//at most 3 distinct eigenvalues
@@ -71,7 +87,7 @@ void SinglePhase::initialize(){
 bool SinglePhase::iterateTimeStep(bool &converged)
 {
 	if(_timeScheme == Explicit || !_usePrimitiveVarsInNewton)
-		ProblemFluid::iterateTimeStep(converged);
+		return ProblemFluid::iterateTimeStep(converged);
 	else
 	{
 		bool stop=false;
@@ -2708,8 +2724,10 @@ void SinglePhase::getDensityDerivatives( double pressure, double temperature, do
 void SinglePhase::save(){
 	string prim(_path+"/SinglePhasePrim_");///Results
 	string cons(_path+"/SinglePhaseCons_");
+	string allFields(_path+"/");
 	prim+=_fileName;
 	cons+=_fileName;
+	allFields+=_fileName;
 
 	PetscInt Ii;
 	for (long i = 0; i < _Nmailles; i++){
@@ -2732,7 +2750,7 @@ void SinglePhase::save(){
 	_VV.setTime(_time,_nbTimeStep);
 
 	// create mesh and component info
-	if (_nbTimeStep ==0){
+	if (_nbTimeStep ==0 || _restartWithNewFileName){		
 		string prim_suppress ="rm -rf "+prim+"_*";
 		string cons_suppress ="rm -rf "+cons+"_*";
 
@@ -2782,6 +2800,7 @@ void SinglePhase::save(){
 			_VV.writeCSV(prim);
 			break;
 		}
+
 	}
 	// do not create mesh
 	else{
@@ -2812,7 +2831,7 @@ void SinglePhase::save(){
 			}
 		}
 	}
-	if(_saveVelocity){
+	if(_saveVelocity || _saveAllFields){
 		for (long i = 0; i < _Nmailles; i++){
 			// j = 0 : pressure; j = _nVar - 1: temperature; j = 1,..,_nVar-2: velocity
 			for (int j = 0; j < _Ndim; j++)//On récupère les composantes de vitesse
@@ -2824,7 +2843,7 @@ void SinglePhase::save(){
 				_Vitesse(i,j)=0;
 		}
 		_Vitesse.setTime(_time,_nbTimeStep);
-		if (_nbTimeStep ==0){
+		if (_nbTimeStep ==0 || _restartWithNewFileName){		
 			_Vitesse.setInfoOnComponent(0,"Velocity_x_(m/s)");
 			_Vitesse.setInfoOnComponent(1,"Velocity_y_(m/s)");
 			_Vitesse.setInfoOnComponent(2,"Velocity_z_(m/s)");
@@ -2857,6 +2876,145 @@ void SinglePhase::save(){
 			}
 		}
 	}
+
+	if(_saveAllFields)
+	{
+		double p,T,rho, h, vx,vy,vz;
+		int Ii;
+		for (long i = 0; i < _Nmailles; i++){
+			Ii = i*_nVar;
+			VecGetValues(_conservativeVars,1,&Ii,&rho);
+			Ii = i*_nVar;
+			VecGetValues(_primitiveVars,1,&Ii,&p);
+			Ii = i*_nVar +_nVar-1;
+			VecGetValues(_primitiveVars,1,&Ii,&T);
+			Ii = i*_nVar + 1;
+			VecGetValues(_primitiveVars,1,&Ii,&vx);
+			if(_Ndim>1)
+			{
+				Ii = i*_nVar + 2;
+				VecGetValues(_primitiveVars,1,&Ii,&vy);
+				if(_Ndim>2){
+					Ii = i*_nVar + 3;
+					VecGetValues(_primitiveVars,1,&Ii,&vz);
+				}
+			}
+
+			h   = _fluides[0]->getEnthalpy(T,rho);
+
+			_Enthalpy(i)=h;
+			_Density(i)=rho;
+			_Pressure(i)=p;
+			_Temperature(i)=T;
+			_VitesseX(i)=vx;
+			if(_Ndim>1)
+			{
+				_VitesseY(i)=vy;
+				if(_Ndim>2)
+					_VitesseZ(i)=vz;
+			}
+		}
+		_Enthalpy.setTime(_time,_nbTimeStep);
+		_Density.setTime(_time,_nbTimeStep);
+		_Pressure.setTime(_time,_nbTimeStep);
+		_Temperature.setTime(_time,_nbTimeStep);
+		_VitesseX.setTime(_time,_nbTimeStep);
+		if(_Ndim>1)
+		{
+			_VitesseY.setTime(_time,_nbTimeStep);
+			if(_Ndim>2)
+				_VitesseZ.setTime(_time,_nbTimeStep);
+		}
+		if (_nbTimeStep ==0 || _restartWithNewFileName){		
+			switch(_saveFormat)
+			{
+			case VTK :
+				_Enthalpy.writeVTK(allFields+"_Enthalpy");
+				_Density.writeVTK(allFields+"_Density");
+				_Pressure.writeVTK(allFields+"_Pressure");
+				_Temperature.writeVTK(allFields+"_Temperature");
+				_VitesseX.writeVTK(allFields+"_VelocityX");
+				if(_Ndim>1)
+				{
+					_VitesseY.writeVTK(allFields+"_VelocityY");
+					if(_Ndim>2)
+						_VitesseZ.writeVTK(allFields+"_VelocityZ");
+				}
+				break;
+			case MED :
+				_Enthalpy.writeMED(allFields+"_Enthalpy");
+				_Density.writeMED(allFields+"_Density");
+				_Pressure.writeMED(allFields+"_Pressure");
+				_Temperature.writeMED(allFields+"_Temperature");
+				_VitesseX.writeMED(allFields+"_VelocityX");
+				if(_Ndim>1)
+				{
+					_VitesseY.writeMED(allFields+"_VelocityY");
+					if(_Ndim>2)
+						_VitesseZ.writeMED(allFields+"_VelocityZ");
+				}
+				break;
+			case CSV :
+				_Enthalpy.writeCSV(allFields+"_Enthalpy");
+				_Density.writeCSV(allFields+"_Density");
+				_Pressure.writeCSV(allFields+"_Pressure");
+				_Temperature.writeCSV(allFields+"_Temperature");
+				_VitesseX.writeCSV(allFields+"_VelocityX");
+				if(_Ndim>1)
+				{
+					_VitesseY.writeCSV(allFields+"_VelocityY");
+					if(_Ndim>2)
+						_VitesseZ.writeCSV(allFields+"_VelocityZ");
+				}
+				break;
+			}
+		}
+		else{
+			switch(_saveFormat)
+			{
+			case VTK :
+				_Enthalpy.writeVTK(allFields+"_Enthalpy",false);
+				_Density.writeVTK(allFields+"_Density",false);
+				_Pressure.writeVTK(allFields+"_Pressure",false);
+				_Temperature.writeVTK(allFields+"_Temperature",false);
+				_VitesseX.writeVTK(allFields+"_VelocityX",false);
+				if(_Ndim>1)
+				{
+					_VitesseY.writeVTK(allFields+"_VelocityY",false);
+					if(_Ndim>2)
+						_VitesseZ.writeVTK(allFields+"_VelocityZ",false);
+				}
+				break;
+			case MED :
+				_Enthalpy.writeMED(allFields+"_Enthalpy",false);
+				_Density.writeMED(allFields+"_Density",false);
+				_Pressure.writeMED(allFields+"_Pressure",false);
+				_Temperature.writeMED(allFields+"_Temperature",false);
+				_VitesseX.writeMED(allFields+"_VelocityX",false);
+				if(_Ndim>1)
+				{
+					_VitesseY.writeMED(allFields+"_VelocityY",false);
+					if(_Ndim>2)
+						_VitesseZ.writeMED(allFields+"_VelocityZ",false);
+				}
+				break;
+			case CSV :
+				_Enthalpy.writeCSV(allFields+"_Enthalpy");
+				_Density.writeCSV(allFields+"_Density");
+				_Pressure.writeCSV(allFields+"_Pressure");
+				_Temperature.writeCSV(allFields+"_Temperature");
+				_VitesseX.writeCSV(allFields+"_VelocityX");
+				if(_Ndim>1)
+				{
+					_VitesseY.writeCSV(allFields+"_VelocityY");
+					if(_Ndim>2)
+						_VitesseZ.writeCSV(allFields+"_VelocityZ");
+				}
+				break;
+			}
+		}
+	}
+
 	if(_isStationary)
 	{
 		prim+="_Stat";
@@ -2890,7 +3048,7 @@ void SinglePhase::save(){
 			}
 		}
 
-		if(_saveVelocity){
+		if(_saveVelocity || _saveAllFields){
 			switch(_saveFormat)
 			{
 			case VTK :
@@ -2905,4 +3063,186 @@ void SinglePhase::save(){
 			}
 		}
 	}
+
+	if (_restartWithNewFileName)
+		_restartWithNewFileName=false;
+}
+
+Field& SinglePhase::getPressureField()
+{
+	if(!_saveAllFields)
+	{
+		_Pressure=Field("Pressure",CELLS,_mesh,1);
+		int Ii;
+		for (long i = 0; i < _Nmailles; i++){
+			Ii = i*_nVar;
+			VecGetValues(_primitiveVars,1,&Ii,&_Pressure(i));
+		}
+		_Pressure.setTime(_time,_nbTimeStep);
+	}
+	return _Pressure;
+}
+
+Field& SinglePhase::getTemperatureField()
+{
+	if(!_saveAllFields)
+	{
+		_Temperature=Field("Temperature",CELLS,_mesh,1);
+		int Ii;
+		for (long i = 0; i < _Nmailles; i++){
+			Ii = i*_nVar +_nVar-1;
+			VecGetValues(_primitiveVars,1,&Ii,&_Temperature(i));
+		}
+		_Temperature.setTime(_time,_nbTimeStep);
+	}
+	return _Temperature;
+}
+
+Field& SinglePhase::getVelocityField()
+{
+	if(!_saveAllFields )
+	{
+		_Vitesse=Field("Vitesse",CELLS,_mesh,3);
+		int Ii;
+		for (long i = 0; i < _Nmailles; i++)
+		{
+			for (int j = 0; j < _Ndim; j++)//On récupère les composantes de vitesse
+			{
+				int Ii = i*_nVar +1+j;
+				VecGetValues(_primitiveVars,1,&Ii,&_Vitesse(i,j));
+			}
+			for (int j = _Ndim; j < 3; j++)//On met à zero les composantes de vitesse si la dimension est <3
+				_Vitesse(i,j)=0;
+		}
+		_Vitesse.setTime(_time,_nbTimeStep);
+		_Vitesse.setInfoOnComponent(0,"Velocity_x_(m/s)");
+		_Vitesse.setInfoOnComponent(1,"Velocity_y_(m/s)");
+		_Vitesse.setInfoOnComponent(2,"Velocity_z_(m/s)");
+	}
+	
+	return _Vitesse;
+}
+
+Field& SinglePhase::getVelocityXField()
+{
+	if(!_saveAllFields )
+	{
+		_VitesseX=Field("Velocity X",CELLS,_mesh,1);
+		int Ii;
+		for (long i = 0; i < _Nmailles; i++)
+		{
+			int Ii = i*_nVar +1;
+			VecGetValues(_primitiveVars,1,&Ii,&_VitesseX(i));
+		}
+		_VitesseX.setTime(_time,_nbTimeStep);
+		_VitesseX.setInfoOnComponent(0,"Velocity_x_(m/s)");
+	}
+	
+	return _VitesseX;
+}
+
+Field& SinglePhase::getDensityField()
+{
+	if(!_saveAllFields )
+	{
+		_Density=Field("Density",CELLS,_mesh,1);
+		int Ii;
+		for (long i = 0; i < _Nmailles; i++){
+			Ii = i*_nVar;
+			VecGetValues(_conservativeVars,1,&Ii,&_Density(i));
+		}
+		_Density.setTime(_time,_nbTimeStep);
+	}
+	return _Density;
+}
+
+Field& SinglePhase::getMomentumField()//not yet managed by parameter _saveAllFields
+{
+	_Momentum=Field("Momentum",CELLS,_mesh,_Ndim);
+	int Ii;
+	for (long i = 0; i < _Nmailles; i++)
+		for (int j = 0; j < _Ndim; j++)//On récupère les composantes de qdm
+		{
+			int Ii = i*_nVar +1+j;
+			VecGetValues(_conservativeVars,1,&Ii,&_Momentum(i,j));
+		}
+	_Momentum.setTime(_time,_nbTimeStep);
+
+	return _Momentum;
+}
+
+Field& SinglePhase::getTotalEnergyField()//not yet managed by parameter _saveAllFields
+{
+	_TotalEnergy=Field("TotalEnergy",CELLS,_mesh,1);
+	int Ii;
+	for (long i = 0; i < _Nmailles; i++){
+		Ii = i*_nVar +_nVar-1;
+		VecGetValues(_conservativeVars,1,&Ii,&_TotalEnergy(i));
+	}
+	_TotalEnergy.setTime(_time,_nbTimeStep);
+
+	return _TotalEnergy;
+}
+
+Field& SinglePhase::getEnthalpyField()
+{
+	if(!_saveAllFields )
+	{
+		_Enthalpy=Field("Enthalpy",CELLS,_mesh,1);
+		int Ii;
+		double p,T,rho;
+		for (long i = 0; i < _Nmailles; i++){
+			Ii = i*_nVar;
+			VecGetValues(_primitiveVars,1,&Ii,&p);
+			Ii = i*_nVar +_nVar-1;
+			VecGetValues(_primitiveVars,1,&Ii,&T);
+			
+			rho=_fluides[0]->getDensity(p,T);
+			_Enthalpy(i)=_fluides[0]->getEnthalpy(T,rho);
+		}
+		_Enthalpy.setTime(_time,_nbTimeStep);
+	}
+
+	return _Enthalpy;
+}
+
+vector<string> SinglePhase::getOutputFieldsNames()
+{
+	vector<string> result(8);
+	
+	result[0]="Pressure";
+	result[1]="Velocity";
+	result[2]="Temperature";
+	result[3]="Density";
+	result[4]="Momentum";
+	result[5]="TotalEnergy";
+	result[6]="Enthalpy";
+	result[7]="VelocityX";
+	
+	return result;
+}
+
+Field& SinglePhase::getOutputField(const string& nameField )
+{
+	if(nameField=="pressure" || nameField=="Pressure" || nameField=="PRESSURE" || nameField=="PRESSION" || nameField=="Pression"  || nameField=="pression" )
+		return getPressureField();
+	else if(nameField=="velocity" || nameField=="Velocity" || nameField=="VELOCITY" || nameField=="Vitesse" || nameField=="VITESSE" || nameField=="vitesse" )
+		return getVelocityField();
+	else if(nameField=="velocityX" || nameField=="VelocityX" || nameField=="VELOCITYX" || nameField=="VitesseX" || nameField=="VITESSEX" || nameField=="vitesseX" )
+		return getVelocityXField();
+	else if(nameField=="temperature" || nameField=="Temperature" || nameField=="TEMPERATURE" || nameField=="temperature" )
+		return getTemperatureField();
+	else if(nameField=="density" || nameField=="Density" || nameField=="DENSITY" || nameField=="Densite" || nameField=="DENSITE" || nameField=="densite" )
+		return getDensityField();
+	else if(nameField=="momentum" || nameField=="Momentum" || nameField=="MOMENTUM" || nameField=="Qdm" || nameField=="QDM" || nameField=="qdm" )
+		return getMomentumField();
+	else if(nameField=="enthalpy" || nameField=="Enthalpy" || nameField=="ENTHALPY" || nameField=="Enthalpie" || nameField=="ENTHALPIE" || nameField=="enthalpie" )
+		return getEnthalpyField();
+	else if(nameField=="totalenergy" || nameField=="TotalEnergy" || nameField=="TOTALENERGY" || nameField=="ENERGIETOTALE" || nameField=="EnergieTotale" || nameField=="energietotale" )
+		return getTotalEnergyField();
+    else
+    {
+        cout<<"Error : Field name "<< nameField << " does not exist, call getOutputFieldsNames first" << endl;
+        throw CdmathException("SinglePhase::getOutputField error : Unknown Field name");
+    }
 }

@@ -1,4 +1,5 @@
 #include "StationaryDiffusionEquation.hxx"
+#include "Node.hxx"
 #include "math.h"
 #include <assert.h>
 
@@ -33,10 +34,10 @@ int main(int argc, char** argv)
 	double T3=0;
 	double T4=0;
 
-	cout<< "Built a regular triangular 2D mesh from a square mesh with "<< nx<<"x" <<ny<< " cells"<<endl;
+	cout<< "Building of a regular triangular 2D mesh from a square mesh with "<< nx<<"x" <<ny<< " cells"<<endl;
 
     /* Create the problem */
-    bool FEComputation=true;
+    bool FEComputation=false;
 	StationaryDiffusionEquation myProblem(spaceDim,FEComputation);
 	myProblem.setMesh(M);
 
@@ -47,14 +48,14 @@ int main(int argc, char** argv)
 	myProblem.setNeumannBoundaryCondition("Bord4");
 
 	/* Set the right hand side function*/
-	Field my_RHSfield("RHS_field", NODES, M, 1);
-    Node Ni; 
+	Field my_RHSfield("RHS_field", CELLS, M, 1);
+    Cell Ci; 
     double x, y;
-	for(int i=0; i< M.getNumberOfNodes(); i++)
+	for(int i=0; i< M.getNumberOfCells(); i++)
     {
-		Ni= M.getNode(i);
-		x = Ni.x();
-		y = Ni.y();
+		Ci= M.getCell(i);
+		x = Ci.x();
+		y = Ci.y();
 
 		my_RHSfield[i]=2*pi*pi*cos(pi*x)*cos(pi*y);//mettre la fonction definie au second membre de l'edp
 	}
@@ -62,7 +63,7 @@ int main(int argc, char** argv)
 	myProblem.setLinearSolver(GMRES,ILU);
 
     /* name the result file */
-	string fileName = "StationnaryDiffusion_2DFV_StructuredTriangles_Neumann";
+	string fileName = "StationnaryDiffusion_2DFV_RegularTriangles_Neumann";
 	myProblem.setFileName(fileName);
 
 	/* Run the computation */
@@ -79,7 +80,7 @@ int main(int argc, char** argv)
 		double max_sol_num=my_ResultField.max();
 		double min_sol_num=my_ResultField.min();
 		double erreur_abs=0;
-		for(int i=0; i< M.getNumberOfNodes() ; i++)
+		for(int i=0; i< M.getNumberOfCells() ; i++)
 			if( erreur_abs < abs(my_RHSfield[i]/(2*pi*pi) - my_ResultField[i]) )
 				erreur_abs = abs(my_RHSfield[i]/(2*pi*pi) - my_ResultField[i]);
 		
@@ -91,6 +92,7 @@ int main(int argc, char** argv)
 
         cout << "Simulation of "<<fileName<<" is successful ! " << endl;
     }
+
 	cout << "------------ End of calculation !!! -----------" << endl;
 	myProblem.terminate();
 

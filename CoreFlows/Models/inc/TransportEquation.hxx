@@ -19,17 +19,52 @@
 
 using namespace std;
 
+
+//! enumeration phase
+/*! The fluid type can be LiquidPhase or water  */
+enum phase
+{
+	LiquidPhase,/**< Fluid considered is GasPhase */
+	GasPhase/**< Fluid considered is Gas */
+};
+
+//! enumeration pressureEstimate
+/*! the pressure estimate needed to fit physical parameters  */
+enum pressureMagnitude
+{
+	around1bar300KTransport,/**< pressure is around 1 bar and temperature around 300K (for TransportEquation, SinglePhase and IsothermalTwoFluid) or 373 K (saturation for DriftModel and FiveEqsTwoFluid) */
+	around155bars600KTransport/**< pressure is around 155 bars  and temperature around 618 K (saturation) */
+};
+
+//! enumeration BoundaryType
+/*! Boundary condition type  */
+enum BoundaryTypeTransport	{InletTransport,  OutletTransport, NeumannTransport, DirichletTransport, NoneBCTransport};//Actually Inlet=Dirichlet and Outlet=Neumann
+
+/** \struct LimitField
+ * \brief value of some fields on the boundary  */
+struct LimitFieldTransport{
+	LimitFieldTransport(){bcType=NoneBCTransport; T=0; h=0; flux=0; }
+	LimitFieldTransport(BoundaryTypeTransport _bcType, double _T,	double _h,double _flux	){
+		bcType=_bcType; T=_T; h=_h; flux=_flux;
+	}
+
+	BoundaryTypeTransport bcType;
+	double T; //for inlet or Dirichlet
+	double h; //for inlet or Dirichlet
+	double flux; //for Neumann or outlet
+};
+
 class TransportEquation: public ProblemCoreFlows
 {
 
 public :
 	/** \fn TransportEquation
 			 * \brief Constructor for the enthalpy transport in a fluid
-			 * \param [in] phaseType : \ref Liquid or \ref Gas
-			 * \param [in] pressureEstimate : \ref around1bar or \ref around155bars
+			 * \param [in] phase : \ref Liquid or \ref Gas
+			 * \param [in] pressureMagnitude : \ref around1bar or \ref around155bars
 			 * \param [in] vector<double> : fluid velocity (assumed constant)
 			 *  */
-	TransportEquation(phaseType fluid, pressureEstimate pEstimate,vector<double> vitesseTransport);
+	TransportEquation(phase fluid, pressureMagnitude pEstimate,vector<double> vitesseTransport);
 
 	//Gestion du calcul
 	virtual void initialize();
@@ -41,6 +76,7 @@ public :
 	virtual void save();
 	virtual void validateTimeStep();
 
+	/* Boundary conditions */
 	/** \fn setIntletBoundaryCondition
 			 * \brief adds a new boundary condition of type Inlet
 			 * \details
@@ -49,14 +85,31 @@ public :
 			 * \param [out] void
 			 *  */
 	void setInletBoundaryCondition(string groupName,double enthalpy){
-		_limitField[groupName]=LimitField(Inlet,-1,vector<double>(_Ndim,0),vector<double>(_Ndim,0),vector<double>(_Ndim,0),-1,enthalpy,-1,-1);
+		_limitField[groupName]=LimitFieldTransport(InletTransport,-1,enthalpy,-1);
 	};
 
-	/*Physical parameters*/
-	Field& getFluidTemperatureField(){
-		return _TT;
-	}
+	/** \fn setNeumannBoundaryCondition
+	 * \brief adds a new boundary condition of type Neumann
+	 * \details
+	 * \param [in] string the name of the boundary
+	 * \param [out] void
+	 *  */
+	void setNeumannBoundaryCondition(string groupName, double flux=0){
+		_limitField[groupName]=LimitFieldTransport(NeumannTransport,-1,flux,-1);
+	};
 
+	/** \fn setBoundaryFields
+	 * \brief met à jour  _limitField  ( le type de condition limite )
+	 * \details
+	 * \param [in] string
+	 * \param [out] void
+	 *  */
+	void setBoundaryFields(map<string, LimitFieldTransport> boundaryFields){
+		_limitField = boundaryFields;
+	};
+
+
+	/*Physical parameters*/
 	void setLiqSatEnthalpy(double hsatl){
 		_hsatl=hsatl;
 	};
@@ -72,6 +125,26 @@ public :
 	void setTransportVelocity(Vector v){
 		_vitesseTransport=v;
 	};
+
+	//get output fields for postprocessing or coupling
+	vector<string> getOutputFieldsNames() ;//liste tous les champs que peut fournir le code pour le postraitement
+	Field&         getOutputField(const string& nameField );//Renvoie un champs pour le postraitement
+
+	Field& getFluidTemperatureField(){
+		return _TT;
+	}
+
+	Field& getEnthalpyField(){
+		return _VV;
+	}
+
+	/** \fn getTimeScheme
+	 * \brief returns the  time scheme name
+	 * \param [in] void
+	 * \param [out] enum TimeScheme (explicit or implicit)
+	 *  */
+	TimeScheme getTimeScheme();
+
 protected :
 	double computeTransportMatrix();
 	double computeRHS();
@@ -98,6 +171,8 @@ protected :
 	bool _transportMatrixSet;
 	Vec _Hn, _deltaH, _Hk, _Hkm1, _b0;
 	double _dt_transport, _dt_src;
+
+	map<string, LimitFieldTransport> _limitField;
 };
 
 #endif /* TransportEquation_HXX_ */

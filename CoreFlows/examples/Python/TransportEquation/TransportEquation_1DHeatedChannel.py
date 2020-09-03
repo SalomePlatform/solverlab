@@ -17,7 +17,7 @@ def TransportEquation_1DHeatedChannel():
     # Set the transport velocity
 	transportVelocity=[5];
 
-	myProblem = cf.TransportEquation(cf.Liquid,cf.around155bars600K,transportVelocity);
+	myProblem = cf.TransportEquation(cf.LiquidPhase,cf.around155bars600KTransport,transportVelocity);
 	nVar = myProblem.getNumberOfVariables();
 
     # Prepare for the initial condition
@@ -38,7 +38,7 @@ def TransportEquation_1DHeatedChannel():
 	myProblem.setNeumannBoundaryCondition("neumann")
 
     # Set the numerical method
-	myProblem.setNumericalScheme(cf.upwind, cf.Explicit);
+	myProblem.setTimeScheme( cf.Explicit);
 
     # name file save
 	fileName = "1DFluidEnthalpy";

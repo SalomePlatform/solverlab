@@ -6,15 +6,9 @@ SET_SOURCE_FILES_PROPERTIES(CoreFlows.i PROPERTIES SWIG_DEFINITIONS "-shadow")
 
 INCLUDE_DIRECTORIES(
   ${PYTHON_INCLUDE_DIRS}
-  ${CoreFlows_SRC}/inc
+  ${CoreFlows_INCLUDES}											    #
 )
 
-INCLUDE_DIRECTORIES(
-      ${PETSC_INCLUDES}
-      ${CDMATH_INCLUDES}
-      ${CDMATH_INCLUDES}/med											    #
-      ${CDMATH_INCLUDES}/medcoupling											    #
-)
 SET(_extra_lib_SWIG ${CDMATH_LIBRARIES} ${PETSC_LIBRARIES})   
 
 

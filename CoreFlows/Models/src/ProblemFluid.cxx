@@ -20,13 +20,25 @@ ProblemFluid::ProblemFluid(void){
 	_saveConservativeField=false;
 	_usePrimitiveVarsInNewton=false;
 	_saveInterfacialField=false;
-	//Pour affichage donnees diphasiques dans IterateTimeStep
-	_err_press_max=0; _part_imag_max=0; _nbMaillesNeg=0; _nbVpCplx=0;_minm1=1e30;_minm2=1e30;
+	_err_press_max=0; _part_imag_max=0; _nbMaillesNeg=0; _nbVpCplx=0;_minm1=1e30;_minm2=1e30;//Pour affichage paramètres diphasiques dans IterateTimeStep
 	_isScaling=false;
 	_entropicCorrection=false;
 	_pressureCorrectionOrder=2;
 	_nonLinearFormulation=Roe;
 	_maxvploc=0.;
+	_spaceScheme=upwind;
+}
+
+SpaceScheme ProblemFluid::getSpaceScheme()
+{
+	return _spaceScheme;
+}
+void ProblemFluid::setNumericalScheme(SpaceScheme spaceScheme, TimeScheme timeScheme)
+{
+	if( _nbTimeStep>0 && timeScheme!=_timeScheme)//This is a change of time scheme during a simulation
+		_restartWithNewTimeScheme=true;
+	_timeScheme = timeScheme;
+	_spaceScheme = spaceScheme;
 }
 
 void ProblemFluid::initialize()
@@ -192,7 +204,7 @@ void ProblemFluid::initialize()
 
 bool ProblemFluid::initTimeStep(double dt){
 	_dt = dt;
-	return _dt>0;
+	return _dt>0;//No need to call MatShift as the linear system matrix is filled at each Newton iteration (unlike linear problem)
 }
 
 bool ProblemFluid::iterateTimeStep(bool &converged)
@@ -201,7 +213,7 @@ bool ProblemFluid::iterateTimeStep(bool &converged)
 
 	if(_NEWTON_its>0){//Pas besoin de computeTimeStep à la première iteration de Newton
 		_maxvp=0.;
-		computeTimeStep(stop);
+		computeTimeStep(stop);//This compute timestep is just to update the linear system. The time step was imposed befor starting the Newton iterations
 	}
 	if(stop){//Le compute time step ne s'est pas bien passé
 		cout<<"ComputeTimeStep failed"<<endl;
@@ -302,6 +314,15 @@ bool ProblemFluid::iterateTimeStep(bool &converged)
 
 double ProblemFluid::computeTimeStep(bool & stop){
 	VecZeroEntries(_b);
+
+	if(_restartWithNewTimeScheme)//This is a change of time scheme during a simulation
+	{
+		if(_timeScheme == Implicit)
+			MatCreateSeqBAIJ(PETSC_COMM_SELF, _nVar, _nVar*_Nmailles, _nVar*_Nmailles, (1+_neibMaxNb), PETSC_NULL, &_A);			
+		else
+			MatDestroy(&_A);
+		_restartWithNewTimeScheme=false;
+	}
 	if(_timeScheme == Implicit)
 		MatZeroEntries(_A);
 

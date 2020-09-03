@@ -13,6 +13,10 @@ option (COREFLOWS_WITH_PYTHON "Compile Python interface for COREFLOWS." OFF)
 option (COREFLOWS_WITH_GUI "Compile Graphic user Interface for COREFLOWS." OFF)
 option (COREFLOWS_WITH_PACKAGE "Generate RPM, Debian and tarball packages." OFF)
 
+#Path to installed libraries
+set (PETSC_DIR            OFF CACHE STRING "PETSc library path" )
+set (SLEPC_DIR            OFF CACHE STRING "SLEPc library path" )
+
 enable_testing()											   #
 # Debug mode activates testing and profiling --------------------------------------------------------------#
 if (CMAKE_BUILD_TYPE STREQUAL Debug)									   #
@@ -35,36 +39,74 @@ find_package (CDMATH REQUIRED)                                                  
 # PETSC ----------------------------------------------------------------------------------------------------#
 message ( STATUS "Checking variable PETSC_DIR : " $ENV{PETSC_DIR} )
 
-if ( NOT DEFINED ENV{PETSC_DIR} AND IS_DIRECTORY "/usr/include/petsc/" AND EXISTS "/usr/lib64/libpetsc.so")  #Case fedora/redhat system install
+if   ( NOT PETSC_DIR AND NOT DEFINED ENV{PETSC_DIR} AND IS_DIRECTORY "/usr/include/petsc/" AND EXISTS "/usr/lib64/libpetsc.so")  #Case fedora/redhat system install
   message ( STATUS "PETSC includes found in /usr/include/petsc/" )
   message ( STATUS "PETSC library found in /usr/lib64" )
   set(PETSC_DIR /usr/)
+  set(PETSC_ARCH lib64)
   set(PETSC_INCLUDES  /usr/include/petsc /usr/include/petsc/petsc/mpiuni)
   set(PETSC_INCLUDES_PATH  /usr/include/petsc:/usr/include/petsc/petsc/mpiuni)
   set(PETSC_LIBRARIES /usr/lib64/libpetsc.so)
-  set(PETSC_VERSION "3.7") #3.7 for fedora 25/26 , 3.9 for fedora 29
-  set (CPACK_RPM_PACKAGE_REQUIRES   "${CPACK_RPM_PACKAGE_REQUIRES}, petsc-devel (>= 3.4)") # This is not fully working yet. 
+  set(PETSC_VERSION "3.7") #3.7 for fedora 25/26 , 3.9 for fedora 29 , 3.10 for fedora 30, , 3.12 for fedora 32
+  set(CPACK_RPM_PACKAGE_REQUIRES   "${CPACK_RPM_PACKAGE_REQUIRES}, petsc-devel (>= 3.4)") # This is not fully working yet. 
+
+  #Define and search slepc variables
+  if   ( IS_DIRECTORY "/usr/include/slepc/" AND EXISTS "/usr/lib64/libslepc.so" )
+    message( STATUS "SLEPc includes found in /usr/include/slepc/" )
+    message( STATUS "SLEPc library found in /usr/lib64/slepc/" )
+    set(SLEPC_DIR /usr/)
+    set(SLEPC_INCLUDES ${SLEPC_DIR}/include)
+    set(SLEPC_LIBRARIES ${SLEPC_DIR}/lib/libslepc.so)
+    set (CPACK_RPM_PACKAGE_REQUIRES   "${CPACK_RPM_PACKAGE_REQUIRES}, slepc-devel (>= 3.4)") # This is not fully working yet. 
+  else ( IS_DIRECTORY "/usr/include/slepc/" AND EXISTS "/usr/lib64/libslepc.so" )
+    message( FATAL_ERROR "SLEPc not found in the system" )
+  endif( IS_DIRECTORY "/usr/include/slepc/" AND EXISTS "/usr/lib64/libslepc.so" )
 
 #elseif ( IS_DIRECTORY "/usr/lib/petsc/") #Case ubuntu/debian system install
 #  message ( STATUS "PETSC found in /usr/lib/petsc/" )
 #  set(PETSC_DIR /usr/lib/petsc/)
+#  set(PETSC_ARCH )
 #  find_package (PETSc 3.4 REQUIRED)
 #  petsc_get_version ()
 #  set (CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_DEBIAN_PACKAGE_DEPENDS}, petsc-dev   (>= 3.4)") # This is not fully working yet. 
 
 #elseif ( IS_DIRECTORY "/usr/local/lib/python2.7/dist-packages/petsc") #Case ubuntu/debian system pip install
 #  message ( STATUS "PETSC found in /usr/local/lib/python2.7/dist-packages/petsc" )
-#  set(PETSC_DIR /usr/local/lib/python2.7/dist-packages/petsc)
-#  set(PETSC_INCLUDES  /usr/local/lib/python2.7/dist-packages/petsc/include /usr/include/openmpi)
-#  set(PETSC_INCLUDES_PATH  /usr/local/lib/python2.7/dist-packages/petsc/include:/usr/include/openmpi)
-#  set(PETSC_LIBRARIES /usr/local/lib/python2.7/dist-packages/petsc/lib/libpetsc.so)
+#  set(PETSC_DIR /usr/local/lib/python2.7/dist-packages/petsc/)
+#  set(PETSC_ARCH lib)
+#  set(PETSC_INCLUDES       $PETSC_DIR/include /usr/include/openmpi)
+#  set(PETSC_INCLUDES_PATH  $PETSC_DIR/include:/usr/include/openmpi)
+#  set(PETSC_LIBRARIES      $PETSC_DIR/lib/libpetsc.so)
 #  set(PETSC_VERSION "3.8") #value for Ubuntu 16.04 
 
-else ()
+else ( NOT PETSC_DIR AND NOT DEFINED ENV{PETSC_DIR} AND IS_DIRECTORY "/usr/include/petsc/" AND EXISTS "/usr/lib64/libpetsc.so")
+  if(NOT PETSC_DIR)
+    set(PETSC_DIR $ENV{PETSC_DIR})
+  endif(NOT PETSC_DIR)
+
   find_package (PETSc 3.4 REQUIRED)
   petsc_get_version ()
   string(REPLACE ";" ":"  PETSC_INCLUDES_PATH "${PETSC_INCLUDES}")# use colon instead of semicolon in environment file env_CoreFlows.sh
-endif ()
+
+    #Define and search slepc variables
+    if   ( NOT SLEPC_DIR )
+      if   ( DEFINED ENV{SLEPC_DIR} )
+        set(SLEPC_DIR $ENV{SLEPC_DIR})
+      else ( DEFINED ENV{SLEPC_DIR} )
+        set(SLEPC_DIR ${PETSC_DIR}/${PETSC_ARCH})
+      endif( DEFINED ENV{SLEPC_DIR} )
+    endif( NOT SLEPC_DIR)
+
+   message ( STATUS "Checking variable SLEPC_DIR" )
+   if ( IS_DIRECTORY ${SLEPC_DIR}/include AND EXISTS ${SLEPC_DIR}/lib/libslepc.so)
+     set(SLEPC_INCLUDES ${SLEPC_DIR}/include)
+     set(SLEPC_LIBRARIES ${SLEPC_DIR}/lib/libslepc.so)
+     message( STATUS "SLEPc found at ${SLEPC_DIR}" )
+   else()
+     message( FATAL_ERROR "SLEPc not found at ${SLEPC_DIR}" )
+   endif()
+
+endif( NOT PETSC_DIR AND NOT DEFINED ENV{PETSC_DIR} AND IS_DIRECTORY "/usr/include/petsc/" AND EXISTS "/usr/lib64/libpetsc.so")
 
 if (${PETSC_VERSION} VERSION_GREATER 3.5)
   add_definitions(-DPETSC_VERSION_GREATER_3_5)
@@ -89,17 +131,23 @@ endif ()                                                                        
                                                                                                             #
 #-----------------------------------------------------------------------------------------------------------#
 
-
 # Base directories
 set (CoreFlows_SRC ${CoreFlows_SOURCE_DIR}/Models ) 
 set (CoreFlows_EXAMPLES ${CoreFlows_SOURCE_DIR}/examples)
+
+set( CoreFlows_INCLUDES 
+  ${CDMATH_INCLUDES}											    #
+  ${MED_INCLUDES}											    #
+  ${MEDCOUPLING_INCLUDES}										    #
+  ${PETSC_INCLUDES}											    #
+  ${CoreFlows_SRC}/inc											    #    
+  )													    #
+
 add_subdirectory (${CoreFlows_SRC})
 add_subdirectory (${CoreFlows_EXAMPLES})
 if (COREFLOWS_WITH_PYTHON)                                                                                  #
    add_subdirectory (${CoreFlows_SWIG_DIR})                                                                 #
 endif ()                                                                                                    #
-
-
 
 # Documentation --------------------------------------------------------------------------------------------#
                                                                                                             #
@@ -137,18 +185,13 @@ endif ()                                                                        
 #--------------------- COMPILATION MAIN --------------------------------------------------------------------#
 													    #
 INCLUDE_DIRECTORIES(						   					    #
-													    #
-  ${PETSC_INCLUDES}											    #
-  ${CDMATH_INCLUDES}											    #
-  ${CDMATH_INCLUDES}/med											    #
-  ${CDMATH_INCLUDES}/medcoupling											    #
-  ${CoreFlows_SRC}/inc											    #    
+  ${CoreFlows_INCLUDES}											    #
   )													    #
 													    #
 SET(CoreFlowsMain_SOURCES										    #
     ${CoreFlows_SRC}/src/Fluide.cxx									    #
     ${CoreFlows_SRC}/src/DiffusionEquation.cxx								    #
-    ${CoreFlows_SRC}/src/StationaryDiffusionEquation.cxx								    #
+    ${CoreFlows_SRC}/src/StationaryDiffusionEquation.cx							    #
     ${CoreFlows_SRC}/src/ProblemFluid.cxx								    #
     ${CoreFlows_SRC}/src/IsothermalTwoFluid.cxx								    #
     ${CoreFlows_SRC}/src/utilitaire_algebre.cxx								    #

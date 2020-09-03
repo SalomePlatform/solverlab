@@ -81,8 +81,9 @@ find_path (PETSC_DIR include/petsc.h
   #RedHat paths
   /usr/include/petsc
   # Debian paths
-  /usr/lib/petscdir/3.7.6 /usr/lib/petscdir/3.7
-  /usr/lib/petscdir/3.6.2 /usr/lib/petscdir/3.6
+  /usr/lib/petscdir/3.12.4 /usr/lib/petscdir/3.12 #Ubuntu 20.04
+  /usr/lib/petscdir/3.7.6 /usr/lib/petscdir/3.7 #Ubuntu 18.04
+  /usr/lib/petscdir/3.6.2 /usr/lib/petscdir/3.6 #Ubuntu 16.04
   /usr/lib/petscdir/3.5.1 /usr/lib/petscdir/3.5
   /usr/lib/petscdir/3.4.2 /usr/lib/petscdir/3.4
   /usr/lib/petscdir/3.3 /usr/lib/petscdir/3.2 /usr/lib/petscdir/3.1
@@ -97,9 +98,10 @@ find_program (MAKE_EXECUTABLE NAMES make gmake)
 if (PETSC_DIR AND NOT PETSC_ARCH)
   set (_petsc_arches
     $ENV{PETSC_ARCH}                            # If set, use environment variable first
-    linux-gnu-c-debug linux-gnu-c-opt           # Debian defaults (petsc compilation)
+    linux-gnu-c-debug linux-gnu-c-opt           # old Debian defaults (petsc compilation)
+    arch-linux-c-opt or arch-linux-c-debug      # new Debian defaults (petsc compilation)
     x86_64-linux-gnu-real   i686-linux-gnu-real # Debian defaults (petsc system installation)
-    arch-linux2-c-opt or arch-linux2-c-debug    # RedHat defaults (petsc compilation)
+    arch-linux2-c-opt or arch-linux2-c-debug    # old RedHat defaults (petsc compilation)
     x86_64-redhat-linux-gnu i686-redhat-linux-gnu # RedHat defaults (petsc apt installation)
     x86_64-unknown-linux-gnu i386-unknown-linux-gnu)
   set (petscconf "NOTFOUND" CACHE FILEPATH "Cleared" FORCE)

@@ -3,7 +3,7 @@
 // Author      : M. Ndjinga
 // Version     :
 // Copyright   : CEA Saclay 2014
-// Description : Generic class for thermal hydraulics problems
+// Description : Generic class for PDEs problems
 //============================================================================
 /* A ProblemCoreFlows class */
 
@@ -23,6 +23,8 @@
 #include <map>
 
 #include <petsc.h>
+#include <slepceps.h>
+#include <slepcsvd.h>
 
 #include "Field.hxx"
 #include "Mesh.hxx"
@@ -31,43 +33,6 @@
 #include "CdmathException.hxx"
 
 using namespace std;
-
-//! enumeration TimeScheme
-/*! The numerical method can be Explicit or Implicit  */
-enum TimeScheme
-{
-	Explicit,/**<  Explicit numerical scheme */
-	Implicit/**< Implicit numerical scheme */
-};
-//! enumeration SpaceScheme
-/*! Several numerical schemes are available */
-enum SpaceScheme
-{
-	upwind,/**<  classical full upwinding scheme (first order in space) */
-	centered,/**<  centered scheme (second order in space) */
-	pressureCorrection,/**<  include a pressure correction in the upwind scheme to increase precision at low Mach numbers */
-	lowMach,/**<  include an upwinding proportional to the Mach numer scheme to increase precision at low Mach numbers */
-	staggered,/**<  scheme inspired by staggered discretisations */
-};
-
-//! enumeration pressureEstimate
-/*! the pressure estimate needed to fit physical parameters  */
-enum pressureEstimate
-{
-	around1bar300K,/**< pressure is around 1 bar and temperature around 300K (for TransportEquation, SinglePhase and IsothermalTwoFluid) or 373 K (saturation for DriftModel and FiveEqsTwoFluid) */
-	around155bars600K/**< pressure is around 155 bars  and temperature around 618 K (saturation) */
-};
-
-//! enumeration BoundaryType
-/*! Boundary condition type  */
-enum BoundaryType	{Wall, InnerWall, Inlet, InletPressure, InletRotationVelocity, InletEnthalpy, Outlet, Neumann, Dirichlet, NoTypeSpecified};
-//! enumeration Fluid
-/*! The fluid type can be Gas or water  */
-enum phaseType
-{
-	Liquid,/**< Fluid considered is water */
-	Gas/**< Fluid considered is Gas */
-};
 
 //! enumeration linearSolver
 /*! the linearSolver can be GMRES or BiCGStab (see Petsc documentation) */
@@ -98,22 +63,12 @@ enum saveFormat
 	CSV/**< CSV format is used */
 };
 
-/** \struct LimitField
- * \brief value of some fields on the boundary  */
-struct LimitField{
-	LimitField(){bcType=NoTypeSpecified; p=0; v_x=vector<double> (0,0); v_y=vector<double> (0,0); v_z=vector<double> (0,0); T=0; h=0; alpha=0;	conc=0;}
-	LimitField(BoundaryType _bcType,	double _p,	vector<double> _v_x, vector<double> _v_y, vector<double> _v_z,
-			double _T,	double _h,	double _alpha,	double _conc){
-		bcType=_bcType; p=_p; v_x=_v_x; v_y=_v_y; v_z=_v_z;	T=_T; h=_h; alpha=_alpha;	conc=_conc;
-	}
-
-	BoundaryType bcType;
-	double p;//For outlet (fluid models)
-	vector<double> v_x; vector<double> v_y; vector<double> v_z;//For wall and inlet (fluid models)
-	double T; //for wall and inlet (DriftModel and FiveEqsTwoFluid) and for Dirichlet (DiffusionEquation)
-	double h; //for inlet (TransportEquation)
-	double alpha; //For inlet (IsothermalTwoFluid and FiveEqsTwoFluid)
-	double conc;//For inlet (DriftModel)
+//! enumeration TimeScheme
+/*! The numerical method can be Explicit or Implicit  */
+enum TimeScheme
+{
+	Explicit,/**<  Explicit numerical scheme */
+	Implicit/**< Implicit numerical scheme */
 };
 
 class ProblemCoreFlows
@@ -226,25 +181,6 @@ public :
 	virtual vector<string> getOutputFieldsNames()=0 ;//liste tous les champs que peut fournir le code pour le postraitement
 	virtual Field& getOutputField(const string& nameField )=0;//Renvoie un champs pour le postraitement
 	 */
-
-	/** \fn setBoundaryFields
-	 * \brief met à jour  _limitField  ( le type de condition limite )
-	 * \details
-	 * \param [in] string
-	 * \param [out] void
-	 *  */
-	void setBoundaryFields(map<string, LimitField> boundaryFields){
-		_limitField = boundaryFields;
-	};
-	/** \fn setNeumannBoundaryCondition
-	 * \brief adds a new boundary condition of type Neumann
-	 * \details
-	 * \param [in] string the name of the boundary
-	 * \param [out] void
-	 *  */
-	void setNeumannBoundaryCondition(string groupName){
-		_limitField[groupName]=LimitField(Neumann,-1,vector<double>(_Ndim,0),vector<double>(_Ndim,0),vector<double>(_Ndim,0),-1,-1,-1,-1);
-	};
 
 	//paramètres du calcul -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
@@ -438,20 +374,6 @@ public :
 	 *  */
 	double getPrecision();
 
-	/** \fn getSpaceScheme
-	 * \brief returns the  space scheme name
-	 * \param [in] void
-	 * \param [out] enum SpaceScheme(upwind, centred, pressureCorrection, pressureCorrection, staggered)
-	 *  */
-	SpaceScheme getSpaceScheme();
-
-	/** \fn getTimeScheme
-	 * \brief returns the  time scheme name
-	 * \param [in] void
-	 * \param [out] enum TimeScheme (explicit or implicit)
-	 *  */
-	TimeScheme getTimeScheme();
-
 	/** \fn getMesh
 	 * \brief renvoie _Mesh (le maillage du problème)
 	 * \details
@@ -503,15 +425,6 @@ public :
 	int getNumberOfVariables(){
 		return _nVar;
 	};
-
-	/** \fn setNumericalScheme
-	 * \brief sets the numerical method (upwind vs centered and explicit vs implicit
-	 * \details
-	 * \param [in] SpaceScheme
-	 * \param [in] TimeScheme
-	 * \param [out] void
-	 *  */
-	void setNumericalScheme(SpaceScheme scheme, TimeScheme method=Explicit);
 
 	/** \fn setWellBalancedCorrection
 	 * \brief include a well balanced correction to treat stiff source terms
@@ -657,6 +570,12 @@ public :
 		_system = system;
 	};
 
+    //Spectrum analysis
+    double getConditionNumber(bool isSingular=false, double tol=1e-6) const;
+    std::vector< double > getEigenvalues (int nev, EPSWhich which=EPS_SMALLEST_MAGNITUDE, double tol=1e-6) const;
+    std::vector< Vector > getEigenvectors(int nev, EPSWhich which=EPS_SMALLEST_MAGNITUDE, double tol=1e-6) const;
+    Field getEigenvectorsField(int nev, EPSWhich which=EPS_SMALLEST_MAGNITUDE, double tol=1e-6) const;
+
 	//  some supplementary functions
 
 	/** \fn displayMatrix
@@ -676,6 +595,22 @@ public :
 	 * @return displays the vector on the terminal
 	 *  */
 	void displayVector(double *vector, int size, string name);
+
+	/** \fn getTimeScheme
+	 * \brief returns the  time scheme name
+	 * \param [in] void
+	 * \param [out] enum TimeScheme (explicit or implicit)
+	 *  */
+	TimeScheme getTimeScheme();
+
+	/** \fn setNumericalScheme
+	 * \brief sets the numerical method ( explicit vs implicit )
+	 * \details
+	 * \param [in] TimeScheme
+	 * \param [out] void
+	 *  */
+	void setTimeScheme( TimeScheme method);
+
 
 protected :
 
@@ -697,11 +632,10 @@ protected :
 	double _cfl;
 	double _maxvp;//valeur propre max pour calcul cfl
 	double _minl;//minimum cell diameter
-	map<string, LimitField> _limitField;
-	TimeScheme _timeScheme;
-	SpaceScheme _spaceScheme;
+    bool _FECalculation;
 	/** boolean used to specify that a well balanced correction should be used */
 	bool _wellBalancedCorrection;
+	TimeScheme _timeScheme;
 
 	//Linear solver and petsc
 	KSP _ksp;
@@ -722,6 +656,8 @@ protected :
 	bool _isStationary;
 	bool _initialDataSet;
 	bool _initializedMemory;
+	bool _restartWithNewTimeScheme;
+	bool _restartWithNewFileName;
 	double _timeMax,_time;
 	int _maxNbOfTimeStep,_nbTimeStep;
 	double _precision;

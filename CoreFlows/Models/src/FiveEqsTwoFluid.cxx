@@ -2262,7 +2262,7 @@ void FiveEqsTwoFluid::save(){
 	}
 	_VV.setTime(_time,_nbTimeStep+1);
 
-	if (_nbTimeStep ==0){
+	if (_nbTimeStep ==0 || _restartWithNewFileName){
 		string prim_suppress ="rm -rf "+prim+"_*";
 		string cons_suppress ="rm -rf "+cons+"_*";
 		system(prim_suppress.c_str());//Nettoyage des précédents calculs identiques
@@ -2370,7 +2370,7 @@ void FiveEqsTwoFluid::save(){
 		}
 		_Vitesse1.setTime(_time,_nbTimeStep);
 		_Vitesse2.setTime(_time,_nbTimeStep);
-		if (_nbTimeStep ==0){
+		if (_nbTimeStep ==0 || _restartWithNewFileName){		
 			_Vitesse1.setInfoOnComponent(0,"Velocity_x_(m/s)");
 			_Vitesse1.setInfoOnComponent(1,"Velocity_y_(m/s)");
 			_Vitesse1.setInfoOnComponent(2,"Velocity_z_(m/s)");
@@ -2413,4 +2413,7 @@ void FiveEqsTwoFluid::save(){
 			}
 		}
 	}
+
+	if (_restartWithNewFileName)
+		_restartWithNewFileName=false;
 }

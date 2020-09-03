@@ -19,6 +19,33 @@
 
 using namespace std;
 
+//! enumeration SpaceScheme
+/*! Several numerical schemes are available */
+enum SpaceScheme
+{
+	upwind,/**<  classical full upwinding scheme (first order in space) */
+	centered,/**<  centered scheme (second order in space) */
+	pressureCorrection,/**<  include a pressure correction in the upwind scheme to increase precision at low Mach numbers */
+	lowMach,/**<  include an upwinding proportional to the Mach numer scheme to increase precision at low Mach numbers */
+	staggered,/**<  scheme inspired by staggered discretisations */
+};
+
+//! enumeration pressureEstimate
+/*! the pressure estimate needed to fit physical parameters  */
+enum pressureEstimate
+{
+	around1bar300K,/**< pressure is around 1 bar and temperature around 300K (for TransportEquation, SinglePhase and IsothermalTwoFluid) or 373 K (saturation for DriftModel and FiveEqsTwoFluid) */
+	around155bars600K/**< pressure is around 155 bars  and temperature around 618 K (saturation) */
+};
+
+//! enumeration phaseType
+/*! The fluid type can be Gas or water  */
+enum phaseType
+{
+	Liquid,/**< Fluid considered is water */
+	Gas/**< Fluid considered is Gas */
+};
+
 //! enumeration NonLinearFormulation
 /*! the formulation used to compute the non viscous fluxes */
 enum NonLinearFormulation
@@ -27,6 +54,27 @@ enum NonLinearFormulation
 	VFRoe,/**< Masella, Faille and Gallouet non linear formulation is used */
 	VFFC,/**< Ghidaglia, Kumbaro and Le Coq non linear formulation is used */
 	reducedRoe,/**< compacted formulation of Roe scheme without computation of the fluxes */
+};
+
+//! enumeration BoundaryType
+/*! Boundary condition type  */
+enum BoundaryType	{Wall, InnerWall, Inlet, InletPressure, InletRotationVelocity, InletEnthalpy, Outlet, Neumann, NoTypeSpecified};
+/** \struct LimitField
+ * \brief value of some fields on the boundary  */
+struct LimitField{
+	LimitField(){bcType=NoTypeSpecified; p=0; v_x=vector<double> (0,0); v_y=vector<double> (0,0); v_z=vector<double> (0,0); T=0; h=0; alpha=0;	conc=0;}
+	LimitField(BoundaryType _bcType,	double _p,	vector<double> _v_x, vector<double> _v_y, vector<double> _v_z,
+			double _T,	double _h,	double _alpha,	double _conc){
+		bcType=_bcType; p=_p; v_x=_v_x; v_y=_v_y; v_z=_v_z;	T=_T; h=_h; alpha=_alpha;	conc=_conc;
+	}
+
+	BoundaryType bcType;
+	double p;//For outlet (fluid models)
+	vector<double> v_x; vector<double> v_y; vector<double> v_z;//For wall and inlet (fluid models)
+	double T; //for wall and inlet (DriftModel and FiveEqsTwoFluid) and for Dirichlet (DiffusionEquation)
+	double h; //for inlet (TransportEquation)
+	double alpha; //For inlet (IsothermalTwoFluid and FiveEqsTwoFluid)
+	double conc;//For inlet (DriftModel)
 };
 
 class ProblemFluid: public ProblemCoreFlows
@@ -94,6 +142,17 @@ public :
 	 *  */
 	virtual void validateTimeStep();
 
+	/* Boundary conditions */
+	/** \fn setNeumannBoundaryCondition
+	 * \brief adds a new boundary condition of type Neumann
+	 * \details
+	 * \param [in] string the name of the boundary
+	 * \param [out] void
+	 *  */
+	void setNeumannBoundaryCondition(string groupName){
+		_limitField[groupName]=LimitField(Neumann,-1,vector<double>(_Ndim,0),vector<double>(_Ndim,0),vector<double>(_Ndim,0),-1,-1,-1,-1);
+	};
+
 	/** \fn setOutletBoundaryCondition
 	 * \brief Adds a new boundary condition of type Outlet
 	 * \details
@@ -117,6 +176,16 @@ public :
 		/* On the boundary we have P-Pref=rho g\cdot(x-xref) */
 		_gravityReferencePoint=reference_point;
 		_limitField[groupName]=LimitField(Outlet,referencePressure,vector<double>(_nbPhases,0),vector<double>(_nbPhases,0),vector<double>(_nbPhases,0),-1,-1,-1,-1);
+	};
+
+	/** \fn setBoundaryFields
+	 * \brief met à jour  _limitField  ( le type de condition limite )
+	 * \details
+	 * \param [in] string
+	 * \param [out] void
+	 *  */
+	void setBoundaryFields(map<string, LimitField> boundaryFields){
+		_limitField = boundaryFields;
 	};
 
 	/** \fn setViscosity
@@ -386,6 +455,22 @@ public :
 		_usePrimitiveVarsInNewton=usePrimitiveVarsInNewton;
 	}
 
+	/** \fn getSpaceScheme
+	 * \brief returns the  space scheme name
+	 * \param [in] void
+	 * \param [out] enum SpaceScheme(upwind, centred, pressureCorrection, pressureCorrection, staggered)
+	 *  */
+	SpaceScheme getSpaceScheme();
+
+	/** \fn setNumericalScheme
+	 * \brief sets the numerical method (upwind vs centered and explicit vs implicit)
+	 * \details
+	 * \param [in] SpaceScheme
+	 * \param [in] TimeScheme
+	 * \param [out] void
+	 *  */
+	void setNumericalScheme(SpaceScheme scheme, TimeScheme method=Explicit);
+
 	//données initiales
 	/*
 	virtual vector<string> getInputFieldsNames()=0 ;//Renvoie les noms des champs dont le problème a besoin (données initiales)
@@ -402,8 +487,12 @@ protected :
 	Field  _UU;
 	/** Field of interfacial states of the VFRoe scheme **/
 	Field _UUstar, _VVstar;
+
+	SpaceScheme _spaceScheme;
 	/** the formulation used to compute the non viscous fluxes **/
 	NonLinearFormulation _nonLinearFormulation;
+
+	map<string, LimitField> _limitField;
 
 	/** boolean used to specify that an entropic correction should be used **/
 	bool _entropicCorrection;
