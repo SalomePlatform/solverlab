@@ -21,7 +21,7 @@ import sys
 from copy import deepcopy
 
 def Transport1DCenteredExplicit(nx,cfl, isSmooth):
-    print "Simulation of 1D transport equation with explicit centered scheme"
+    print( "Simulation of 1D transport equation with explicit centered scheme" )
 
     ##################### Simulation parameters
     a = 0.0 # space domain :  a <= x <= b
@@ -36,11 +36,11 @@ def Transport1DCenteredExplicit(nx,cfl, isSmooth):
     ########################## Initial data
     
     if(isSmooth):
-        print "Smooth initial data"
+        print( "Smooth initial data" )
         u_initial = [ sin(2*pi*xi)  for xi in x];# to be used with a=0, b=1
         tmax = 3*(b-a)/c # runs the simulation for 0 <= t <= tMax
     else:
-        print "Stiff initial data"
+        print( "Stiff initial data" )
         u_initial = [ int(1./3<xi)*int(xi<2./3)  for xi in x];# to be used with a=0, b=1
         tmax = (b-a)/c # runs the simulation for 0 <= t <= tMax
     ntmax = ceil(tmax/dt)
@@ -93,12 +93,12 @@ def Transport1DCenteredExplicit(nx,cfl, isSmooth):
                 plt.savefig("TransportEquation_CenteredExplicit_"+str(nx)+"Cells_Smoothness"+str(isSmooth)+"_CFL"+str(cfl)+"_ResultField_"+str(it)+".png")
                 #plt.show()
 
-    print "Exact solution minimum   : ", min(u_initial), "Numerical solution minimum   : ",  min(u)
-    print "Exact solution maximum   : ", max(u_initial), "Numerical solution maximum   : ",  max(u)
-    print "Exact solution variation : ", np.sum([abs(u_initial[i] - u_initial[(i-1)%nx]) for i in range(nx)]), "Numerical solution variation : ",  np.sum([abs(u[i] - u[(i-1)%nx]) for i in range(nx)])
-    print "l1 numerical error       : ", dx*np.sum([abs(u[i] - u_initial[i]) for i in range(nx)])        
+    print( "Exact solution minimum   : ", min(u_initial), "Numerical solution minimum   : ",  min(u) )
+    print( "Exact solution maximum   : ", max(u_initial), "Numerical solution maximum   : ",  max(u) )
+    print( "Exact solution variation : ", np.sum([abs(u_initial[i] - u_initial[(i-1)%nx]) for i in range(nx)]), "Numerical solution variation : ",  np.sum([abs(u[i] - u[(i-1)%nx]) for i in range(nx)]) )
+    print( "l1 numerical error       : ", dx*np.sum([abs(u[i] - u_initial[i]) for i in range(nx)])        
     
-    print "Simulation of 1D transport equation with explicit centered scheme done"
+    print( "Simulation of 1D transport equation with explicit centered scheme done" )
     
     #return min, max, total variation and l1 error
     return min(u), max(u), np.sum([abs(u[i] - u[(i-1)%nx]) for i in range(nx)]), dx*np.sum([abs(u[i] - u_initial[i]) for i in range(nx)])

@@ -27,7 +27,7 @@ rho0=p0/c0*c0#reference density
 precision=1e-5
 
 def initial_conditions_shock(my_mesh, isCircle):
-    print "Initial data : Spherical wave"
+    print( "Initial data : Spherical wave")
     dim     = my_mesh.getMeshDimension()
     nbCells = my_mesh.getNumberOfCells()
 
@@ -232,7 +232,7 @@ def WaveSystemStaggered(ntmax, tmax, cfl, my_mesh, output_freq, meshName, resolu
     elif(meshName.find("disk")>-1 or meshName.find("Disk")>-1):
         pressure_field, velocity_field = initial_conditions_shock(my_mesh,True)
     else:
-        print "Mesh name : ", meshName
+        print( "Mesh name : ", meshName )
         raise ValueError("Mesh name should contain substring square, cube or disk")
 
     for k in range(nbCells):
@@ -279,7 +279,7 @@ def WaveSystemStaggered(ntmax, tmax, cfl, my_mesh, output_freq, meshName, resolu
         cvgceLS=LS.getStatus();
         iterGMRES=LS.getNumberOfIter();
         if(not cvgceLS):
-            print "Linear system did not converge ", iterGMRES, " GMRES iterations"
+            print( "Linear system did not converge ", iterGMRES, " GMRES iterations")
             raise ValueError("Pas de convergence du système linéaire");
         dUn-=Un
         
@@ -296,9 +296,9 @@ def WaveSystemStaggered(ntmax, tmax, cfl, my_mesh, output_freq, meshName, resolu
     
         #Sauvegardes
         if(it%output_freq==0 or it>=ntmax or isStationary or time >=tmax):
-            print"-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt)
-            print "Variation temporelle relative : pressure ", max_dp/p0 ,", velocity ", max_dq/rho0
-            print "Linear system converged in ", iterGMRES, " GMRES iterations"
+            print( "-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt) )
+            print( "Variation temporelle relative : pressure ", max_dp/p0 ,", velocity ", max_dq/rho0 )
+            print( "Linear system converged in ", iterGMRES, " GMRES iterations" )
 
             for k in range(nbCells):
                 pressure_field[k]=Un[k]
@@ -313,15 +313,15 @@ def WaveSystemStaggered(ntmax, tmax, cfl, my_mesh, output_freq, meshName, resolu
             velocity_field.setTime(time,it);
             velocity_field.writeVTK("WaveSystem"+str(dim)+"DStaggered"+meshName+"_velocity",False);
 
-    print"-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt)
-    print "Variation temporelle relative : pressure ", max_dp/p0 ,", velocity ", max_dq/rho0 
-    print
+    print( "-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt) )
+    print( "Variation temporelle relative : pressure ", max_dp/p0 ,", velocity ", max_dq/rho0 )
+    print()
 
     if(it>=ntmax):
-        print "Nombre de pas de temps maximum ntmax= ", ntmax, " atteint"
+        print( "Nombre de pas de temps maximum ntmax= ", ntmax, " atteint")
     elif(isStationary):
-        print "Régime stationnaire atteint au pas de temps ", it, ", t= ", time
-        print "------------------------------------------------------------------------------------"
+        print( "Régime stationnaire atteint au pas de temps ", it, ", t= ", time)
+        print( "------------------------------------------------------------------------------------")
 
         pressure_field.setTime(time,0);
         pressure_field.writeVTK("WaveSystem"+str(dim)+"DStaggered"+meshName+"_pressure_Stat");
@@ -333,15 +333,15 @@ def WaveSystemStaggered(ntmax, tmax, cfl, my_mesh, output_freq, meshName, resolu
         PV_routines.Save_PV_data_to_picture_file("WaveSystem"+str(dim)+"DStaggered"+meshName+"_velocity_Stat"+'_0.vtu',"Velocity",'CELLS',"WaveSystem"+str(dim)+"DStaggered"+meshName+"_velocity_Stat")
         
     else:
-        print "Temps maximum Tmax= ", tmax, " atteint"
+        print( "Temps maximum Tmax= ", tmax, " atteint")
 
 
 def solve(my_mesh,meshName,resolution):
-    print "Resolution of the Wave system in dimension ", my_mesh.getSpaceDimension()
-    print "Numerical method : staggered scheme"
-    print "Initial data : Spherical wave"
-    print "Periodic boundary conditions"
-    print "Mesh name : ",meshName , my_mesh.getNumberOfCells(), " cells"
+    print( "Resolution of the Wave system in dimension ", my_mesh.getSpaceDimension() )
+    print( "Numerical method : staggered scheme" )
+    print( "Initial data : Spherical wave" )
+    print( "Periodic boundary conditions" )
+    print( "Mesh name : ",meshName , my_mesh.getNumberOfCells(), " cells" )
     
     # Problem data
     tmax = 1000.

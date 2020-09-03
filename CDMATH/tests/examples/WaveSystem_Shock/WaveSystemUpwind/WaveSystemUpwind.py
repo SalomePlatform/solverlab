@@ -27,7 +27,7 @@ rho0=p0/c0*c0#reference density
 precision=1e-5
 
 def initial_conditions_shock(my_mesh, isCircle):
-    print "Initial data : Spherical wave"
+    print( "Initial data : Spherical wave" )
     dim     = my_mesh.getMeshDimension()
     nbCells = my_mesh.getNumberOfCells()
 
@@ -142,7 +142,7 @@ def computeDivergenceMatrix(my_mesh,nbVoisinsMax,dt):
                     implMat.addValue(j*nbComp,cellAutre*nbComp,Am)
                     implMat.addValue(j*nbComp,        j*nbComp,Am*(-1.))
                 elif(Fk.getGroupName() != "Neumann"):#Nothing to do for Neumann boundary condition
-                    print Fk.getGroupName()
+                    print( Fk.getGroupName() )
                     raise ValueError("computeFluxes: Unknown boundary condition name");
                 
     return implMat
@@ -165,7 +165,7 @@ def WaveSystemVF(ntmax, tmax, cfl, my_mesh, output_freq, filename,resolution, is
     elif(filename.find("disk")>-1 or filename.find("Disk")>-1):
         pressure_field, velocity_field = initial_conditions_shock(my_mesh,True)
     else:
-        print "Mesh name : ", filename
+        print( "Mesh name : ", filename )
         raise ValueError("Mesh name should contain substring square, cube or disk")
 
     #iteration vectors
@@ -209,7 +209,7 @@ def WaveSystemVF(ntmax, tmax, cfl, my_mesh, output_freq, filename,resolution, is
             LS.setSndMember(Un)
             Un=LS.solve();
             if(not LS.getStatus()):
-                print "Linear system did not converge ", LS.getNumberOfIter(), " GMRES iterations"
+                print( "Linear system did not converge ", LS.getNumberOfIter(), " GMRES iterations" )
                 raise ValueError("Pas de convergence du système linéaire");
             dUn-=Un
 
@@ -238,12 +238,12 @@ def WaveSystemVF(ntmax, tmax, cfl, my_mesh, output_freq, filename,resolution, is
             velocity_field.writeVTK("WaveSystem"+str(dim)+"DUpwind"+"_isImplicit"+str(isImplicit)+meshName+"_velocity",False);
 
     print("-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt))
-    print
+    print()
 
     if(it>=ntmax):
-        print "Nombre de pas de temps maximum ntmax= ", ntmax, " atteint"
+        print( "Nombre de pas de temps maximum ntmax= ", ntmax, " atteint")
     elif(isStationary):
-        print "Régime stationnaire atteint au pas de temps ", it, ", t= ", time
+        print( "Régime stationnaire atteint au pas de temps ", it, ", t= ", time)
 
         pressure_field.setTime(time,0);
         pressure_field.writeVTK("WaveSystem"+str(dim)+"DUpwind"+"_isImplicit"+str(isImplicit)+meshName+"_pressure_Stat");
@@ -258,15 +258,15 @@ def WaveSystemVF(ntmax, tmax, cfl, my_mesh, output_freq, filename,resolution, is
         PV_routines.Save_PV_data_to_picture_file("WaveSystem"+str(dim)+"DUpwind"+"_isImplicit"+str(isImplicit)+meshName+"_velocity_Stat"+'_0.vtu',"Velocity",'CELLS',"WaveSystem"+str(dim)+"DUpwind"+meshName+"_velocity_Stat")
         
     else:
-        print "Temps maximum Tmax= ", tmax, " atteint"
+        print( "Temps maximum Tmax= ", tmax, " atteint")
 
 
 def solve(my_mesh,filename,resolution, isImplicit):
-    print "Resolution of the Wave system in dimension ", my_mesh.getSpaceDimension()
-    print "Numerical method : upwind"
-    print "Initial data : spherical wave"
-    print "Wall boundary conditions"
-    print "Mesh name : ",filename , my_mesh.getNumberOfCells(), " cells"
+    print( "Resolution of the Wave system in dimension ", my_mesh.getSpaceDimension() )
+    print( "Numerical method : upwind" )
+    print( "Initial data : spherical wave" )
+    print( "Wall boundary conditions" )
+    print( "Mesh name : ",filename , my_mesh.getNumberOfCells(), " cells" )
 
     # Problem data
     tmax = 1.

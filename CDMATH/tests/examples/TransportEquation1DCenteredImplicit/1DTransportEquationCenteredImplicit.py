@@ -31,7 +31,7 @@ def centeredSchemeMatrix(nx,cfl):
     return centeredMat
     
 def Transport1DCenteredImplicit(nx,cfl):
-    print "Simulation of 1D transport equation with implicit centered scheme"
+    print( "Simulation of 1D transport equation with implicit centered scheme" )
 
     ##################### Simulation parameters
     a = 0.0 # space domain :  a <= x <= b
@@ -100,17 +100,17 @@ def Transport1DCenteredImplicit(nx,cfl):
             LS.setSndMember(Un)
             Un=LS.solve()
             if(not LS.getStatus()):
-                print "Linear system did not converge ", iterGMRES, " GMRES iterations"
+                print( "Linear system did not converge ", iterGMRES, " GMRES iterations" )
                 raise ValueError("Pas de convergence du système linéaire");
             for i in range(nx):
                 u[i]=Un[i]
     
             if ( max(u) > max_initial ):
-                print "-- Iter: " + str(it) + " max principle violated : max(t) > max(0) : max(t)= ",max(u), " max(0)= ", max_initial
+                print( "-- Iter: " + str(it) + " max principle violated : max(t) > max(0) : max(t)= ",max(u), " max(0)= ", max_initial )
             if ( min(u) < min_initial ):
-                print "-- Iter: " + str(it) + " min principle violated : min(t) < min(0) : min(t)= ",min(u), " min(0)= ", min_initial
+                print( "-- Iter: " + str(it) + " min principle violated : min(t) < min(0) : min(t)= ",min(u), " min(0)= ", min_initial )
             if ( np.sum([abs(u[i] - u[(i-1)%nx]) for i in range(nx)]) > total_var_initial ):
-                print "-- Iter: " + str(it) + " total variation increased : var(t) > var(0) : var(t)= ", np.sum([abs(u[i] - u[(i-1)%nx]) for i in range(nx)]), " var(0)= ", total_var_initial
+                print( "-- Iter: " + str(it) + " total variation increased : var(t) > var(0) : var(t)= ", np.sum([abs(u[i] - u[(i-1)%nx]) for i in range(nx)]), " var(0)= ", total_var_initial )
 
             time += dt
             it += 1
@@ -119,15 +119,15 @@ def Transport1DCenteredImplicit(nx,cfl):
             line1.set_ydata(u)
             writer.grab_frame()
             if (it % output_freq == 0):
-                print("-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt))
+                print( "-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt) )
                 np.savetxt( "TransportEquation_CenteredImplicit_"+str(nx)+"Cells_CFL"+str(cfl)+"_ResultField_"+str(it)+".txt", u, delimiter="\n")
                 plt.savefig("TransportEquation_CenteredImplicit_"+str(nx)+"Cells_CFL"+str(cfl)+"_ResultField_"+str(it)+".png")
                 #plt.show()
 
-    print "Exact solution minimum   : ", min(u_initial), "Numerical solution minimum   : ",  min(u)
-    print "Exact solution maximum   : ", max(u_initial), "Numerical solution maximum   : ",  max(u)
-    print "Exact solution variation : ", np.sum([abs(u_initial[i] - u_initial[(i-1)%nx]) for i in range(nx)]), "Numerical solution variation : ",  np.sum([abs(u[i] - u[(i-1)%nx]) for i in range(nx)])
-    print "l1 numerical error       : ", dx*np.sum([abs(u[i] - u_initial[i]) for i in range(nx)])        
+    print( "Exact solution minimum   : ", min(u_initial), "Numerical solution minimum   : ",  min(u) )
+    print( "Exact solution maximum   : ", max(u_initial), "Numerical solution maximum   : ",  max(u) )
+    print( "Exact solution variation : ", np.sum([abs(u_initial[i] - u_initial[(i-1)%nx]) for i in range(nx)]), "Numerical solution variation : ",  np.sum([abs(u[i] - u[(i-1)%nx]) for i in range(nx)]) )
+    print( "l1 numerical error       : ", dx*np.sum([abs(u[i] - u_initial[i]) for i in range(nx)]) )       
     
     print("Simulation of transport equation with implicit centered scheme done.")
     

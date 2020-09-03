@@ -67,40 +67,40 @@ resolution=100
 
 outputFileName="Extract_VTK_over_line_"+fileNameVTK1+".csv"
 Extract_VTK_data_over_line_to_txt_file('2D_structured_cell_field_0.vtu', outputFileName, point1, point2, resolution)
-print "Extract_VTK_over_line ok"
+print( "Extract_VTK_over_line ok")
 
 outputFileName="Extract_field_over_line_"+fileNameVTK2+".csv"
 Extract_field_data_over_line_to_txt_file(field2, point1, point2, resolution, outputFileName)
-print "Extract_field_over_line ok"
+print( "Extract_field_over_line ok")
 
 point=[0.5,0.5,0.5]
 normal=[-0.5,-0.5,-0.5]
 outputFileName="Slice_VTK_data_to_txt_file_"+fileNameVTK3+".csv"
 Slice_VTK_data_to_txt_file(fileNameVTK3+'_0.vtu', outputFileName, point, normal,resolution )
-print "Slice_VTK_data_to_txt_file ok"
+print( "Slice_VTK_data_to_txt_file ok")
 
 outputFileName="Slice_field_data_to_txt_file_"+fileNameVTK4+".csv"
 Slice_field_data_to_txt_file(field4, outputFileName, point, normal,resolution)
-print "Slice_field_data_to_txt_file ok"
+print( "Slice_field_data_to_txt_file ok")
 
 outputFileName="Slice_VTK_data_to_VTK_"+fileNameVTK5+'_0.vtu'
 Slice_VTK_data_to_VTK(fileNameVTK5+'_0.vtu',outputFileName,point, normal,resolution )
-print "Slice_VTK_data_to_VTK ok"
+print( "Slice_VTK_data_to_VTK ok")
 
 outputFileName="Clip_VTK_data_to_VTK_"+fileNameVTK5+'_0.vtu'
 Clip_VTK_data_to_VTK(fileNameVTK5+'_0.vtu',outputFileName,point, normal,resolution )
-print "Clip_VTK_data_to_VTK ok"
+print( "Clip_VTK_data_to_VTK ok")
 
 inputFileName="Slice_VTK_data_to_VTK_"+fileNameVTK5
 outputFileName="Save_Slice_VTK_data_to_VTK_"+fileNameVTK5
 Save_VTK_data_to_picture_file(inputFileName+'_0.vtu',"testfield5","CELLS",outputFileName)
-print "Save_VTK_Slice_data_to_picture_file ok"
+print( "Save_VTK_Slice_data_to_picture_file ok")
 
 inputFileName="Clip_VTK_data_to_VTK_"+fileNameVTK5
 outputFileName="Save_Clip_VTK_data_to_VTK_"+fileNameVTK5
 Save_VTK_data_to_picture_file(inputFileName+'_0.vtu',"testfield5","CELLS",outputFileName)
-print "Save_VTK_Clip_data_to_picture_file ok"
+print( "Save_VTK_Clip_data_to_picture_file ok")
 
 outputFileName="Save_VTK_data_to_picture_file_"+fileNameVTK5
 Save_VTK_data_to_picture_file(fileNameVTK5+'_0.vtu',"testfield5","CELLS",outputFileName)
-print "Save_VTK_data_to_picture_file ok"
+print( "Save_VTK_data_to_picture_file ok")

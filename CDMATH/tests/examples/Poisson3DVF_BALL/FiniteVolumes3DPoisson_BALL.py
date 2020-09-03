@@ -90,9 +90,9 @@ print("Linear system matrix building done")
 LS=cdmath.LinearSolver(Rigidite,RHS,500,1.E-6,"GMRES","ILU")
 SolSyst=LS.solve()
 
-print "Preconditioner used : ", LS.getNameOfPc()
-print "Number of iterations used : ", LS.getNumberOfIter()
-print "Final residual : ", LS.getResidu()
+print( "Preconditioner used : ", LS.getNameOfPc() )
+print( "Number of iterations used : ", LS.getNumberOfIter() )
+print( "Final residual : ", LS.getResidu() )
 print("Linear system solved")
 
 # Création du champ résultat
@@ -140,6 +140,6 @@ for i in range(nbCells) :
 
 print("Absolute error = max(| exact solution - numerical solution |) = ",erreur_abs )
 print("Relative error = max(| exact solution - numerical solution |)/max(| exact solution |) = ",erreur_abs/max_abs_sol_exacte)
-print ("Maximum numerical solution = ", max_sol_num, " Minimum numerical solution = ", min_sol_num)
+print("Maximum numerical solution = ", max_sol_num, " Minimum numerical solution = ", min_sol_num)
 
 assert erreur_abs/max_abs_sol_exacte <1.

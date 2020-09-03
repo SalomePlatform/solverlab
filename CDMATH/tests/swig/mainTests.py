@@ -304,11 +304,11 @@ class TestsCDMATHSwig(unittest.TestCase):
             self.assertTrue(0.0 == conc13[i])
 
         conc15 = conc1 * 2.
-        conc16 = conc1 / 3.
+        conc16 = conc1 * 0.3 
 
         for i in range(conc15.getNumberOfElements()):
             self.assertTrue(conc1[i] * 2. == conc15[i])
-            self.assertTrue(conc1[i] / 3. == conc16[i])
+            self.assertTrue(conc1[i] * 0.3 == conc16[i])
 
         MF = Mesh(0.0, 1.0, 3, 0., 1., 3)
         concF1 = Field("CONCENTRATION", FACES, MF)
@@ -543,7 +543,7 @@ class TestsCDMATHSwig(unittest.TestCase):
 
         M23 = Mesh("meshSquare.med")
         self.assertTrue(len(M23.getNameOfFaceGroups()) == 5)
-        print M23.getNameOfFaceGroups()
+        print( M23.getNameOfFaceGroups() )
         self.assertTrue(M23.getNameOfFaceGroups()[3] == "Bottom")
         self.assertTrue(M23.getNameOfFaceGroups()[2] == "Left")
         self.assertTrue(M23.getNameOfFaceGroups()[1] == "Right")
@@ -631,7 +631,7 @@ class TestsCDMATHSwig(unittest.TestCase):
         self.assertTrue(9.0 == A22[1, 0])
         self.assertTrue(12.0 == A22[1, 1])
 
-        A22 = A / 2
+        A22 = A *0.5
         self.assertTrue(0.5 == A22[0, 0])
         self.assertTrue(1.0 == A22[0, 1])
         self.assertTrue(1.5 == A22[1, 0])
@@ -752,7 +752,7 @@ class TestsCDMATHSwig(unittest.TestCase):
         self.assertTrue(2.0 == E[0])
         self.assertTrue(4.0 == E[1])
 
-        E /= 2
+        E *= 0.5
         self.assertTrue(1.0 == E[0])
         self.assertTrue(2.0 == E[1])
 
@@ -760,7 +760,7 @@ class TestsCDMATHSwig(unittest.TestCase):
         self.assertTrue(2.0, E[0])
         self.assertTrue(4.0, E[1])
 
-        F = A / 2
+        F = A * 0.5
         self.assertTrue(A[0] / 2 == F[0])
         self.assertTrue(A[1] / 2 == F[1])
 
@@ -770,18 +770,18 @@ class TestsCDMATHSwig(unittest.TestCase):
         a = A[0]
         self.assertTrue(A[0] == a)
 
-#         v3=Vector(4);
-#         v3[0]=1;
-#         v3[1]=2;
-#         v3[2]=3;
-#         v3[3]=4;
-#
-#         v4=Vector(3);
-#         v4[0]=1.;
-#         v4[1]=2.;
-#         v4[2]=3.;
-#
-#         v5=v3^v4;
+#        v3=Vector(4);
+#        v3[0]=1;
+#        v3[1]=2;
+#        v3[2]=3;
+#        v3[3]=4;
+
+#        v4=Vector(3);
+#        v4[0]=1.;
+#        v4[1]=2.;
+#        v4[2]=3.;
+
+#        v5=v3^v4;
 #
 #         self.assertTrue( 1.==v5[0,0] );
 #         self.assertTrue( 2.==v5[0,1] );

@@ -44,7 +44,7 @@ def Flux_Godunov2(u_l, u_r):
     elif (u_l*u_l>u_r*u_r):
         flux = max(1./3.*u_l*u_l*u_l,1./3.*u_r*u_r*u_r)
     else:
-        print "u_l ",u_l, " u_r ", u_r
+        print( "u_l ",u_l, " u_r ", u_r )
     return flux
 
 def Du_ncsv(u_l, u_i, u_r):

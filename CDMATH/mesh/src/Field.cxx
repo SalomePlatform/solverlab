@@ -409,29 +409,29 @@ Field::getNormEuclidean() const
 }
 
 double
-Field::max() const
+Field::max(int component) const
 {
-	if( getNumberOfComponents() !=1)
-		throw CdmathException("double Field::max() : field should have a single component in order to extract maximum value");
+	if( component >= getNumberOfComponents() )
+		throw CdmathException("double Field::max() : component number should be smaller than field number of components");
 		
-	double result=0;
+	double result=-1e100;
 	for(int i=0; i<getNumberOfElements() ; i++)
-		if( result < (*this)(i,0))
-			result = (*this)(i,0);
+		if( result < (*this)(i,component))
+			result = (*this)(i,component);
 
 	return result;
 }
 
 double
-Field::min() const
+Field::min(int component) const
 {
-	if( getNumberOfComponents() !=1)
-		throw CdmathException("double Field::min() : field should have a single component in order to extract minimum value");
+	if( component >= getNumberOfComponents() )
+		throw CdmathException("double Field::min() : component number should be smaller than field number of components");
 		
 	double result=1e100;
 	for(int i=0; i<getNumberOfElements() ; i++)
-		if( result > (*this)(i,0))
-			result = (*this)(i,0);
+		if( result > (*this)(i,component))
+			result = (*this)(i,component);
 
 	return result;
 }
@@ -555,6 +555,24 @@ Field::normMax ( ) const
                 result(j)=fabs((*this)(i,j));
 
 	return result;
+}
+
+Vector 
+Field::componentMax(Vector & Indices) const
+{
+	int nbComp=_field->getNumberOfComponents();
+   	int nbElems=getNumberOfElements();
+
+	Vector result(nbComp);//Vector containing the Linfinity norm of each component
+
+	for(int i=0; i<nbElems ; i++)
+        for(int j=0; j<nbComp ; j++)
+            if(fabs((*this)(i,j))>result(j))
+            {
+                result(j)=fabs((*this)(i,j));
+                Indices(j)=i;
+            }
+	return result;    
 }
 
 //----------------------------------------------------------------------

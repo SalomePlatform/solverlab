@@ -70,13 +70,13 @@ resolution=100
 
 outputFileName="Extract_PV_over_line_"+fileNameVTK1+".csv"
 Extract_PV_data_over_line_to_txt_file('2D_structured_cell_field_0.vtu', outputFileName, point1, point2, resolution)
-print "Extract_VTK_over_line ok"
+print( "Extract_VTK_over_line ok")
 
 point=[0.5,0.5,0]
 normal=[1,1,0]
 outputFileName="Slice_PV_data_to_txt_file_"+fileNameVTK3+".csv"
 Slice_PV_data_to_txt_file(fileNameVTK3+'_0.vtu', outputFileName, point, normal,resolution )
-print "Slice_PV_data_to_txt_file ok"
+print( "Slice_PV_data_to_txt_file ok")
 
 #outputFileName="Slice_field_data_to_txt_file"+fileNameVTK4+".csv"
 #Slice_PV_field_data_to_txt_file(field4, outputFileName, point, normal,resolution)
@@ -85,25 +85,25 @@ print "Slice_PV_data_to_txt_file ok"
 outputFileName="Clip_PV_data_to_VTK_"+fileNameVTK5
 inputFileName="Clip_VTK_data_to_VTK_"+fileNameVTK5
 Save_PV_data_to_picture_file(inputFileName+'_0.vtu',fieldName5,'CELLS',outputFileName)
-print "Save_PV_Clip_data_to_picture_file ok"
+print( "Save_PV_Clip_data_to_picture_file ok")
 
 outputFileName="Slice_PV_data_to_VTK_"+fileNameVTK5
 inputFileName="Slice_VTK_data_to_VTK_"+fileNameVTK5
 Save_PV_data_to_picture_file(inputFileName+'_0.vtu',fieldName5,'CELLS',outputFileName)
-print "Save_PV_Slice_data_to_picture_file ok"
+print( "Save_PV_Slice_data_to_picture_file ok")
 
 outputFileName="Save_PV_data_to_picture_file_"+fileNameVTK2
 Save_PV_data_to_picture_file(fileNameVTK2+'_0.vtu',fieldName2,'NODES',outputFileName)
-print "Save_PV_data_to_picture_file " + fileNameVTK2+ " ok"
+print( "Save_PV_data_to_picture_file " + fileNameVTK2+ " ok")
 
 outputFileName="Save_PV_data_to_picture_file_"+fileNameVTK3
 Save_PV_data_to_picture_file(fileNameVTK3+'_0.vtu',fieldName3,'NODES',outputFileName)
-print "Save_PV_data_to_picture_file " + fileNameVTK3+ " ok"
+print( "Save_PV_data_to_picture_file " + fileNameVTK3+ " ok")
 
 outputFileName="Save_PV_data_to_picture_file_"+fileNameVTK4
 Save_PV_data_to_picture_file(fileNameVTK4+'_0.vtu',fieldName4,'NODES',outputFileName)
-print "Save_PV_data_to_picture_file " + fileNameVTK4+ " ok"
+print( "Save_PV_data_to_picture_file " + fileNameVTK4+ " ok")
 
 outputFileName="Save_PV_data_to_picture_file_"+fileNameVTK5
 Save_PV_data_to_picture_file(fileNameVTK5+'_0.vtu',fieldName5,'CELLS',outputFileName)
-print "Save_PV_data_to_picture_file " + fileNameVTK5+ " ok"
+print( "Save_PV_data_to_picture_file " + fileNameVTK5+ " ok")

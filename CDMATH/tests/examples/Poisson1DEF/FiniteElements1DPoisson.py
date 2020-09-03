@@ -110,9 +110,9 @@ print("Linear system matrix building done")
 LS=cdmath.LinearSolver(Rigidite,RHS,100,1.E-6,"CG","ILU")#Remplacer CG par CHOLESKY pour solveur direct
 SolSyst=LS.solve()
 
-print "Preconditioner used : ", LS.getNameOfPc()
-print "Number of iterations used : ", LS.getNumberOfIter()
-print "Final residual : ", LS.getResidu()
+print( "Preconditioner used : ", LS.getNameOfPc() )
+print( "Number of iterations used : ", LS.getNumberOfIter() )
+print( "Final residual : ", LS.getResidu() )
 print("Linear system solved")
 
 # Création du champ résultat
@@ -156,7 +156,7 @@ for i in range(nbNodes) :
 
 print("Absolute error = max(| exact solution - numerical solution |) = ",erreur_abs )
 print("Relative error = max(| exact solution - numerical solution |)/max(| exact solution |) = ",erreur_abs/max_abs_sol_exacte)
-print ("Maximum numerical solution = ", max_sol_num, " Minimum numerical solution = ", min_sol_num)
-print ("Maximum exact solution = ", my_RHSfield.max()/(pi*pi), " Minimum exact solution = ", my_RHSfield.min()/(pi*pi))
+print("Maximum numerical solution = ", max_sol_num, " Minimum numerical solution = ", min_sol_num)
+print("Maximum exact solution = ", my_RHSfield.max()/(pi*pi), " Minimum exact solution = ", my_RHSfield.min()/(pi*pi))
 
 assert erreur_abs/max_abs_sol_exacte <1.

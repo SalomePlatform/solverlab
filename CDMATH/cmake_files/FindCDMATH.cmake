@@ -54,20 +54,32 @@ set(CDMATH_INCLUDES ${CDMATH_DIR}/include)
 if (NOT (IS_DIRECTORY  ${CDMATH_INCLUDES}) )
   message (SEND_ERROR "CDMATH_INCLUDES can not be used, ${CDMATH_INCLUDES} does not exist.")
 endif () 
+set(MED_INCLUDES ${CDMATH_DIR}/share/med/include)
+if (NOT (IS_DIRECTORY  ${MED_INCLUDES}) )
+  message (SEND_ERROR "MED_INCLUDES can not be used, ${MED_INCLUDES} does not exist.")
+endif () 
+set(MEDCOUPLING_INCLUDES ${CDMATH_DIR}/share/medcoupling/include)
+if (NOT (IS_DIRECTORY  ${MEDCOUPLING_INCLUDES}) )
+  message (SEND_ERROR "MEDCOUPLING_INCLUDES can not be used, ${MEDCOUPLING_INCLUDES} does not exist.")
+endif () 
 
 # CDMATH libraries against which to link
 # This sets the variable ${CDMATH_LIBRARIES}.
 set(CDMATH_LIBDIR ${CDMATH_DIR}/lib)
-if (NOT (IS_DIRECTORY  ${CDMATH_LIBDIR}) )
+if ( NOT (IS_DIRECTORY  ${CDMATH_LIBDIR}) )
   message (SEND_ERROR "CDMATH_LIBDIR can not be used, ${CDMATH_LIBDIR} does not exist.")
 endif () 
-find_library (INTERPKERNEL_LIB NAMES interpkernel PATHS ${CDMATH_LIBDIR})
-find_library (MEDC_LIB NAMES medC PATHS ${CDMATH_LIBDIR})
-find_library (MEDLOADER_LIB NAMES medloader PATHS ${CDMATH_LIBDIR})
-find_library (MEDCOUPLING_LIB NAMES medcoupling PATHS ${CDMATH_LIBDIR})
 find_library (CDMATHBASE_LIB NAMES base PATHS ${CDMATH_LIBDIR})
 find_library (CDMATHMESH_LIB NAMES mesh PATHS ${CDMATH_LIBDIR})
-find_library (CDMATHLINEARSOLVER_LIB NAMES linearsolver PATHS ${CDMATH_LIBDIR})
+find_library (MEDC_LIB NAMES medC PATHS ${CDMATH_DIR}/share/med/lib)
+find_library (MEDLOADER_LIB NAMES medloader PATHS ${CDMATH_DIR}/share/medcoupling/lib/)
+find_library (MEDCOUPLING_LIB NAMES medcoupling PATHS ${CDMATH_DIR}/share/medcoupling/lib/)
+#find_library (CDMATHLINEARSOLVER_LIB NAMES linearsolver PATHS ${CDMATH_LIBDIR})
 set (CDMATH_LIBRARIES
-    ${INTERPKERNEL_LIB} ${MEDC_LIB} ${MEDLOADER_LIB} ${MEDCOUPLING_LIB}
-    ${CDMATHBASE_LIB} ${CDMATHMESH_LIB} ${CDMATHLINEARSOLVER_LIB})
+	${MEDC_LIB} 
+	${MEDLOADER_LIB} 
+	${MEDCOUPLING_LIB}
+	${CDMATHBASE_LIB} 
+	${CDMATHMESH_LIB} 
+#	${CDMATHLINEARSOLVER_LIB}
+	)

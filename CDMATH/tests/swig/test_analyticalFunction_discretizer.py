@@ -23,8 +23,8 @@ solution = anSol.analyticalFunction_discretizer(mesh, output_dir="./tmp",
 
 print(solution.var_list)
 for varName in solution.var_dict:
-    print varName + "=", solution.var_eval[varName]
+    print( varName + "=", solution.var_eval[varName])
 
 solution.save_all_variables()
 
-print "done"
+print( "done" )

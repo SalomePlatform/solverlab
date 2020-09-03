@@ -15,7 +15,7 @@ rho0=p0/c0*c0#reference density
 precision=1e-5
 
 def initial_conditions_Riemann_problem(a,b,nx):
-    print "Initial data Riemann problem"
+    print( "Initial data Riemann problem" )
 
     dx = (b - a) / nx #space step
     x=[a+0.5*dx + i*dx for i in range(nx)]   # array of cell center (1D mesh)
@@ -152,7 +152,7 @@ def WaveSystemVF(ntmax, tmax, cfl, a,b,nx, output_freq, meshName,scaling):
             LS.setSndMember(Un_implicite)
             Un_implicite=LS.solve();
             if(not LS.getStatus()):
-                print "Linear system did not converge ", LS.getNumberOfIter(), " GMRES iterations"
+                print( "Linear system did not converge ", LS.getNumberOfIter(), " GMRES iterations" )
                 raise ValueError("Pas de convergence du système linéaire");
             dUn_implicite-=Un_implicite
     
@@ -171,8 +171,8 @@ def WaveSystemVF(ntmax, tmax, cfl, a,b,nx, output_freq, meshName,scaling):
         
             #Sauvegardes
             if(it==1 or it%output_freq==0 or it>=ntmax or isStationary or time >=tmax):
-                print"-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt)
-                print "Linear system converged in ", LS.getNumberOfIter(), " GMRES iterations"
+                print( "-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt) )
+                print( "Linear system converged in ", LS.getNumberOfIter(), " GMRES iterations" )
     
                 np.savetxt("WaveSystem" +str(dim)+"DUpwindExplicit"+meshName+"_pressure"+str(it)+".txt", pressure_field          , delimiter="\n")
                 np.savetxt("WaveSystem" +str(dim)+"DUpwindExplicit"+meshName+"_velocity"+str(it)+".txt", velocity_field          , delimiter="\n")
@@ -180,15 +180,15 @@ def WaveSystemVF(ntmax, tmax, cfl, a,b,nx, output_freq, meshName,scaling):
                 np.savetxt("WaveSystem" +str(dim)+"DUpwindImplicit"+meshName+"_velocity"+str(it)+".txt", velocity_field          , delimiter="\n")
                 plt.savefig("WaveSystem"+str(dim)+"DUpwind"        +meshName+"_pressure"+str(it)+".png")
     
-                print
-    print"-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt)
+                print()
+    print("-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt) )
 
     if(it>=ntmax):
-        print "Nombre de pas de temps maximum ntmax= ", ntmax, " atteint"
+        print( "Nombre de pas de temps maximum ntmax= ", ntmax, " atteint" )
         return
     elif(isStationary):
-        print "Régime stationnaire atteint au pas de temps ", it, ", t= ", time
-        print "------------------------------------------------------------------------------------"
+        print( "Régime stationnaire atteint au pas de temps ", it, ", t= ", time )
+        print( "------------------------------------------------------------------------------------")
 
         np.savetxt( "WaveSystem"+str(dim)+"DUpwind"+meshName+"_pressure_Stat.txt", pressure_field, delimiter="\n")
         np.savetxt( "WaveSystem"+str(dim)+"DUpwind"+meshName+"_velocity_Stat.txt", velocity_field, delimiter="\n")
@@ -196,16 +196,16 @@ def WaveSystemVF(ntmax, tmax, cfl, a,b,nx, output_freq, meshName,scaling):
 
         return
     else:
-        print "Temps maximum Tmax= ", tmax, " atteint"
+        print( "Temps maximum Tmax= ", tmax, " atteint")
         return
 
 
 def solve( a,b,nx, meshName, scaling, meshType, cfl):
 
-    print "Resolution of the Wave system in dimension 1 on "+str(nx)+ " cells, upwind scheme"
-    print "Initial data : ", "Riemann problem"
-    print "Boundary conditions : ", "Neumann"
-    print "Mesh name : ",meshName , ", ", nx, " cells"
+    print( "Resolution of the Wave system in dimension 1 on "+str(nx)+ " cells, upwind scheme")
+    print( "Initial data : ", "Riemann problem")
+    print( "Boundary conditions : ", "Neumann")
+    print( "Mesh name : ",meshName , ", ", nx, " cells")
     
     # Problem data
     tmax = 10000.

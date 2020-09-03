@@ -64,9 +64,9 @@ def Slice_PV_field_data_to_numpyArray(field,
     inputFileName = field.getName()
     field.writeVTK(inputFileName)
  
-    numpy_array = Slice_PV_data_to_numpyArray(inputFileName+"_0.vtu", point, normal, resolution)
+    numpy_array = Slice_PV_data_to_numpyArray(inputFileName+"_1.vtu", point, normal, resolution)
 
-    os.remove(inputFileName+"_0.vtu")
+    os.remove(inputFileName+"_1.vtu")
     return numpy_array
 
 def Slice_PV_field_data_to_txt_file(field, outputFileName,

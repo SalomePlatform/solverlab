@@ -143,8 +143,8 @@ def WaveSystem1DVF(ntmax, tmax, cfl, my_mesh, output_freq, resolution):
         #Sauvegardes
         if(it%output_freq==0 or it>=ntmax or isStationary or time >=tmax):
             print("-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt))
-            print "Variation temporelle relative : pressure ", maxVector[0]/p0 ,", velocity x", maxVector[1]/rho0 
-            print
+            print( "Variation temporelle relative : pressure ", maxVector[0]/p0 ,", velocity x", maxVector[1]/rho0 )
+            print()
 
             for k in range(nbCells):
                 pressure_field[k]=U[k,0]
@@ -155,15 +155,15 @@ def WaveSystem1DVF(ntmax, tmax, cfl, my_mesh, output_freq, resolution):
             velocity_field.setTime(time,it);
             velocity_field.writeCSV("WaveSystem1DUpwind_velocity");
     
-    print("-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt))
-    print "|| Un+1 - Un || : pressure ", maxVector[0]/p0 ,", velocity x", maxVector[1]/rho0 
-    print
+    print( "-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt) )
+    print( "|| Un+1 - Un || : pressure ", maxVector[0]/p0 ,", velocity x", maxVector[1]/rho0 )
+    print()
 
     if(it>=ntmax):
-        print "Nombre de pas de temps maximum ntmax= ", ntmax, " atteint"
+        print( "Nombre de pas de temps maximum ntmax= ", ntmax, " atteint" )
         raise ValueError("Maximum number of time steps reached : Stationary state not found !!!!!!!")
     elif(isStationary):
-        print "Régime stationnaire atteint au pas de temps ", it, ", t= ", time
+        print( "Régime stationnaire atteint au pas de temps ", it, ", t= ", time )
         for k in range(nbCells):
             pressure_field[k]=U[k,0]
             velocity_field[k,0]=U[k,1]/rho0
@@ -174,7 +174,7 @@ def WaveSystem1DVF(ntmax, tmax, cfl, my_mesh, output_freq, resolution):
         velocity_field.writeCSV("WaveSystem1DUpwind_velocity_Stat");
         
     else:
-        print "Temps maximum Tmax= ", tmax, " atteint"
+        print( "Temps maximum Tmax= ", tmax, " atteint" )
         raise ValueError("Maximum time reached : Stationary state not found !!!!!!!")
 
 

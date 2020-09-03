@@ -26,8 +26,8 @@ nbCells = my_mesh.getNumberOfCells()
 if( my_mesh.getSpaceDimension()!=2 or my_mesh.getMeshDimension()!=2) :
     raise ValueError("Wrong space or mesh dimension : space and mesh dimensions should be 2")
 
-print "Mesh loading done"
-print "Number of cells  = ", nbCells
+print( "Mesh loading done" )
+print( "Number of cells  = ", nbCells )
 
 #Discrétisation du second membre et extraction du nb max de voisins d'une cellule
 #================================================================================
@@ -50,7 +50,7 @@ for i in range(nbCells):
 	maxNbNeighbours= max(1+Ci.getNumberOfFaces(),maxNbNeighbours)
 
 print("Right hand side discretisation done")
-print "Maximum number of neighbours = ", maxNbNeighbours
+print("Maximum number of neighbours = ", maxNbNeighbours )
 
 # Construction de la matrice et du vecteur second membre du système linéaire
 #===========================================================================
@@ -87,10 +87,10 @@ print("Linear system matrix building done")
 LS=cdmath.LinearSolver(Rigidite,RHS,500,1.E-6,"GMRES","ILU")
 SolSyst=LS.solve()
 
-print "Preconditioner used : ", LS.getNameOfPc()
-print "Number of iterations used : ", LS.getNumberOfIter()
-print "Final residual : ", LS.getResidu()
-print "Linear system solved"
+print( "Preconditioner used : ", LS.getNameOfPc() )
+print( "Number of iterations used : ", LS.getNumberOfIter() )
+print( "Final residual : ", LS.getResidu() )
+print( "Linear system solved" )
 
 # Création du champ résultat
 #===========================

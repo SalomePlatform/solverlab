@@ -192,8 +192,8 @@ for j in boundaryNodes:
 #sauvegarde sur le disque dur du résultat dans un fichier paraview
 my_Temperature.writeVTK("FiniteElements3DTemperature")
 
-print "Minimum temperature= ", my_Temperature.min(), ", maximum temperature= ", my_Temperature.max()
+print( "Minimum temperature= ", my_Temperature.min(), ", maximum temperature= ", my_Temperature.max() )
 assert my_Temperature.min()>= min(Tmur,Tfenetre,Tradiateur) and my_Temperature.max()<= max(Tmur,Tfenetre,Tradiateur)
 
-print "Numerical solution of 3D Laplace equation using finite elements done"
+print( "Numerical solution of 3D Laplace equation using finite elements done" )
 

@@ -39,9 +39,9 @@ def Extract_field_data_over_line_to_numpyArray(field, point1, point2, resolution
     inputFileName = field.getName()#os.getcwd()+field.get_name()
     field.writeVTK(inputFileName)
 
-    numpy_array = Extract_VTK_data_over_line_to_numpyArray(inputFileName+"_0.vtu", point1, point2, resolution)
+    numpy_array = Extract_VTK_data_over_line_to_numpyArray(inputFileName+"_1.vtu", point1, point2, resolution)
 
-    os.remove(inputFileName+"_0.vtu")
+    os.remove(inputFileName+"_1.vtu")
     return numpy_array
 
 def Extract_field_data_over_line_to_txt_file(field, point1, point2, resolution, outputFileName):
@@ -89,9 +89,9 @@ def Slice_field_data_to_numpyArray(field,
     inputFileName = field.getName()
     field.writeVTK(inputFileName)
  
-    numpy_array = Slice_VTK_data_to_numpyArray(inputFileName+"_0.vtu", point, normal, resolution)
+    numpy_array = Slice_VTK_data_to_numpyArray(inputFileName+"_1.vtu", point, normal, resolution)
 
-    os.remove(inputFileName+"_0.vtu")
+    os.remove(inputFileName+"_1.vtu")
     return numpy_array
 
 def Slice_field_data_to_txt_file(field, outputFileName,

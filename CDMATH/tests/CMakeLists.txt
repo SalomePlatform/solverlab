@@ -1,10 +1,8 @@
-# nom du projet tests
+# Nom du projet tests
 PROJECT(tests)
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 IF (CDMATH_WITH_TESTS)
-  ADD_SUBDIRECTORY(cdmath)
-
   INCLUDE_DIRECTORIES(
     ${MEDCOUPLING_INCLUDE_DIR}
     ${BASE_DIR}/inc
@@ -12,44 +10,49 @@ IF (CDMATH_WITH_TESTS)
     cdmath
     )
 
-  SET(_extra_lib_TESTS)
-  if (CDMATH_WITH_PETSC)
-      INCLUDE_DIRECTORIES(
-        ${LINEARSOLVER_DIR}/inc
-        ${PETSC_INCLUDES}
-        ${SLEPC_INCLUDES}
-        )
-      SET(_extra_lib_TESTS linearsolver ${PETSC_LIBRARIES} ${SLEPC_LIBRARIES})
-  endif (CDMATH_WITH_PETSC)
-
   SET(MAIN_SOURCES
     MainTests.cxx
     )
 
   ADD_EXECUTABLE(TestCDMATH ${MAIN_SOURCES})
 
-  if (CDMATH_WITH_PETSC)
-     SET_TARGET_PROPERTIES(TestCDMATH PROPERTIES COMPILE_FLAGS -DCDMATH_WITH_PETSC)
-  else(CDMATH_WITH_PETSC)
-     SET_TARGET_PROPERTIES(TestCDMATH PROPERTIES COMPILE_FLAGS "")
-  endif (CDMATH_WITH_PETSC)
+  if  (CDMATH_WITH_PETSC)
+      INCLUDE_DIRECTORIES(
+        ${LINEARSOLVER_DIR}/inc
+        ${PETSC_INCLUDES}
+        ${SLEPC_INCLUDES}
+        )
+      SET(_extra_lib_TESTS linearsolver ${PETSC_LIBRARIES} ${SLEPC_LIBRARIES})
+      SET_TARGET_PROPERTIES(TestCDMATH PROPERTIES COMPILE_FLAGS -DCDMATH_WITH_PETSC)
+      SET(TESTS_LIBRARY_PATH ${CMAKE_BINARY_DIR}/base/lib:${CMAKE_BINARY_DIR}/mesh/lib:${CMAKE_BINARY_DIR}/linearsolver/lib:${MEDCOUPLING_ROOT_DIR}/lib:${MEDFILE_ROOT_DIR}/lib:${PETSC_DIR}/${PETSC_ARCH}/lib:${HDF5_ROOT}/lib ) 
+  else (CDMATH_WITH_PETSC)
+      SET(_extra_lib_TESTS)
+      SET_TARGET_PROPERTIES(TestCDMATH PROPERTIES COMPILE_FLAGS "")
+      SET(TESTS_LIBRARY_PATH ${CMAKE_BINARY_DIR}/base/lib:${CMAKE_BINARY_DIR}/mesh/lib:${MEDCOUPLING_ROOT_DIR}/lib:${MEDFILE_ROOT_DIR}/lib:${PETSC_DIR}/${PETSC_ARCH}/lib:${HDF5_ROOT}/lib ) 
+  endif(CDMATH_WITH_PETSC)
+
+  if   (CDMATH_WITH_PYTHON)
+    SET(TESTS_PYTHON_PATH ${CMAKE_BINARY_DIR}/swig:${CMAKE_BINARY_DIR}/postprocessing ) 
+  endif(CDMATH_WITH_PYTHON)
 
   TARGET_LINK_LIBRARIES(TestCDMATH TestMesh base mesh ${CPPUNIT_LIBS} ${_extra_lib_TESTS})
 
   ADD_TEST(UnitTestCDMATH TestCDMATH)
-  SET_PROPERTY(TEST UnitTestCDMATH PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_INSTALL_PREFIX}/lib:${CMAKE_INSTALL_PREFIX}/lib/medcoupling:${CMAKE_INSTALL_PREFIX}/lib/med:${PETSC_DIR}/${PETSC_ARCH}/lib:${HDF5_ROOT_DIR}/lib")
+  SET_PROPERTY(TEST UnitTestCDMATH PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${TESTS_LIBRARY_PATH}")
+  INSTALL(TARGETS TestCDMATH DESTINATION tests/unit_tests)
 
-  INSTALL(TARGETS TestCDMATH DESTINATION bin/tests)
+  ADD_SUBDIRECTORY(cdmath)
+
+  IF (CDMATH_WITH_PYTHON)
+    ADD_SUBDIRECTORY(swig)
+  ENDIF (CDMATH_WITH_PYTHON)
+
 ENDIF (CDMATH_WITH_TESTS)
 
 ADD_SUBDIRECTORY(ressources)
 
-IF (CDMATH_WITH_PYTHON)
-  ADD_SUBDIRECTORY(swig)
-ENDIF (CDMATH_WITH_PYTHON)
-
-FILE(COPY doc/ DESTINATION convergence)
-INSTALL( DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/convergence DESTINATION share/doc/)
+FILE(COPY doc/ DESTINATION convergence_tests)
+INSTALL( DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/convergence_tests DESTINATION doc/)
 
 if (CDMATH_WITH_PYTHON AND CDMATH_WITH_PETSC AND CDMATH_WITH_POSTPRO)
   # Examples tests
@@ -62,6 +65,8 @@ if (CDMATH_WITH_PYTHON AND CDMATH_WITH_PETSC AND CDMATH_WITH_POSTPRO)
   add_custom_target (examples COMMAND ctest -R Example)# may be replace ctest -R with ctest -L
   add_custom_target (validation COMMAND ctest -R validation)# may be replace ctest -R with ctest -L
 
+  add_custom_target (spectrum COMMAND ctest -R Spectrum)# may be replace ctest -R with ctest -L
+  add_custom_target (beltrami COMMAND ctest -R Beltrami)# may be replace ctest -R with ctest -L
   add_custom_target (poisson COMMAND ctest -R Poisson)# may be replace ctest -R with ctest -L
   add_custom_target (diffusion COMMAND ctest -R Diffusion)# may be replace ctest -R with ctest -L
   add_custom_target (transport COMMAND ctest -R Transport)# may be replace ctest -R with ctest -L
@@ -77,6 +82,8 @@ if (CDMATH_WITH_PYTHON AND CDMATH_WITH_PETSC AND CDMATH_WITH_POSTPRO)
   add_custom_target (noscaling COMMAND ctest -R no_scaling)# may be replace ctest -R with ctest -L
   add_custom_target (2D COMMAND ctest -R 2D)# may be replace ctest -R with ctest -L
   add_custom_target (3D COMMAND ctest -R 3D)# may be replace ctest -R with ctest -L
+  add_custom_target (FE COMMAND ctest -R FE)# may be replace ctest -R with ctest -L
+  add_custom_target (FV COMMAND ctest -R FV)# may be replace ctest -R with ctest -L
   add_custom_target (shock COMMAND ctest -R Shock)# may be replace ctest -R with ctest -L
   add_custom_target (vortex COMMAND ctest -R Vortex)# may be replace ctest -R with ctest -L
   add_custom_target (riemann COMMAND ctest -R RiemannProblem)# may be replace ctest -R with ctest -L

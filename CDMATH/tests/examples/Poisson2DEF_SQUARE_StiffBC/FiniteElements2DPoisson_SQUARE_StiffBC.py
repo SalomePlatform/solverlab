@@ -173,10 +173,10 @@ print("Linear system matrix building done")
 LS=cdmath.LinearSolver(Rigidite,RHS,100,1.E-6,"CG","ILU")#Remplacer CG par CHOLESKY pour solveur direct
 SolSyst=LS.solve()
 
-print "Preconditioner used : ", LS.getNameOfPc()
-print "Number of iterations used : ", LS.getNumberOfIter()
-print "Final residual : ", LS.getResidu()
-print("Linear system solved")
+print( "Preconditioner used : ", LS.getNameOfPc() )
+print( "Number of iterations used : ", LS.getNumberOfIter() )
+print( "Final residual : ", LS.getResidu() )
+print( "Linear system solved")
 
 # Création du champ résultat
 #===========================
@@ -215,7 +215,7 @@ l2_error = (my_ExactSol - my_ResultField).normL2()[0]
 
 print("L2 absolute error = norm( exact solution - numerical solution ) = ",l2_error )
 print("L2 relative error = norm( exact solution - numerical solution )/norm( exact solution ) = ",l2_error/l2_norm_sol_exacte)
-print ("Maximum numerical solution = ", my_ResultField.max(), " Minimum numerical solution = ", my_ResultField.min())
-print ("Maximum exact solution = ", my_ExactSol.max(), " Minimum exact solution = ", my_ExactSol.min())
+print("Maximum numerical solution = ", my_ResultField.max(), " Minimum numerical solution = ", my_ResultField.min())
+print("Maximum exact solution = ", my_ExactSol.max(), " Minimum exact solution = ", my_ExactSol.min())
 
 assert l2_error/l2_norm_sol_exacte <1.

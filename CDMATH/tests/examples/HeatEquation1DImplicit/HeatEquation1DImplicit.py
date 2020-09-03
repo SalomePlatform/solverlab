@@ -30,7 +30,7 @@ def implicitSchemeMatrix(nx,cfl):
     return implMat
 
 def HeatEquation1DImplicit(nx,cfl):
-    print "Simulation of 1D heat equation with an implicit scheme"
+    print( "Simulation of 1D heat equation with an implicit scheme")
 
     ##################### Simulation parameters
     a = 0.0 # space domain :  a <= x <= b
@@ -96,7 +96,7 @@ def HeatEquation1DImplicit(nx,cfl):
             LS.setSndMember(Un)
             Un=LS.solve()
             if(not LS.getStatus()):
-                print "Linear system did not converge ", iterGMRES, " GMRES iterations"
+                print( "Linear system did not converge ", iterGMRES, " GMRES iterations" )
                 raise ValueError("Pas de convergence du système linéaire");
             for i in range(nx):
                 u[i]=Un[i]
@@ -117,10 +117,10 @@ def HeatEquation1DImplicit(nx,cfl):
                 plt.savefig("HeatEquation1D_Implicit_"+str(nx)+"Cells_CFL"+str(cfl)+"_ResultField_"+str(it)+".png")
                 #plt.show()
 
-    print "Exact solution minimum   : ", min(u_initial), "Numerical solution minimum   : ",  min(u)
-    print "Exact solution maximum   : ", max(u_initial), "Numerical solution maximum   : ",  max(u)
-    print "Exact solution variation : ", np.sum([abs(u_initial[i] - u_initial[(i-1)%nx]) for i in range(nx)]), "Numerical solution variation : ",  np.sum([abs(u[i] - u[(i-1)%nx]) for i in range(nx)])
-    print "l1 numerical error       : ", dx*np.sum([abs(u[i] - u_initial[i]) for i in range(nx)])        
+    print( "Exact solution minimum   : ", min(u_initial), "Numerical solution minimum   : ",  min(u) )
+    print( "Exact solution maximum   : ", max(u_initial), "Numerical solution maximum   : ",  max(u) )
+    print( "Exact solution variation : ", np.sum([abs(u_initial[i] - u_initial[(i-1)%nx]) for i in range(nx)]), "Numerical solution variation : ",  np.sum([abs(u[i] - u[(i-1)%nx]) for i in range(nx)]) )
+    print( "l1 numerical error       : ", dx*np.sum([abs(u[i] - u_initial[i]) for i in range(nx)]) ) 
     
     print("Simulation of heat equation with implicit scheme done.")
     

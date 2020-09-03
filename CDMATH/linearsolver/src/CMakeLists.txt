@@ -7,10 +7,6 @@ INCLUDE_DIRECTORIES(
   ${SLEPC_INCLUDES}
 )
 
-IF (CMAKE_CDMATH_TESTS)
-  SET(CMAKE_CXX_FLAGS "-fprofile-arcs -ftest-coverage")
-ENDIF (CMAKE_CDMATH_TESTS)
-
 FILE(GLOB src_linearsolver_CXX . *.cxx)
 ADD_LIBRARY(linearsolver SHARED ${src_linearsolver_CXX} ${MPI_CXX_LIBRARIES})
 

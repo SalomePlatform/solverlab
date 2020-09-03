@@ -123,9 +123,9 @@ print("Linear system matrix building done")
 LS=cdmath.LinearSolver(Rigidite,RHS,100,1.E-6,"CG","ILU")#Remplacer CG par CHOLESKY pour solveur direct
 SolSyst=LS.solve()
 
-print "Preconditioner used : ", LS.getNameOfPc()
-print "Number of iterations used : ", LS.getNumberOfIter()
-print "Final residual : ", LS.getResidu()
+print( "Preconditioner used : ", LS.getNameOfPc() )
+print( "Number of iterations used : ", LS.getNumberOfIter() )
+print( "Final residual : ", LS.getResidu() )
 print("Linear system solved")
 
 # Création du champ résultat

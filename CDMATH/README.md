@@ -30,21 +30,19 @@ Create your source directory. For instance:
 * `cd ~/workspace/cdmath`
 
 Download from GitHub
-* click on the following link : `https://github.com/ndjinga/CDMATH/archive/master.zip` then unzip the file in a directory cdmath-master
-* or type the following in a terminal : `wget https://github.com/ndjinga/CDMATH/archive/master.zip` then unzip the file in a directory cdmath-master
+* click on the following link : `https://github.com/ndjinga/CDMATH/archive/master.zip`, then unzip the file in a directory cdmath-master
+* or type the following in a terminal : `wget https://github.com/ndjinga/CDMATH/archive/master.zip`, then unzip the file in a directory cdmath-master
 * or clone the git repository to a folder cdmath-master:  `git clone https://github.com/ndjinga/CDMATH.git cdmath-master`
 
 
 Set environment for the compilation of CDMATH
 ---------------------------------------------
-Dependencies. The following packages list is sufficient on Ubuntu 14.04, Ubuntu 16.04, Ubuntu 18.04 :
+Dependencies. The following package list is sufficient on Ubuntu 14.04, Ubuntu 16.04, Ubuntu 18.04 :
 
  - `cmake3` (mandatory)
  - `g++` or another C++ compiler (mandatory)
- - `libhdf5-dev` (mandatory)
  - `python-dev`, `python-numpy` and `swig`, if you want to use CDMATH commands in Python scripts. Use the compilation option `-DCDMATH_WITH_PYTHON=ON`. (highly recommended)
  - `python-matplotlib` and `paraview` for postprocessing tools such as plotting curves (matplotlib) or generating 3D view images (paraview). Use the compilation option `-DCDMATH_WITH_POSTPRO=ON` (recommended).
- - `petsc` if you want to solve large spase linear systems. Typically required for implicit methods. Use the compilation option `-DCDMATH_WITH_PETSC=ON` (recommended).
  - `jupyter`, in order to generate and visualise nice reports from test case simulations (optional)
  - `doxygen`, `graphviz` and `mscgen`, if you want to generate a nice source code documentation in `~/workspace/cdmath/cdmath_install/doc/`. Use the compilation option `-DCDMATH_WITH_DOCUMENTATION=ON` (optional).
  - `libcppunit-dev`, if you want to generate unit tests. Use the compilation option `-DCDMATH_WITH_TESTS=ON` (optional).
@@ -59,26 +57,34 @@ Directories. Create the suggested build and installation folders:
 
 Compile and install CDMATH
 --------------------------
-Generate makefiles for a minimum version:
-* `cmake ../cdmath-master/ -DCMAKE_INSTALL_PREFIX=../cdmath_install -DCMAKE_BUILD_TYPE=Release`
+Simpler build for a minimum version:
+* `cmake ../cdmath-master/ -DCMAKE_INSTALL_PREFIX=../cdmath_install -DCMAKE_BUILD_TYPE=Release -DCDMATH_WITH_PETSC=ON -DCDMATH_WITH_PYTHON=ON `  
+> This will download and build the following dependencies
+> - PETSc from http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-3.13.2.tar.gz
+> - SLEPc from https://slepc.upv.es/download/distrib/slepc-3.13.2.tar.gz
+> - HDF5 http://files.salome-platform.org/Salome/other/med-4.0.0.tar.gz
+> - MEDFILE from http://files.salome-platform.org/Salome/other/med-4.0.0.tar.gz
+> - MEDCOUPLING from http://files.salome-platform.org/Salome/other/medCoupling-9.4.0.tar.gz
 
-Or generate makefiles for an all-options version:
-* `cmake ../cdmath-master -DCMAKE_INSTALL_PREFIX=../cdmath_install -DCMAKE_BUILD_TYPE=Release -G"Eclipse CDT4 - Unix Makefiles" -D_ECLIPSE_VERSION=4.3 -DCDMATH_WITH_PETSC=ON -DCDMATH_WITH_PYTHON=ON  -DCDMATH_WITH_POSTPRO=ON -DCDMATH_WITH_TESTS=ON -DCDMATH_WITH_DOCUMENTATION=ON`
+Advanced build for an all-options version:
+* `cmake ../cdmath-master -DCMAKE_INSTALL_PREFIX=../cdmath_install -DCMAKE_BUILD_TYPE=Release -G"Eclipse CDT4 - Unix Makefiles" -D_ECLIPSE_VERSION=4.3 -DCDMATH_WITH_PETSC=ON -DCDMATH_WITH_PYTHON=ON  -DCDMATH_WITH_POSTPRO=ON -DCDMATH_WITH_TESTS=ON -DCDMATH_WITH_DOCUMENTATION=ON -DPETSC_DIR=${PETSC_DIR} -DMEDFILE_ROOT_DIR=${MEDFILE_ROOT_DIR} -DMEDCOUPLING_ROOT_DIR=${MEDCOUPLING_ROOT_DIR}`  
+> This assumes that you have an existing 
+> - install of PETSc (with submodules SLEPC and HDF5) at the location given by the environment variable PETSC_DIR and the architecture variable PETSC_ARCH  
+> See the instructions given in [the official documentation](http://www.mcs.anl.gov/petsc/documentation/installation.html)
+> - install of MED                                    at the location given by the environment variable MEDFILE_ROOT_DIR
+> - install of MEDCOUPLING                            at the location given by the environment variable MEDCOUPLING_ROOT_DIR
 
+The 3 dependencies PETSC, MED and MEDCOUPLING should have been compiled with the same version of HDF5  
+Warning : the linux package libhdf5-dev is generally not compatible with the libraries MED and MEDCoupling
 Compile and install:
 * `make`
-* `make install`
+* `make doc install`
 
 Run unit and example tests:
-* make check
+* make example
 
 Run validation tests:
 * make validation
-
-Notes for compilation options:
-* Eclipse: The Cmake options `-G"Eclipse CDT4 - Unix Makefiles" -D_ECLIPSE_VERSION=4.3` create project files if you want to develop CDMATH with Eclipse Kepler or higher.
-* HDF5: On some systems (not Ubuntu 14.04 nor Ubuntu 16.04), you may have to use the compilation option `-DHDF5_ROOT_DIR=/path/to/hdf5/library` too.
-* PETSc: If the library Petsc is already installed in your system (packages libpetsc-dev for ubuntu and petsc-devel for fedora 25 and 26), you may save time and disk space by using the installed library instead of installing a new one. In order to do so use the compilation options `-DPETSC_DIR=/path/to/petsc/installation/petsc -DPETSC_ARCH=arch-linux2-c-opt`. If you prefer to compile PETSc yourself from the sources you may follow the instructions given in [the official documentation](http://www.mcs.anl.gov/petsc/documentation/installation.html).
 
 Use of CDMATH
 -------------
@@ -91,11 +97,14 @@ Then in your terminal simply type
 
 If performance or parallelism is an issue for your simulations, you can use CDMATH librairies with your C++ code :
  * C++ libraries: `export LD_LIBRARY_PATH=~/workspace/cdmath/cdmath_install/lib`
- * To know how to include the right libraries for compilation, see the makefiles of the examples. They include the list `-linterpkernel -lmedC -lmedloader -lmedcoupling -lbase -lmesh -llinearsolver`.
+ * To know how to include the right libraries for compilation, see the makefiles of the examples. They include the list ` -lmedC -lmedloader -lmedcoupling -lbase -lmesh -llinearsolver`.
 
 The CDMATH environment variables consist in :
- * C++ libraries: `export LD_LIBRARY_PATH=~/workspace/cdmath/cdmath_install/lib`
- * Python libraries: `export PYTHONPATH=~/workspace/cdmath/cdmath_install/lib/cdmath:~/workspace/cdmath/cdmath_install/bin/cdmath`
+ * CDMATH C++ library path: `~/workspace/cdmath/cdmath_install/lib`
+ * CDMATH Python library paths: `~/workspace/cdmath/cdmath_install/lib/cdmath:~/workspace/cdmath/cdmath_install/bin/cdmath`
+ * PETSc, SLEPc and HDF5 library path: `${PETSC_DIR}/${PETSC_ARCH}/lib`
+ * MED library path: `${MEDFILE_ROOT_DIR}/lib`
+ * MEDCOUPLING library path: `${MEDCOUPLING_ROOT_DIR}/lib`
 
 Create Linux installation packages for CDMATH
 ---------------------------------------------

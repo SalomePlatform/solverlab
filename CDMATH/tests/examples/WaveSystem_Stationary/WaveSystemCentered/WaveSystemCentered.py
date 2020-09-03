@@ -28,7 +28,7 @@ rho0=p0/c0*c0#reference density
 precision=1e-5
 
 def initial_conditions_disk_vortex(my_mesh):
-    print "Disk vortex initial data"
+    print( "Disk vortex initial data")
     dim     = my_mesh.getMeshDimension()
     nbCells = my_mesh.getNumberOfCells()
 
@@ -51,7 +51,7 @@ def initial_conditions_disk_vortex(my_mesh):
     return pressure_field, velocity_field
 
 def initial_conditions_square_vortex(my_mesh):
-    print "Initial data : Square vortex (Constant pressure, divergence free velocity)"
+    print( "Initial data : Square vortex (Constant pressure, divergence free velocity)")
     dim     = my_mesh.getMeshDimension()
     nbCells = my_mesh.getNumberOfCells()
 
@@ -148,7 +148,7 @@ def computeDivergenceMatrix(my_mesh,nbVoisinsMax,dt):
                     implMat.addValue(j*nbComp,cellAutre*nbComp,Am)
                     implMat.addValue(j*nbComp,        j*nbComp,Am*(-1.))
                 elif(Fk.getGroupName() != "Neumann"):#Nothing to do for Neumann boundary condition
-                    print Fk.getGroupName()
+                    print( Fk.getGroupName() )
                     raise ValueError("computeFluxes: Unknown boundary condition name");
                 
     return implMat
@@ -177,7 +177,7 @@ def WaveSystemVF(ntmax, tmax, cfl, my_mesh, output_freq, filename,resolution):
     elif(filename.find("disk")>-1 or filename.find("Disk")>-1):
         pressure_field, velocity_field = initial_conditions_disk_vortex(my_mesh)
     else:
-        print "Mesh name : ", filename
+        print( "Mesh name : ", filename)
         raise ValueError("Mesh name should contain substring square, cube or disk")
 
     for k in range(nbCells):
@@ -217,7 +217,7 @@ def WaveSystemVF(ntmax, tmax, cfl, my_mesh, output_freq, filename,resolution):
         cvgceLS=LS.getStatus();
         iterGMRES=LS.getNumberOfIter();
         if(not cvgceLS):
-            print "Linear system did not converge ", iterGMRES, " GMRES iterations"
+            print( "Linear system did not converge ", iterGMRES, " GMRES iterations")
             raise ValueError("Pas de convergence du système linéaire");
         dUn-=Un
         
@@ -230,9 +230,9 @@ def WaveSystemVF(ntmax, tmax, cfl, my_mesh, output_freq, filename,resolution):
     
         #Sauvegardes
         if(it%output_freq==0 or it>=ntmax or isStationary or time >=tmax):
-            print"-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt)
-            print "Variation temporelle relative : pressure ", maxVector[0]/p0 ,", velocity x", maxVector[1]/rho0 ,", velocity y", maxVector[2]/rho0
-            print "Linear system converged in ", iterGMRES, " GMRES iterations"
+            print( "-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt) )
+            print( "Variation temporelle relative : pressure ", maxVector[0]/p0 ,", velocity x", maxVector[1]/rho0 ,", velocity y", maxVector[2]/rho0 )
+            print( "Linear system converged in ", iterGMRES, " GMRES iterations")
 
             for k in range(nbCells):
                 pressure_field[k]=Un[k*(dim+1)+0]
@@ -247,15 +247,15 @@ def WaveSystemVF(ntmax, tmax, cfl, my_mesh, output_freq, filename,resolution):
             velocity_field.setTime(time,it);
             velocity_field.writeVTK("WaveSystem"+str(dim)+"DCentered"+meshName+"_velocity",False);
 
-    print"-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt)
-    print "Variation temporelle relative : pressure ", maxVector[0]/p0 ,", velocity x", maxVector[1]/rho0 ,", velocity y", maxVector[2]/rho0
-    print
+    print( "-- Iter: " + str(it) + ", Time: " + str(time) + ", dt: " + str(dt) )
+    print( "Variation temporelle relative : pressure ", maxVector[0]/p0 ,", velocity x", maxVector[1]/rho0 ,", velocity y", maxVector[2]/rho0 )
+    print()
 
     if(it>=ntmax):
-        print "Nombre de pas de temps maximum ntmax= ", ntmax, " atteint"
+        print( "Nombre de pas de temps maximum ntmax= ", ntmax, " atteint")
     elif(isStationary):
-        print "Régime stationnaire atteint au pas de temps ", it, ", t= ", time
-        print "------------------------------------------------------------------------------------"
+        print( "Régime stationnaire atteint au pas de temps ", it, ", t= ", time)
+        print( "------------------------------------------------------------------------------------")
 
         pressure_field.setTime(time,0);
         pressure_field.writeVTK("WaveSystem"+str(dim)+"DCentered"+meshName+"_pressure_Stat");
@@ -267,15 +267,15 @@ def WaveSystemVF(ntmax, tmax, cfl, my_mesh, output_freq, filename,resolution):
         PV_routines.Save_PV_data_to_picture_file("WaveSystem"+str(dim)+"DCentered"+meshName+"_velocity_Stat"+'_0.vtu',"Velocity",'CELLS',"WaveSystem"+str(dim)+"DCentered"+meshName+"_velocity_Stat")
         
     else:
-        print "Temps maximum Tmax= ", tmax, " atteint"
+        print( "Temps maximum Tmax= ", tmax, " atteint")
 
 
 def solve(my_mesh,meshName,resolution):
-    print "Resolution of the Wave system in dimension ", my_mesh.getSpaceDimension()
-    print "Numerical method : implicit centered"
-    print "Initial data : stationary solution (constant pressure, divergence free velocity)"
-    print "Wall boundary conditions"
-    print "Mesh name : ",meshName , my_mesh.getNumberOfCells(), " cells"
+    print( "Resolution of the Wave system in dimension ", my_mesh.getSpaceDimension() )
+    print( "Numerical method : implicit centered" )
+    print( "Initial data : stationary solution (constant pressure, divergence free velocity)" )
+    print( "Wall boundary conditions" )
+    print( "Mesh name : ",meshName , my_mesh.getNumberOfCells(), " cells" )
     
     # Problem data
     tmax = 1000.

@@ -129,13 +129,13 @@ SparseMatrixPetscTests::testClassSparseMatrixPetsc( void )
 	CPPUNIT_ASSERT_DOUBLES_EQUAL( 2, vp[1],1.e-5);
 
 	std::vector< Vector > Vp = A.getEigenvectors(2);
-	CPPUNIT_ASSERT_DOUBLES_EQUAL( 0, Vp[0][0] - Vp[0][1],1.e-5);
-	CPPUNIT_ASSERT_DOUBLES_EQUAL( 0, Vp[1][0] + Vp[1][1],1.e-5);
+	CPPUNIT_ASSERT_DOUBLES_EQUAL( 0, abs(Vp[0][0]) - abs(Vp[0][1]),1.e-5);
+	CPPUNIT_ASSERT_DOUBLES_EQUAL( 0, abs(Vp[1][0]) - abs(Vp[1][1]),1.e-5);
 
 	MEDCoupling::DataArrayDouble * VpArrayDouble = A.getEigenvectorsDataArrayDouble(2);
 	const double *values=VpArrayDouble->getConstPointer();
-	CPPUNIT_ASSERT_DOUBLES_EQUAL( 0, values[0] + values[1],1.e-5);
-	CPPUNIT_ASSERT_DOUBLES_EQUAL( 0, values[2] - values[3],1.e-5);
+	CPPUNIT_ASSERT_DOUBLES_EQUAL( 0, abs(values[0]) - abs(values[1]),1.e-5);
+	CPPUNIT_ASSERT_DOUBLES_EQUAL( 0, abs(values[2]) - abs(values[3]),1.e-5);
 
     A.setValue(0,0,-1.);
     A.setValue(0,1, 1.);
