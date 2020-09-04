@@ -11,4 +11,4 @@ SET(TABLES
 
 file(COPY ${NOTEBOOK} ${TABLES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-add_custom_target ( notebook COMMAND jupyter-nbconvert --to notebook --execute convergence_synthesis_StationaryDiffusion.ipynb )
+add_custom_target ( notebook_CoreFlows COMMAND jupyter-nbconvert --to notebook --execute convergence_synthesis_StationaryDiffusion.ipynb )

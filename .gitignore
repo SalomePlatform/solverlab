@@ -1,0 +1,25 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.pyc
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+
+# Temporary files
+*~
+
+# Automatically generated documentation files
+*.map
+
+# Eclipse files
+.cproject
+.project
+.settings/*
