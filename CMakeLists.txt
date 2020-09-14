@@ -212,7 +212,7 @@ include(ExternalProject)#For PETSc, MED and MEDCoupling
     add_definitions(-DPETSC_VERSION_GREATER_3_5)
   endif( ${PETSC_VERSION} VERSION_GREATER 3.5 )
 
-string(REPLACE ";" ":"  PETSC_INCLUDES_INSTALL "${PETSC_INCLUDES}")# use colon instead of semicolon in environment file env_CDMATH.sh
+string(REPLACE ";" ":"  PETSC_INCLUDES_INSTALL "${PETSC_INCLUDES}")# use colon instead of semicolon in environment file env_SOLVERLAB.sh
 
 add_library(petsc   SHARED IMPORTED)
 set_property(TARGET petsc  PROPERTY IMPORTED_LOCATION ${PETSC_LIBRARIES})
@@ -357,7 +357,7 @@ if( NOT DEFINED PARAVIEW_VERSION )
     set( PARAVIEW_LIBRARIES_DIR ${PARAVIEW_ROOT_DIR}/lib)
   else( DEFINED PARAVIEW_ROOT_DIR)
     set( PARAVIEW_INCLUDE_DIR /usr/include/paraview/)
-    set( PARAVIEW_LIBRARIES_DIR /usr/lib/paraview/:/usr/lib64/paraview/)
+    set( PARAVIEW_LIBRARIES_DIR /usr/lib/paraview/:/usr/lib64/paraview/:/usr/lib64/vtk/:/usr/lib/vtk/)
   endif( DEFINED PARAVIEW_ROOT_DIR)
 
   #extraction of the paraview version"
@@ -385,8 +385,8 @@ ELSE ( ${PARAVIEW_VERSION} STRGREATER "5.6" OR ${PARAVIEW_VERSION} STREQUAL "5.6
   SET(PYTHON2OR3 "2")
 ENDIF( ${PARAVIEW_VERSION} STRGREATER "5.6" OR ${PARAVIEW_VERSION} STREQUAL "5.6" )
 
-    set (PV_LIB_DIR    /usr/lib/python${PYTHON2OR3}.7/dist-packages/paraview/:${PARAVIEW_LIBRARIES_DIR})
-    set (PV_PYTHON_DIR /usr/lib/python${PYTHON2OR3}.7/dist-packages/paraview/:/usr/lib64/paraview/site-packages/:/usr/lib64/paraview/site-packages/paraview/:/usr/lib64/paraview/site-packages/vtk/:/usr/lib64/paraview/python${PYTHON2OR3}.7/site-packages/:/usr/lib64/paraview/python${PYTHON2OR3}.7/site-packages/paraview/:/usr/lib64/paraview/python${PYTHON2OR3}.7/site-packages/vtkmodules:/usr/lib/paraview/site-packages/paraview:/usr/lib/paraview/site-packages/paraview/vtk)
+    set (PV_LIB_DIR    /usr/lib/python${PYTHON2OR3}.7/dist-packages/paraview/:/usr/lib64/python${PYTHON2OR3}.7/site-packages/vtk/:${PARAVIEW_LIBRARIES_DIR})
+    set (PV_PYTHON_DIR /usr/lib/python${PYTHON2OR3}.7/dist-packages/paraview/:/usr/lib64/python${PYTHON2OR3}.7/site-packages/vtk/:/usr/lib64/paraview/site-packages/:/usr/lib64/paraview/site-packages/paraview/:/usr/lib64/paraview/site-packages/vtk/:/usr/lib64/paraview/python${PYTHON2OR3}.7/site-packages/:/usr/lib64/paraview/python${PYTHON2OR3}.7/site-packages/paraview/:/usr/lib64/paraview/python${PYTHON2OR3}.7/site-packages/vtkmodules:/usr/lib/paraview/site-packages/paraview:/usr/lib/paraview/site-packages/paraview/vtk)
 
 # Find python
 IF   (${CMAKE_VERSION} VERSION_GREATER "3.12.0")
@@ -412,6 +412,7 @@ if (SOLVERLAB_WITH_DOCUMENTATION)                                               
   endif(NOT DOXYGEN_FOUND)
 endif()			
 if (SOLVERLAB_WITH_TESTS)                                                                                  #
+  enable_testing ()
   find_package (CPPUNIT REQUIRED)
 endif()			
 find_package (XDR REQUIRED)

@@ -196,7 +196,7 @@ def TransportEquationVF(ntmax, tmax, cfl, my_mesh, output_freq, meshName, resolu
         if(test_bc=="Periodic"):
             print( "Mass loss: ", (total_mass_initial-unknown_field.integral()).norm(), " precision required= ", precision )
             assert (total_mass_initial-unknown_field.integral()).norm()<precision
-        print "------------------------------------------------------------------------------------"
+        print( "------------------------------------------------------------------------------------")
 
         unknown_field.setTime(time,0);
         unknown_field.writeVTK("TransportEquation"+str(dim)+"DUpwind"+meshName+"_Stat");
@@ -209,7 +209,7 @@ def TransportEquationVF(ntmax, tmax, cfl, my_mesh, output_freq, meshName, resolu
         #Postprocessing : save 2D picture
         PV_routines.Save_PV_data_to_picture_file("TransportEquation"+str(dim)+"DUpwind"+meshName+"_Stat"+'_0.vtu',"unknown",'CELLS',"TransportEquation"+str(dim)+"DUpwind"+meshName+"_Stat")
         
-        return nbCells, time, it, unknown_field.getNormEuclidean().max(), diag_data_u
+        return nbCells, time, it, unknown_field.getNormEuclidean().max(), diag_data_u        
     else:
         print( "Temps maximum Tmax= ", tmax, " atteint" )
         raise ValueError("Maximum time reached : Stationary state not found !!!!!!!")
