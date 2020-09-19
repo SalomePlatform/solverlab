@@ -18,7 +18,7 @@ The main research objectives of SOLVERLAB are the study of
 - New preconditioners for implicit methods for two phase flows
 - The coupling of fluid models or multiphysics coupling (eg thermal hydraulics and neutronics or thermal hydraulics and solid thermics)
 
-The library is currently developed for linux distributions and is maintained on Ubuntu 16.04 LTS and 18.04 LTS, as well as on Fedora 24, 26, 28, 29 and 30.
+The library is currently developed for linux distributions and is maintained on Ubuntu 16.04 LTS and 18.04 LTS, as well as on Fedora 24, 26, 28, 30 and 32.
 
 Examples of use
 ---------------
@@ -72,6 +72,7 @@ Simpler build for a minimum version:
 > This will download and build the following dependencies
 > - PETSc from http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-3.13.5.tar.gz
 > - SLEPc from https://slepc.upv.es/download/distrib/slepc-3.13.4.tar.gz
+> - F2CBLASLAPACK from http://ftp.mcs.anl.gov/pub/petsc/externalpackages/f2cblaslapack-3.4.2.q4.tar.gz
 > - HDF5 https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.3/src/hdf5-1.10.3.tar.gz
 > - MEDFILE from http://files.salome-platform.org/Salome/other/med-4.1.0.tar.gz
 > - MEDCOUPLING from http://files.salome-platform.org/Salome/other/medCoupling-9.4.0.tar.gz
