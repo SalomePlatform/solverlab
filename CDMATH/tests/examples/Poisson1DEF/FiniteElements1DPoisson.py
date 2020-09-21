@@ -139,7 +139,7 @@ plt.legend()
 plt.xlabel('Position')
 plt.ylabel('Value')
 plt.title('1D finite elements \n for Laplace operator')
-plt.savefig('FiniteElements1DPoisson_ResultField_'+str(nbNodes) + '_nodes'+'.png')
+plt.savefig("FiniteElements1DPoisson_ResultField_"+str(nbNodes) + '_nodes'+".png")
 
 print("Numerical solution of the 1D Poisson equation using finite elements done")
 
