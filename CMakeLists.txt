@@ -355,11 +355,14 @@ endif(TARGET PETSc AND TARGET MEDCoupling)
 ####################                                  
 
 # Paraview variables for env_SOLVERLAB.sh  
-if( NOT DEFINED PARAVIEW_VERSION )
+if  ( DEFINED PARAVIEW_VERSION )
+  message(STATUS "ParaView version is ${PARAVIEW_VERSION}" )
+else( DEFINED PARAVIEW_VERSION )
   if( DEFINED PARAVIEW_ROOT_DIR)
     set( PARAVIEW_INCLUDE_DIR   ${PARAVIEW_ROOT_DIR}/include)
     set( PARAVIEW_LIBRARIES_DIR ${PARAVIEW_ROOT_DIR}/lib)
   else( DEFINED PARAVIEW_ROOT_DIR)
+    message(WARNING "PARAVIEW_VERSION and PARAVIEW_ROOT_DIR not set. Trying to find paraview in the system.")
     set( PARAVIEW_INCLUDE_DIR /usr/include/paraview/)
     set( PARAVIEW_LIBRARIES_DIR /usr/lib/paraview/:/usr/lib64/paraview/:/usr/lib64/vtk/:/usr/lib/vtk/)
   endif( DEFINED PARAVIEW_ROOT_DIR)
@@ -367,30 +370,28 @@ if( NOT DEFINED PARAVIEW_VERSION )
   #extraction of the paraview version"
   IF   ( EXISTS ${PARAVIEW_INCLUDE_DIR}/vtkPVConfig.h )
     file(STRINGS ${PARAVIEW_INCLUDE_DIR}/vtkPVConfig.h vtkConfig)
+    FOREACH(line ${vtkConfig})
+      string(FIND "${line}" "#define PARAVIEW_VERSION_FULL " pos)
+      IF(NOT ${pos} EQUAL -1)
+        string(LENGTH ${line} line_length)#length of the tarball
+        MATH(EXPR start_pv_version "${line_length}-6")#line ends with "x.y.z", that counts for 7 characters
+        string(SUBSTRING ${line} ${start_pv_version} 5 PARAVIEW_VERSION)
+        break()
+      ENDIF(NOT ${pos} EQUAL -1)
+    ENDFOREACH(line vtkConfig)
+    message(STATUS "ParaView found, version is ${PARAVIEW_VERSION}" )
   ELSE ( EXISTS ${PARAVIEW_INCLUDE_DIR}/vtkPVConfig.h )
     message(WARNING "Could not find ParaView configuration file vtkPVConfig.h in folder ${PARAVIEW_INCLUDE_DIR}. Postprocessing may not work")
+    set( PARAVIEW_VERSION  "5.0")
   ENDIF( EXISTS ${PARAVIEW_INCLUDE_DIR}/vtkPVConfig.h )
+endif( DEFINED PARAVIEW_VERSION)
 
-  FOREACH(line ${vtkConfig})
-    string(FIND "${line}" "#define PARAVIEW_VERSION_FULL " pos)
-    IF(NOT ${pos} EQUAL -1)
-      string(LENGTH ${line} line_length)#length of the tarball
-      MATH(EXPR start_pv_version "${line_length}-6")#line ends with "x.y.z", that counts for 7 characters
-      string(SUBSTRING ${line} ${start_pv_version} 5 PARAVIEW_VERSION)
-      break()
-    ENDIF(NOT ${pos} EQUAL -1)
-  ENDFOREACH(line vtkConfig)
-endif(NOT DEFINED PARAVIEW_VERSION)
   
-message(STATUS "ParaView version is ${PARAVIEW_VERSION}" )
 IF   ( ${PARAVIEW_VERSION} STRGREATER "5.6" OR ${PARAVIEW_VERSION} STREQUAL "5.6" )#Use python 3, use VERSION_GREATER_EQUAL if cmake >=3.7
   SET(PYTHON2OR3 "3")
 ELSE ( ${PARAVIEW_VERSION} STRGREATER "5.6" OR ${PARAVIEW_VERSION} STREQUAL "5.6" )#Use python 2
   SET(PYTHON2OR3 "2")
 ENDIF( ${PARAVIEW_VERSION} STRGREATER "5.6" OR ${PARAVIEW_VERSION} STREQUAL "5.6" )
-
-    set (PV_LIB_DIR    /usr/lib/python${PYTHON2OR3}.7/dist-packages/paraview/:/usr/lib64/python${PYTHON2OR3}.7/site-packages/vtk/:${PARAVIEW_LIBRARIES_DIR})
-    set (PV_PYTHON_DIR /usr/lib/python${PYTHON2OR3}.7/dist-packages/paraview/:/usr/lib64/python${PYTHON2OR3}.7/site-packages/vtk/:/usr/lib64/paraview/site-packages/:/usr/lib64/paraview/site-packages/paraview/:/usr/lib64/paraview/site-packages/vtk/:/usr/lib64/paraview/python${PYTHON2OR3}.7/site-packages/:/usr/lib64/paraview/python${PYTHON2OR3}.7/site-packages/paraview/:/usr/lib64/paraview/python${PYTHON2OR3}.7/site-packages/vtkmodules:/usr/lib/paraview/site-packages/paraview:/usr/lib/paraview/site-packages/paraview/vtk)
 
 # Find python
 IF   (${CMAKE_VERSION} VERSION_GREATER "3.12.0")
@@ -399,10 +400,16 @@ IF   (${CMAKE_VERSION} VERSION_GREATER "3.12.0")
 ELSE (${CMAKE_VERSION} VERSION_GREATER "3.12.0")
   find_package(PythonInterp ${PYTHON2OR3} REQUIRED )
   find_package(PythonLibs   ${PYTHON2OR3} REQUIRED )
-  set(Python_LIBRARIES    ${PYTHON_LIBRARIES})
-  set(Python_INCLUDE_DIRS ${PYTHON_INCLUDE_DIRS})
-  set(Python_VERSION      ${PYTHON_VERSION_STRING})
+  set(Python_LIBRARIES     ${PYTHON_LIBRARIES})
+  set(Python_INCLUDE_DIRS  ${PYTHON_INCLUDE_DIRS})
+  set(Python_VERSION       ${PYTHON_VERSION_STRING})
+  set(Python_VERSION_MAJOR ${PYTHON_VERSION_MAJOR})
+  set(Python_VERSION_MINOR ${PYTHON_VERSION_MINOR})
 ENDIF(${CMAKE_VERSION} VERSION_GREATER "3.12.0")
+
+#Paraview library paths
+set (PV_LIB_DIR    /usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:${PARAVIEW_LIBRARIES_DIR})
+set (PV_PYTHON_DIR /usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:/usr/lib64/paraview/site-packages/:/usr/lib64/paraview/site-packages/paraview/:/usr/lib64/paraview/site-packages/vtk/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/paraview/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules:/usr/lib/paraview/site-packages/paraview:/usr/lib/paraview/site-packages/paraview/vtk)
 
 message(STATUS "Python version is ${Python_VERSION}")
 find_package (SWIG 3.0 REQUIRED)
