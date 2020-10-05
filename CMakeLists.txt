@@ -42,12 +42,6 @@ list (APPEND CMAKE_MODULE_PATH "${SOLVERLAB_SOURCE_DIR}/cmake_files")
 
 include(ExternalProject)#For PETSc, MED and MEDCoupling
 
-set(Python_ROOT_DIR $ENV{PYTHON_ROOT_DIR} )
-set(PYQT5_ROOT_DIR $ENV{PYQT5_ROOT_DIR} )
-set(PARAVIEW_ROOT_DIR $ENV{PARAVIEW_ROOT_DIR} )
-set(MATPLOTLIB_ROOT_DIR $ENV{MATPLOTLIB_ROOT_DIR} )
-set(HDF5_ROOT_DIR $ENV{HDF5_ROOT_DIR} )
-
 ######################################################
 # Detection or compilation of PETSc+SLEPc+HDF5       #
 ######################################################
@@ -362,26 +356,26 @@ endif(TARGET PETSc AND TARGET MEDCoupling)
 ####################                                  
 
 # Paraview variables to choose python version and for env_SOLVERLAB.sh  
+if  ( DEFINED PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
+  if  ( DEFINED PARAVIEW_ROOT_DIR )
+    set( PARAVIEW_INCLUDE_DIR   ${PARAVIEW_ROOT_DIR}/include)
+    set( PARAVIEW_LIBRARIES_DIR ${PARAVIEW_ROOT_DIR}/lib)
+  else( DEFINED PARAVIEW_ROOT_DIR )
+    set( PARAVIEW_INCLUDE_DIR   $ENV{PARAVIEW_ROOT_DIR}/include)
+    set( PARAVIEW_LIBRARIES_DIR $ENV{PARAVIEW_ROOT_DIR}/lib)
+  endif( DEFINED PARAVIEW_ROOT_DIR )
+else( DEFINED PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
+  message(STATUS "PARAVIEW_ROOT_DIR not set. Trying to detect paraview.")
+  set( PARAVIEW_INCLUDE_DIR /usr/include/paraview/)
+  set( PARAVIEW_LIBRARIES_DIR /usr/lib/paraview/:/usr/lib64/paraview/:/usr/lib64/vtk/:/usr/lib/vtk/)
+endif( DEFINED PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
+
 if  ( DEFINED PARAVIEW_VERSION OR DEFINED ENV{PARAVIEW_VERSION} )
   if   ( NOT DEFINED PARAVIEW_VERSION )
     set( PARAVIEW_VERSION  $ENV{PARAVIEW_VERSION})
   endif( NOT DEFINED PARAVIEW_VERSION )
   message(STATUS "ParaView version is ${PARAVIEW_VERSION}" )
 else( DEFINED PARAVIEW_VERSION OR DEFINED ENV{PARAVIEW_VERSION} )
-  if  ( DEFINED PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
-    if  ( DEFINED PARAVIEW_ROOT_DIR )
-      set( PARAVIEW_INCLUDE_DIR   ${PARAVIEW_ROOT_DIR}/include)
-      set( PARAVIEW_LIBRARIES_DIR ${PARAVIEW_ROOT_DIR}/lib)
-    else( DEFINED PARAVIEW_ROOT_DIR )
-      set( PARAVIEW_INCLUDE_DIR   $ENV{PARAVIEW_ROOT_DIR}/include)
-      set( PARAVIEW_LIBRARIES_DIR $ENV{PARAVIEW_ROOT_DIR}/lib)
-    endif( DEFINED PARAVIEW_ROOT_DIR )
-  else( DEFINED PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
-    message(STATUS "PARAVIEW_VERSION and PARAVIEW_ROOT_DIR not set. Trying to detect paraview.")
-    set( PARAVIEW_INCLUDE_DIR /usr/include/paraview/)
-    set( PARAVIEW_LIBRARIES_DIR /usr/lib/paraview/:/usr/lib64/paraview/:/usr/lib64/vtk/:/usr/lib/vtk/)
-  endif( DEFINED PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
-
   set( PARAVIEW_SUFFIXES paraview-5.0 paraview-5.1 paraview-5.2 paraview-5.3 paraview-5.4 paraview-5.5 paraview-5.6 paraview-5.7 paraview-5.8 paraview-5.9 )
   find_file( vtkConfig_file vtkPVConfig.h HINTS ${PARAVIEW_INCLUDE_DIR} PATH_SUFFIXES ${PARAVIEW_SUFFIXES})
 
@@ -436,9 +430,21 @@ ELSE (${CMAKE_VERSION} VERSION_GREATER "3.12.0")
   set(Python_VERSION_MINOR ${PYTHON_VERSION_MINOR})
 ENDIF(${CMAKE_VERSION} VERSION_GREATER "3.12.0")
 
+IF  ( PYTHON_ROOT_DIR OR ENV{PYTHON_ROOT_DIR})
+  IF  ( PYTHON_ROOT_DIR )
+    set(PYQT5_ROOT_DIR ${PYQT5_ROOT_DIR} )
+  ELSE( PYTHON_ROOT_DIR })
+    set(PYQT5_ROOT_DIR $ENV{PYQT5_ROOT_DIR} )
+  ENDIF( PYTHON_ROOT_DIR })
+ENDIF(PYTHON_ROOT_DIR OR ENV{PYTHON_ROOT_DIR})
+set(PARAVIEW_ROOT_DIR $ENV{PARAVIEW_ROOT_DIR} )
+set(MATPLOTLIB_ROOT_DIR $ENV{MATPLOTLIB_ROOT_DIR} )
+set(HDF5_ROOT_DIR $ENV{HDF5_ROOT_DIR} )
+
+
 #Paraview library paths
-set (PV_LIB_DIR    /usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:${PARAVIEW_LIBRARIES_DIR})
-set (PV_PYTHON_DIR /usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:/usr/lib64/paraview/site-packages/:/usr/lib64/paraview/site-packages/paraview/:/usr/lib64/paraview/site-packages/vtk/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/paraview/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules:/usr/lib/paraview/site-packages/paraview:/usr/lib/paraview/site-packages/paraview/vtk:${PARAVIEW_LIBRARIES_DIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules/)
+set (PV_LIB_DIR    /usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:${MATPLOTLIB_ROOT_DIR}/lib/:${PARAVIEW_LIBRARIES_DIR})
+set (PV_PYTHON_DIR /usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:/usr/lib64/paraview/site-packages/:/usr/lib64/paraview/site-packages/paraview/:/usr/lib64/paraview/site-packages/vtk/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/paraview/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules:/usr/lib/paraview/site-packages/paraview:/usr/lib/paraview/site-packages/paraview/vtk:${PARAVIEW_ROOT_DIR}/lib/:${PARAVIEW_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:${PARAVIEW_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules/:${MATPLOTLIB_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages:${PYQT5_ROOT_DIR}:${PYQT5_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages)
 
 message(STATUS "Python version found is ${Python_VERSION}")
 find_package (SWIG 3.0 REQUIRED)
