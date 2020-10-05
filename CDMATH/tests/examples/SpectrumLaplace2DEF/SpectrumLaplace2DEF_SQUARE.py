@@ -110,7 +110,7 @@ for i in range(nbCells):
 			j_int=interiorNodes.index(j)#indice du noeud j en tant que noeud intérieur
 			nodal_volumes[j_int]+=Ci.getMeasure()/3
 			#Contribution de la cellule triangulaire i à la ligne j_int du système linéaire
- 			for k in [nodeId0,nodeId1,nodeId2] : 
+			for k in [nodeId0,nodeId1,nodeId2] : 
 				if boundaryNodes.count(k)==0 : #seuls les noeuds intérieurs contribuent à la matrice du système linéaire
 					k_int=interiorNodes.index(k)#indice du noeud k en tant que noeud intérieur
 					Rigidite.addValue(j_int,k_int,GradShapeFuncs[j]*GradShapeFuncs[k]/Ci.getMeasure())
