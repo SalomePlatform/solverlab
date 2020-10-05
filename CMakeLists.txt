@@ -47,7 +47,6 @@ set(PARAVIEW_ROOT_DIR $ENV{PARAVIEW_ROOT_DIR} )
 set(MATPLOTLIB_ROOT_DIR $ENV{MATPLOTLIB_ROOT_DIR} )
 set(HDF5_ROOT_DIR $ENV{HDF5_ROOT_DIR} )
 
-
 ######################################################
 # Detection or compilation of PETSc+SLEPc+HDF5       #
 ######################################################
