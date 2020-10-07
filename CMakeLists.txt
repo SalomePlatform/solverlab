@@ -288,8 +288,21 @@ if( MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
     set(MEDCOUPLING_ROOT_DIR $ENV{MEDCOUPLING_ROOT_DIR} )
   endif( NOT MEDCOUPLING_ROOT_DIR )
 
-  set(MEDCoupling_DIR  ${MEDCOUPLING_ROOT_DIR}/cmake_files)
-  find_package(MEDCoupling CONFIG REQUIRED )   # CONFIG is important !
+  message (STATUS "Seeking MEDCoupling library in ${MEDCOUPLING_ROOT_DIR}")
+
+  if( NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedloader.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedcoupling.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/include/MEDCoupling.hxx)
+    message (FATAL_ERROR "MEDCoupling library not found in ${MEDCOUPLING_ROOT_DIR}")
+  else( NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedloader.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedcoupling.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/include/MEDCoupling.hxx)
+    message (STATUS "MEDCoupling library found in ${MEDCOUPLING_ROOT_DIR}")
+  endif( NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedloader.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedcoupling.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/include/MEDCoupling.hxx)
+
+  #the find package(MEDCoupling) generates an error
+  set(MEDCoupling_VERSION 9.6.0)#We force the version to 9.6 until we solve the problem of find_package(MEDCoupling)
+  add_library(medloader   SHARED IMPORTED )
+  set_property(TARGET medloader   PROPERTY IMPORTED_LOCATION ${MEDCOUPLING_ROOT_DIR}/lib/libmedloader.so)
+
+#  set(MEDCoupling_DIR  ${MEDCOUPLING_ROOT_DIR}/cmake_files)
+#  find_package(MEDCoupling CONFIG REQUIRED )   # CONFIG is important !
   message( STATUS "MEDCoupling found. Version is ${MEDCoupling_VERSION}")
 
 else( MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
@@ -442,15 +455,13 @@ IF   ( NOT MATPLOTLIB_ROOT_DIR )
 ENDIF( NOT MATPLOTLIB_ROOT_DIR )
 
 #HDF5_ROOT_DIR
-set(HDF5_ROOT_DIR $ENV{HDF5_ROOT_DIR} )
-
-#IF   ( NOT HDF5_ROOT_DIR )
-#  IF  ( ENV{HDF5_ROOT_DIR} )
-#    set(HDF5_ROOT_DIR $ENV{HDF5_ROOT_DIR} )
-#  ELSE( ENV{HDF5_ROOT_DIR} )
-#    set(HDF5_ROOT_DIR ${HDF5_ROOT} )
-#  ENDIF( ENV{HDF5_ROOT_DIR} )
-#ENDIF( NOT HDF5_ROOT_DIR )
+IF   ( NOT HDF5_ROOT_DIR )
+  IF  ( ENV{HDF5_ROOT_DIR} )
+    set(HDF5_ROOT_DIR $ENV{HDF5_ROOT_DIR} )
+  ELSE( ENV{HDF5_ROOT_DIR} )
+    set(HDF5_ROOT_DIR ${HDF5_ROOT} )
+  ENDIF( ENV{HDF5_ROOT_DIR} )
+ENDIF( NOT HDF5_ROOT_DIR )
 
 
 #Paraview library paths
