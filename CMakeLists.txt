@@ -296,8 +296,6 @@ if( MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
     message (STATUS "MEDCoupling library found in ${MEDCOUPLING_ROOT_DIR}")
   endif( NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedloader.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedcoupling.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/include/MEDCoupling.hxx)
 
-  #the find package(MEDCoupling) generates an error
-  set(MEDCoupling_VERSION 9.6.0)#We force the version to 9.6 until we solve the problem of find_package(MEDCoupling)
   add_library(medloader   SHARED IMPORTED )
   set_property(TARGET medloader   PROPERTY IMPORTED_LOCATION ${MEDCOUPLING_ROOT_DIR}/lib/libmedloader.so)
   add_library(interpkernel   SHARED IMPORTED )
