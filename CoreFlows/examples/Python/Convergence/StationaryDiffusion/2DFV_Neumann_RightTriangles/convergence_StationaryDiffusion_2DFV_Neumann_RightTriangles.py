@@ -15,7 +15,7 @@ def convergence_StationaryDiffusion_2DFV_Neumann_RightTriangles():
     ### 2D FV right triangles mesh
     method = 'FV' 
     BC = 'Neumann'
-    meshList=[5,20,50,100, 200,400]
+    meshList=[5,20,50,100, 200]
     nbMeshes=len(meshList)
     error_tab=[0]*nbMeshes
     mesh_size_tab=[0]*nbMeshes
@@ -27,19 +27,19 @@ def convergence_StationaryDiffusion_2DFV_Neumann_RightTriangles():
     curv_abs=np.linspace(0,sqrt(2),resolution+1)
     plt.close('all')
     i=0
-    testColor="Orange \n (suspicious order 0 convergence), singular matrix"#Convergence of the linear solver if direct solver. Scheme seems to diverge (order -0.005)
+    testColor="Red, to be investigated"#Convergence of the linear solver if direct solver. Scheme seems to diverge (order -0.005)
     # Storing of numerical errors, mesh sizes and diagonal values
     for nx in meshList:
-		my_mesh=cm.Mesh(0,1,nx,0,1,nx,1)
-		error_tab[i], mesh_size_tab[i], diag_data[i], min_sol_num, max_sol_num, time_tab[i] =validationStationaryDiffusionEquation.SolveStationaryDiffusionEquation(my_mesh,resolution,meshType,method,BC)
+        my_mesh=cm.Mesh(0,1,nx,0,1,nx,1)
+        error_tab[i], mesh_size_tab[i], diag_data[i], min_sol_num, max_sol_num, time_tab[i] =validationStationaryDiffusionEquation.SolveStationaryDiffusionEquation(my_mesh,resolution,meshType,method,BC)
 
-		assert min_sol_num>-1.22
-		assert max_sol_num<1.
-		plt.plot(curv_abs, diag_data[i], label= str(mesh_size_tab[i]) + ' cells')
-		error_tab[i]=log10(error_tab[i])
-		time_tab[i]=log10(time_tab[i])
-		mesh_size_tab[i] = 0.5*log10(mesh_size_tab[i])
-		i=i+1
+        assert min_sol_num>-1.22
+        assert max_sol_num<1.
+        plt.plot(curv_abs, diag_data[i], label= str(mesh_size_tab[i]) + ' cells')
+        error_tab[i]=log10(error_tab[i])
+        time_tab[i]=log10(time_tab[i])
+        mesh_size_tab[i] = 0.5*log10(mesh_size_tab[i])
+        i=i+1
     end = time.time()
         
    
@@ -65,7 +65,7 @@ def convergence_StationaryDiffusion_2DFV_Neumann_RightTriangles():
     a=( a3*b1-a2*b2)/det
     b=(-a2*b1+a1*b2)/det
     
-    print "FV for diffusion on 2D right triangle meshes: scheme order is ", -a
+    print( "FV for diffusion on 2D right triangle meshes: scheme order is ", -a)
     assert abs(a-0.005)<0.01
     
     # Plot of convergence curve
