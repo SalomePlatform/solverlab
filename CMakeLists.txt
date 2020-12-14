@@ -4,8 +4,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Project name
 project (SOLVERLAB C CXX)
-set (SOLVERLAB_VERSION_MAJOR 0)
-set (SOLVERLAB_VERSION_MINOR 1)
+set (SOLVERLAB_VERSION_MAJOR 9)
+set (SOLVERLAB_VERSION_MINOR 7)
+set (SOLVERLAB_VERSION_SUBMINOR alpha)
 
 option (SOLVERLAB_WITH_DOCUMENTATION "Generate SOLVERLAB documentation" ON)
 option (SOLVERLAB_WITH_PYTHON        "Compile Python interface of SOLVERLAB" ON)
@@ -21,11 +22,12 @@ set (HDF5_ROOT            OFF CACHE STRING "HDF5 library path" )#For the compila
 set (MEDFILE_ROOT_DIR     OFF CACHE STRING "MED library path" )
 set (MEDCOUPLING_ROOT_DIR OFF CACHE STRING "MEDCoupling library path" )
 set (PYTHON_ROOT_DIR      OFF CACHE STRING "Python library path" )
+set (PARAVIEW_ROOT_DIR    OFF CACHE STRING "PARAVIEW library path" )
 
 #url of tarball librairies
-set (DOWNLOAD_PETSC         http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-lite-3.14.0.tar.gz 
+set (DOWNLOAD_PETSC         http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-lite-3.14.2.tar.gz 
      CACHE STRING           "PETSc tarball path/url" )
-set (DOWNLOAD_SLEPC         https://slepc.upv.es/download/distrib/slepc-3.14.0.tar.gz
+set (DOWNLOAD_SLEPC         https://slepc.upv.es/download/distrib/slepc-3.14.1.tar.gz
      CACHE STRING           "SLEPC tarball path/url" )
 set (DOWNLOAD_F2CBLASLAPACK https://www.mcs.anl.gov/petsc/mirror/externalpackages/f2cblaslapack-3.4.2.q4.tar.gz
      CACHE STRING           "F2CBLASLAPACK tarball path/url" )
@@ -33,14 +35,29 @@ set (DOWNLOAD_HDF5          https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-
      CACHE STRING           "HDF5 tarball path/url" )
 set (DOWNLOAD_MED           http://files.salome-platform.org/Salome/other/med-4.1.0.tar.gz
      CACHE STRING           "MED tarball path/url")
-set (DOWNLOAD_MEDCOUPLING   http://files.salome-platform.org/Salome/other/medCoupling-9.4.0.tar.gz
+set (DOWNLOAD_MEDCOUPLING   http://files.salome-platform.org/Salome/other/medCoupling-9.6.0.tar.gz
      CACHE STRING           "MEDCoupling tarball path/url" )
+set (DOWNLOAD_OPENMPI       https://download.open-mpi.org/release/open-mpi/v3.1/openmpi-3.1.6.tar.gz
+     CACHE STRING           "OPENMPI tarball path/url" )
+set (DOWNLOAD_HYPRE         https://github.com/hypre-space/hypre/archive/v2.20.0.zip
+     CACHE STRING           "HYPRE tarball path/url" )
 
 set (CMAKE_BUILD_TYPE Release CACHE STRING "Installation mode")
 
+include(ExternalProject)#For PETSc, MED and MEDCoupling
+
 list (APPEND CMAKE_MODULE_PATH "${SOLVERLAB_SOURCE_DIR}/cmake_files")
 
-include(ExternalProject)#For PETSc, MED and MEDCoupling
+if( DEFINED ENV{MPI_HOME} OR DEFINED MPI_HOME )
+  set(SOLVERLAB_WITH_MPI ON)
+  find_package(MPI)
+  if(   ${MPI_LIBRARY} STREQUAL "MPI_LIBRARY-NOTFOUND")
+    set ( MPI_LIBRARY ${MPI_HOME}/lib/libmpi.so )
+  endif(${MPI_LIBRARY} STREQUAL "MPI_LIBRARY-NOTFOUND")
+  message ( STATUS "MPI executable is ${MPIEXEC}" )
+else( DEFINED ENV{MPI_HOME} OR DEFINED MPI_HOME )
+  set(SOLVERLAB_WITH_MPI OFF)
+endif( DEFINED ENV{MPI_HOME} OR DEFINED MPI_HOME )
 
 ######################################################
 # Detection or compilation of PETSc+SLEPc+HDF5       #
@@ -57,6 +74,9 @@ include(ExternalProject)#For PETSc, MED and MEDCoupling
     petsc_get_version ()
 
     message ( STATUS "PETSc found. Version is ${PETSC_VERSION_MAJOR}.${PETSC_VERSION_MINOR}.${PETSC_VERSION_SUBMINOR}" )
+    message ( STATUS "PETSc compiler is ${PETSC_COMPILER}" )
+    message ( STATUS "PETSc executable is ${PETSC_MPIEXEC}")
+
     set(PETSC_INSTALL ${PETSC_DIR})
 
     #Define and search slepc variables
@@ -168,7 +188,7 @@ include(ExternalProject)#For PETSc, MED and MEDCoupling
       URL               ${DOWNLOAD_PETSC}   
       SOURCE_DIR        ${PETSC_DIR}
       BUILD_IN_SOURCE   TRUE
-      CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${PETSC_INSTALL} --with-debugging=0 --with-mpi=0 --download-f2cblaslapack=${DOWNLOAD_F2CBLASLAPACK} --with-fc=0 --download-slepc=${DOWNLOAD_SLEPC} --download-hdf5=${DOWNLOAD_HDF5}
+      CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${PETSC_INSTALL} --with-debugging=0 --download-f2cblaslapack=${DOWNLOAD_F2CBLASLAPACK} --with-fc=0 --download-slepc=${DOWNLOAD_SLEPC} --download-hdf5=${DOWNLOAD_HDF5} --with-mpi=0 # --download-openmpi=${DOWNLOAD_OPENMPI} --download-hypre=${DOWNLOAD_HYPRE}
       BUILD_COMMAND     make all
       TEST_COMMAND      make check
       INSTALL_COMMAND   make install
@@ -195,8 +215,8 @@ include(ExternalProject)#For PETSc, MED and MEDCoupling
 
       #define slepc variables
       set(SLEPC_DIR ${PETSC_INSTALL})
-      set(SLEPC_INCLUDES ${SLEPC_DIR}/include  ${PETSC_DIR}/${PETSC_ARCH}/externalpackages/slepc-3.13.4/include ${PETSC_DIR}/${PETSC_ARCH}/externalpackages/slepc-3.13.4/installed-arch-linux2-c-opt/include)
-      set(SLEPC_LIBRARIES ${PETSC_DIR}/${PETSC_ARCH}/externalpackages/slepc-3.13.4/installed-arch-linux2-c-opt/lib/libslepc.so)
+      set(SLEPC_INCLUDES ${SLEPC_DIR}/include  ${PETSC_DIR}/${PETSC_ARCH}/externalpackages/slepc-3.14.1/include ${PETSC_DIR}/${PETSC_ARCH}/externalpackages/slepc-3.14.1/installed-arch-linux2-c-opt/include)
+      set(SLEPC_LIBRARIES ${PETSC_DIR}/${PETSC_ARCH}/externalpackages/slepc-3.14.1/installed-arch-linux2-c-opt/lib/libslepc.so)
       message( STATUS "SLEPc includes ${SLEPC_INCLUDES}")
 
       #define hdf5 variables
@@ -209,6 +229,12 @@ include(ExternalProject)#For PETSc, MED and MEDCoupling
       endif( NOT HDF5_ROOT )
       set(HDF5_LIBRARY_DIR ${HDF5_ROOT}/lib)
       set(HDF5_INCLUDE_DIRS ${HDF5_ROOT}/include)
+
+      #define MPI variables
+      set(SOLVERLAB_WITH_MPI ON)
+      set(MPI_HOME    ${PETSC_INSTALL} )
+      set(MPI_LIBRARY ${PETSC_INSTALL}/lib/libmpi.so)
+      set(MPIEXEC     ${PETSC_INSTALL}/bin/mpiexec)
 
     endif ( IS_DIRECTORY "/usr/include/petsc/" AND EXISTS "/usr/lib64/libpetsc.so" )
   endif ( DEFINED ENV{PETSC_DIR} OR PETSC_DIR )
@@ -253,7 +279,7 @@ else( MEDFILE_ROOT_DIR OR DEFINED ENV{MEDFILE_ROOT_DIR})
         URL               ${DOWNLOAD_MED}  #location of med tarball
         SOURCE_DIR        ${CMAKE_CURRENT_BINARY_DIR}/pre_requis/${MED_TARBALL_NAME}
         BUILD_IN_SOURCE   TRUE
-        CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${MEDFILE_ROOT_DIR}  --with-hdf5=${HDF5_ROOT} --with-hdf5-include=${HDF5_ROOT}/include --with-hdf5-lib=${HDF5_LIBRARY_DIR} --with-hdf5-bin=${HDF5_ROOT}/bin  --with-swig=yes 
+        CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${MEDFILE_ROOT_DIR}  --with-hdf5=${HDF5_ROOT} --with-hdf5-include=${HDF5_ROOT}/include --with-hdf5-lib=${HDF5_LIBRARY_DIR} --with-hdf5-bin=${HDF5_ROOT}/bin  --with-swig=yes --disable-fortran #CC=${PETSC_INSTALL}/bin/mpicc
         BUILD_COMMAND     make
         INSTALL_COMMAND   make install
         INSTALL_DIR       ${MEDFILE_ROOT_DIR}
@@ -309,7 +335,7 @@ if( MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
   find_package(MEDCoupling CONFIG REQUIRED)   # CONFIG is important !
   message( STATUS "MEDCoupling found. Version is ${MEDCoupling_VERSION}")
 
-else( MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
+else( DEFINED MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
   message(STATUS "MEDCoupling will be downloaded and installed from ${DOWNLOAD_MEDCOUPLING}")
   set(MEDCOUPLING_ROOT_DIR ${CMAKE_INSTALL_PREFIX}/share/medcoupling) # Location of the final install
   SET(ENV{HDF5_ROOT} ${HDF5_ROOT})#MEDCoupling install process seems to require an environment variable
@@ -327,8 +353,8 @@ else( MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
   ExternalProject_Add (MEDCoupling
         URL               ${DOWNLOAD_MEDCOUPLING}  #location of medcoupling tarball
         SOURCE_DIR        ${CMAKE_CURRENT_BINARY_DIR}/pre_requis/${MEDCOUPLING_TARBALL_NAME}
-#        BUILD_IN_SOURCE   FALSE
-        CONFIGURE_COMMAND cmake <SOURCE_DIR>/${MEDCOUPLING_TARBALL_NAME} -DCMAKE_INSTALL_PREFIX=${MEDCOUPLING_ROOT_DIR} -DCONFIGURATION_ROOT_DIR=<SOURCE_DIR>/configuration-${MEDCoupling_VERSION} -DMEDFILE_ROOT_DIR=${MEDFILE_ROOT_DIR} -DMEDCOUPLING_ENABLE_PARTITIONER=OFF -DMEDCOUPLING_PARTITIONER_METIS=OFF -DMEDCOUPLING_PARTITIONER_SCOTCH=OFF -DMEDCOUPLING_ENABLE_RENUMBER=OFF -DMEDCOUPLING_BUILD_DOC=OFF -DHDF5_ROOT_DIR=${HDF5_ROOT}
+        BUILD_IN_SOURCE   TRUE
+        CONFIGURE_COMMAND cmake <SOURCE_DIR>/${MEDCOUPLING_TARBALL_NAME} -DCMAKE_INSTALL_PREFIX=${MEDCOUPLING_ROOT_DIR} -DCONFIGURATION_ROOT_DIR=<SOURCE_DIR>/configuration-${MEDCoupling_VERSION} -DMEDFILE_ROOT_DIR=${MEDFILE_ROOT_DIR} -DMEDCOUPLING_ENABLE_PARTITIONER=OFF -DMEDCOUPLING_PARTITIONER_METIS=OFF -DMEDCOUPLING_PARTITIONER_SCOTCH=OFF -DMEDCOUPLING_ENABLE_RENUMBER=OFF -DMEDCOUPLING_BUILD_DOC=OFF -DHDF5_ROOT_DIR=${HDF5_ROOT} -DMEDCOUPLING_USE_64BIT_IDS=ON -DMEDCOUPLING_ENABLE_PYTHON=ON#-DSALOME_USE_MPI=ON
         BUILD_COMMAND     make
         INSTALL_COMMAND   make install
         INSTALL_DIR       ${MEDCOUPLING_ROOT_DIR}
@@ -377,20 +403,20 @@ ENDIF(MEDCOUPLING_USE_64BIT_IDS)
 ####################                                  
 
 # Paraview variables to choose python version and for env_SOLVERLAB.sh  
-if  ( DEFINED PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
-  if  ( DEFINED PARAVIEW_ROOT_DIR )
+if  ( PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
+  if  ( PARAVIEW_ROOT_DIR )
     set( PARAVIEW_INCLUDE_DIR   ${PARAVIEW_ROOT_DIR}/include)
     set( PARAVIEW_LIBRARIES_DIR ${PARAVIEW_ROOT_DIR}/lib)
-  else( DEFINED PARAVIEW_ROOT_DIR )
+  else( PARAVIEW_ROOT_DIR )
     set( PARAVIEW_ROOT_DIR      $ENV{PARAVIEW_ROOT_DIR} )
     set( PARAVIEW_INCLUDE_DIR   $ENV{PARAVIEW_ROOT_DIR}/include)
     set( PARAVIEW_LIBRARIES_DIR $ENV{PARAVIEW_ROOT_DIR}/lib)
-  endif( DEFINED PARAVIEW_ROOT_DIR )
-else( DEFINED PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
+  endif( PARAVIEW_ROOT_DIR )
+else( PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
   message(STATUS "PARAVIEW_ROOT_DIR not set. Trying to detect paraview.")
   set( PARAVIEW_INCLUDE_DIR /usr/include/paraview/)
   set( PARAVIEW_LIBRARIES_DIR /usr/lib/paraview/:/usr/lib64/paraview/:/usr/lib64/vtk/:/usr/lib/vtk/)
-endif( DEFINED PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
+endif( PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
 
 if  ( DEFINED PARAVIEW_VERSION OR DEFINED ENV{PARAVIEW_VERSION} )
   if   ( NOT DEFINED PARAVIEW_VERSION )
