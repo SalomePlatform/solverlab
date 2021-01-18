@@ -11,7 +11,7 @@ SET(MESH_MED
   ../../../ressources/ballWithTetrahedra.med
   )
 
-file(COPY ${MESH_MED} DESTINATION ${CMAKE_BINARY_DIR}/tests/examples/EulerSystemUpwind)
+file(COPY ${MESH_MED} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 install(FILES ${MESH_MED} DESTINATION share/examples/EulerSystemUpwind)
 
 if (CDMATH_WITH_PYTHON AND CDMATH_WITH_PETSC AND CDMATH_WITH_POSTPRO)
@@ -28,11 +28,11 @@ if (CDMATH_WITH_PYTHON AND CDMATH_WITH_PETSC AND CDMATH_WITH_POSTPRO)
 
     SET(MESH_FILE  ../../../ressources/meshCube.med  )
 
-    ADD_TEST(ExampleEulerSystem_3DShock_UpwindExplicit_CUBE_tetrahedra ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/EulerSystemUpwind.py  ${MESH_FILE} ${IMPLICIT_SCHEME})
+    #ADD_TEST(ExampleEulerSystem_3DShock_UpwindExplicit_CUBE_tetrahedra ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/EulerSystemUpwind.py  ${MESH_FILE} ${IMPLICIT_SCHEME})
 
     SET(MESH_FILE  ../../../ressources/cubeWithCubes.med  )
 
-    ADD_TEST(ExampleEulerSystem_3DShock_UpwindExplicit_CUBE_cubes ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/EulerSystemUpwind.py  ${MESH_FILE} ${IMPLICIT_SCHEME})
+    #ADD_TEST(ExampleEulerSystem_3DShock_UpwindExplicit_CUBE_cubes ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/EulerSystemUpwind.py  ${MESH_FILE} ${IMPLICIT_SCHEME})
 
     SET(MESH_FILE  ../../../ressources/diskWithTriangles.med  )
 
@@ -66,11 +66,11 @@ if (CDMATH_WITH_PYTHON AND CDMATH_WITH_PETSC AND CDMATH_WITH_POSTPRO)
 
     SET(MESH_FILE  ../../../ressources/meshCube.med  )
 
-    ADD_TEST(ExampleEulerSystem_3DShock_UpwindImplicit_CUBE_tetrahedra ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/EulerSystemUpwind.py  ${MESH_FILE} ${IMPLICIT_SCHEME})
+    #ADD_TEST(ExampleEulerSystem_3DShock_UpwindImplicit_CUBE_tetrahedra ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/EulerSystemUpwind.py  ${MESH_FILE} ${IMPLICIT_SCHEME})
 
     SET(MESH_FILE  ../../../ressources/cubeWithCubes.med  )
 
-    ADD_TEST(ExampleEulerSystem_3DShock_UpwindImplicit_CUBE_cubes ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/EulerSystemUpwind.py  ${MESH_FILE} ${IMPLICIT_SCHEME})
+    #ADD_TEST(ExampleEulerSystem_3DShock_UpwindImplicit_CUBE_cubes ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/EulerSystemUpwind.py  ${MESH_FILE} ${IMPLICIT_SCHEME})
 
     SET(MESH_FILE  ../../../ressources/diskWithTriangles.med  )
 
