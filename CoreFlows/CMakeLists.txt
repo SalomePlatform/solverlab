@@ -73,10 +73,9 @@ endif ()                                                                        
 
 # Graphic interface-----------------------------------------------------------------------------------------#
      													    #
-if (COREFLOWS_WITH_GUI)											    					  														    #
- set (CoreFlows_GUI_DIR ${CoreFlows_SOURCE_DIR}/gui)                                                        #
- add_subdirectory(${CoreFlows_GUI_DIR})			
-
+if (COREFLOWS_WITH_GUI) 														    #
+  set (CoreFlows_GUI_DIR ${CoreFlows_SOURCE_DIR}/gui)                                                        #
+  add_subdirectory(${CoreFlows_GUI_DIR})
 endif ()                                                                                                    #
 													    #
 # ------------- --------------------------------------------------------------------------------------------#
