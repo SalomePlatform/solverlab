@@ -36,8 +36,8 @@ if (COREFLOWS_WITH_GUI)
 	# =============
 	
 	# Mandatory products
-#	FIND_PACKAGE(SalomePythonInterp REQUIRED)
-#	FIND_PACKAGE(SalomePythonLibs REQUIRED)
+	FIND_PACKAGE(SalomePythonInterp REQUIRED)
+	FIND_PACKAGE(SalomePythonLibs REQUIRED)
 	
 	SET(_all_SCRIPTS
 	    main_tests.py
