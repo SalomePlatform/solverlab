@@ -215,7 +215,7 @@ endif( DEFINED ENV{MPI_HOME} OR DEFINED MPI_HOME )
 
       #define slepc variables
       set(SLEPC_DIR ${PETSC_INSTALL})
-      set(SLEPC_INCLUDES ${SLEPC_DIR}/include  ${PETSC_DIR}/${PETSC_ARCH}/externalpackages/slepc-3.14.1/include ${PETSC_DIR}/${PETSC_ARCH}/externalpackages/slepc-3.14.1/installed-arch-linux2-c-opt/include)
+      set(SLEPC_INCLUDES ${SLEPC_DIR}/include  ${PETSC_DIR}/${PETSC_ARCH}/externalpackages/slepc-3.14.1/include )
       set(SLEPC_LIBRARIES ${PETSC_DIR}/${PETSC_ARCH}/externalpackages/slepc-3.14.1/installed-arch-linux2-c-opt/lib/libslepc.so)
       message( STATUS "SLEPc includes ${SLEPC_INCLUDES}")
 
@@ -231,10 +231,10 @@ endif( DEFINED ENV{MPI_HOME} OR DEFINED MPI_HOME )
       set(HDF5_INCLUDE_DIRS ${HDF5_ROOT}/include)
 
       #define MPI variables
-      set(SOLVERLAB_WITH_MPI ON)
-      set(MPI_HOME    ${PETSC_INSTALL} )
-      set(MPI_LIBRARY ${PETSC_INSTALL}/lib/libmpi.so)
-      set(MPIEXEC     ${PETSC_INSTALL}/bin/mpiexec)
+      #set(SOLVERLAB_WITH_MPI ON)
+      #set(MPI_HOME    ${PETSC_INSTALL} )
+      #set(MPI_LIBRARY ${PETSC_INSTALL}/lib/libmpi.so)
+      #set(MPIEXEC     ${PETSC_INSTALL}/bin/mpiexec)
 
     endif ( IS_DIRECTORY "/usr/include/petsc/" AND EXISTS "/usr/lib64/libpetsc.so" )
   endif ( DEFINED ENV{PETSC_DIR} OR PETSC_DIR )
@@ -310,26 +310,11 @@ string(REPLACE ";" ":"  MEDFILE_LIBRARIES_INSTALL "${MEDFILE_LIBRARIES}")# use c
 ######################################################
 if( MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
 
-  if( NOT MEDCOUPLING_ROOT_DIR )
+  if   ( NOT MEDCOUPLING_ROOT_DIR )
     set(MEDCOUPLING_ROOT_DIR $ENV{MEDCOUPLING_ROOT_DIR} )
   endif( NOT MEDCOUPLING_ROOT_DIR )
 
   message (STATUS "Seeking MEDCoupling library in ${MEDCOUPLING_ROOT_DIR}")
-
-  if( NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedloader.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedcoupling.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/include/MEDCoupling.hxx)
-    message (FATAL_ERROR "MEDCoupling library not found in ${MEDCOUPLING_ROOT_DIR}")
-  else( NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedloader.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedcoupling.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/include/MEDCoupling.hxx)
-    message (STATUS "MEDCoupling library found in ${MEDCOUPLING_ROOT_DIR}")
-  endif( NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedloader.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/lib/libmedcoupling.so OR NOT EXISTS ${MEDCOUPLING_ROOT_DIR}/include/MEDCoupling.hxx)
-
-  add_library(medloader   SHARED IMPORTED )
-  set_property(TARGET medloader   PROPERTY IMPORTED_LOCATION ${MEDCOUPLING_ROOT_DIR}/lib/libmedloader.so)
-  add_library(interpkernel   SHARED IMPORTED )
-  set_property(TARGET interpkernel   PROPERTY IMPORTED_LOCATION ${MEDCOUPLING_ROOT_DIR}/lib/libinterpkernel.so)
-  add_library(medcouplingremapper   SHARED IMPORTED )
-  set_property(TARGET medcouplingremapper   PROPERTY IMPORTED_LOCATION ${MEDCOUPLING_ROOT_DIR}/lib/libmedcouplingremapper.so)
-  add_library(medcouplingcpp   SHARED IMPORTED )
-  set_property(TARGET medcouplingcpp   PROPERTY IMPORTED_LOCATION ${MEDCOUPLING_ROOT_DIR}/lib/libmedcouplingcpp.so)
 
   set(MEDCoupling_DIR  ${MEDCOUPLING_ROOT_DIR}/cmake_files)
   find_package(MEDCoupling CONFIG REQUIRED)   # CONFIG is important !
@@ -348,13 +333,13 @@ else( DEFINED MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
   string(SUBSTRING ${DOWNLOAD_MEDCOUPLING} ${start_tarball_name} ${tarball_name_length} MEDCOUPLING_TARBALL_NAME)
   string(SUBSTRING ${MEDCOUPLING_TARBALL_NAME} 12 ${tarball_name_length} MEDCoupling_VERSION)
 
-  message(STATUS "MEDCoupling version will be ${MEDCoupling_VERSION}")
+  message(STATUS "MEDCoupling will be installed at ${MEDCOUPLING_ROOT_DIR}")
 
   ExternalProject_Add (MEDCoupling
         URL               ${DOWNLOAD_MEDCOUPLING}  #location of medcoupling tarball
         SOURCE_DIR        ${CMAKE_CURRENT_BINARY_DIR}/pre_requis/${MEDCOUPLING_TARBALL_NAME}
         BUILD_IN_SOURCE   TRUE
-        CONFIGURE_COMMAND cmake <SOURCE_DIR>/${MEDCOUPLING_TARBALL_NAME} -DCMAKE_INSTALL_PREFIX=${MEDCOUPLING_ROOT_DIR} -DCONFIGURATION_ROOT_DIR=<SOURCE_DIR>/configuration-${MEDCoupling_VERSION} -DMEDFILE_ROOT_DIR=${MEDFILE_ROOT_DIR} -DMEDCOUPLING_ENABLE_PARTITIONER=OFF -DMEDCOUPLING_PARTITIONER_METIS=OFF -DMEDCOUPLING_PARTITIONER_SCOTCH=OFF -DMEDCOUPLING_ENABLE_RENUMBER=OFF -DMEDCOUPLING_BUILD_DOC=OFF -DHDF5_ROOT_DIR=${HDF5_ROOT} -DMEDCOUPLING_USE_64BIT_IDS=ON -DMEDCOUPLING_ENABLE_PYTHON=ON#-DSALOME_USE_MPI=ON
+        CONFIGURE_COMMAND cmake <SOURCE_DIR>/${MEDCOUPLING_TARBALL_NAME} -DCMAKE_INSTALL_PREFIX=${MEDCOUPLING_ROOT_DIR} -DCONFIGURATION_ROOT_DIR=<SOURCE_DIR>/configuration-${MEDCoupling_VERSION} -DMEDFILE_ROOT_DIR=${MEDFILE_ROOT_DIR} -DMEDCOUPLING_ENABLE_PARTITIONER=OFF -DMEDCOUPLING_PARTITIONER_METIS=OFF -DMEDCOUPLING_PARTITIONER_SCOTCH=OFF -DMEDCOUPLING_ENABLE_RENUMBER=OFF -DMEDCOUPLING_BUILD_DOC=OFF -DHDF5_ROOT_DIR=${HDF5_ROOT} -DMEDCOUPLING_USE_64BIT_IDS=ON #-DSALOME_USE_MPI=ON
         BUILD_COMMAND     make
         INSTALL_COMMAND   make install
         INSTALL_DIR       ${MEDCOUPLING_ROOT_DIR}
@@ -369,6 +354,8 @@ else( DEFINED MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
 
   add_library(medloader   SHARED IMPORTED )
   set_property(TARGET medloader   PROPERTY IMPORTED_LOCATION ${MEDCOUPLING_ROOT_DIR}/lib/libmedloader.so)
+
+  SET(MEDCOUPLING_USE_64BIT_IDS  ON)
 
 endif( MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR} )
 
@@ -430,7 +417,7 @@ else( DEFINED PARAVIEW_VERSION OR DEFINED ENV{PARAVIEW_VERSION} )
   #extraction of the paraview version"
   IF   ( ${vtkConfig_file} STREQUAL "vtkConfig_file-NOTFOUND" )
     message(WARNING "Could not find ParaView configuration file vtkPVConfig.h in folder ${PARAVIEW_INCLUDE_DIR} and subdirectories  ${PARAVIEW_SUFFIXES}. Postprocessing may not work")
-    set( PARAVIEW_VERSION  "5.0")
+    set( PARAVIEW_VERSION  "5.8")
   ELSE ( ${vtkConfig_file} STREQUAL "vtkConfig_file-NOTFOUND" )
     message( STATUS "Found vtkPVConfig.h in ${vtkConfig_file}")
     file(STRINGS ${vtkConfig_file} vtkConfig)
@@ -497,6 +484,7 @@ IF   ( NOT HDF5_ROOT_DIR )
   ENDIF( ENV{HDF5_ROOT_DIR} )
 ENDIF( NOT HDF5_ROOT_DIR )
 
+
 #Paraview library paths
 set (PV_LIB_DIR    /usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:${MATPLOTLIB_ROOT_DIR}/lib/:${PARAVIEW_LIBRARIES_DIR})
 set (PV_PYTHON_DIR /usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:/usr/lib64/paraview/site-packages/:/usr/lib64/paraview/site-packages/paraview/:/usr/lib64/paraview/site-packages/vtk/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/paraview/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules:/usr/lib/paraview/site-packages/paraview:/usr/lib/paraview/site-packages/paraview/vtk:${PARAVIEW_ROOT_DIR}/lib/:${PARAVIEW_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:${PARAVIEW_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules/:${MATPLOTLIB_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages:${PYQT5_ROOT_DIR}:${PYQT5_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages)
@@ -516,7 +504,6 @@ if (SOLVERLAB_WITH_TESTS)                                                       
   enable_testing ()
   find_package (CPPUNIT REQUIRED)
 endif()			
-find_package (XDR REQUIRED)
 				    
 # Enter subdirectories
 add_subdirectory (CDMATH)
