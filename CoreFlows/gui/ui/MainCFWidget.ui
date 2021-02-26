@@ -29,7 +29,7 @@
    <string notr="true"/>
   </property>
   <property name="currentIndex">
-   <number>0</number>
+   <number>1</number>
   </property>
   <widget class="QWidget" name="tabModel">
    <attribute name="title">
@@ -12751,12 +12751,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>610</x>
-     <y>237</y>
+     <x>194</x>
+     <y>70</y>
     </hint>
     <hint type="destinationlabel">
-     <x>110</x>
-     <y>65</y>
+     <x>832</x>
+     <y>371</y>
     </hint>
    </hints>
   </connection>
@@ -12767,12 +12767,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>476</x>
-     <y>237</y>
+     <x>194</x>
+     <y>70</y>
     </hint>
     <hint type="destinationlabel">
-     <x>110</x>
-     <y>65</y>
+     <x>582</x>
+     <y>371</y>
     </hint>
    </hints>
   </connection>
@@ -12783,28 +12783,28 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>342</x>
-     <y>237</y>
+     <x>194</x>
+     <y>70</y>
     </hint>
     <hint type="destinationlabel">
-     <x>110</x>
-     <y>65</y>
+     <x>331</x>
+     <y>371</y>
     </hint>
    </hints>
   </connection>
   <connection>
    <sender>MeshCreation_RadioButton</sender>
    <signal>toggled(bool)</signal>
-   <receiver>Mesh_Creation</receiver>
-   <slot>setEnabled(bool)</slot>
+   <receiver>TabWidget</receiver>
+   <slot>onCreationMesh(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>100</x>
-     <y>65</y>
+     <x>228</x>
+     <y>270</y>
     </hint>
     <hint type="destinationlabel">
-     <x>780</x>
-     <y>235</y>
+     <x>610</x>
+     <y>425</y>
     </hint>
    </hints>
   </connection>
@@ -12831,8 +12831,8 @@
    <slot>onDriftModelSelected(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>647</x>
-     <y>465</y>
+     <x>314</x>
+     <y>75</y>
     </hint>
     <hint type="destinationlabel">
      <x>610</x>
@@ -12847,8 +12847,8 @@
    <slot>onSinglePhaseSelected(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>522</x>
-     <y>390</y>
+     <x>314</x>
+     <y>75</y>
     </hint>
     <hint type="destinationlabel">
      <x>610</x>
@@ -12863,8 +12863,8 @@
    <slot>onTransportSelected(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>522</x>
-     <y>294</y>
+     <x>314</x>
+     <y>75</y>
     </hint>
     <hint type="destinationlabel">
      <x>610</x>
@@ -12879,8 +12879,8 @@
    <slot>onDiffusionSelected(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>522</x>
-     <y>330</y>
+     <x>314</x>
+     <y>75</y>
     </hint>
     <hint type="destinationlabel">
      <x>610</x>
@@ -12895,8 +12895,8 @@
    <slot>onIsothermal2FluidSelected(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>522</x>
-     <y>486</y>
+     <x>314</x>
+     <y>75</y>
     </hint>
     <hint type="destinationlabel">
      <x>610</x>
@@ -12911,8 +12911,40 @@
    <slot>on5Eq2FluidSelected(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>522</x>
-     <y>522</y>
+     <x>314</x>
+     <y>75</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>610</x>
+     <y>425</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>MeshInputFileName_RadioButton</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>TabWidget</receiver>
+   <slot>onMeshFile(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>183</x>
+     <y>153</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>610</x>
+     <y>425</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>MeshInputFileName_toolButton</sender>
+   <signal>clicked()</signal>
+   <receiver>TabWidget</receiver>
+   <slot>onSelectMeshFile()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>601</x>
+     <y>153</y>
     </hint>
     <hint type="destinationlabel">
      <x>610</x>
@@ -12931,6 +12963,9 @@
   <slot>Dim_1(bool)</slot>
   <slot>Dim_2(bool)</slot>
   <slot>Dim_3(bool)</slot>
+  <slot>onMeshFile(bool)</slot>
+  <slot>onSelectMeshFile()</slot>
+  <slot>onCreationMesh(bool)</slot>
   <slot>onLaunchSimu()</slot>
  </slots>
 </ui>
