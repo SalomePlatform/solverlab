@@ -12751,12 +12751,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>618</x>
-     <y>212</y>
+     <x>610</x>
+     <y>237</y>
     </hint>
     <hint type="destinationlabel">
-     <x>858</x>
-     <y>377</y>
+     <x>110</x>
+     <y>65</y>
     </hint>
    </hints>
   </connection>
@@ -12767,12 +12767,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>482</x>
-     <y>212</y>
+     <x>476</x>
+     <y>237</y>
     </hint>
     <hint type="destinationlabel">
-     <x>608</x>
-     <y>377</y>
+     <x>110</x>
+     <y>65</y>
     </hint>
    </hints>
   </connection>
@@ -12783,12 +12783,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>346</x>
-     <y>212</y>
+     <x>342</x>
+     <y>237</y>
     </hint>
     <hint type="destinationlabel">
-     <x>358</x>
-     <y>377</y>
+     <x>110</x>
+     <y>65</y>
     </hint>
    </hints>
   </connection>
@@ -12799,12 +12799,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>183</x>
-     <y>249</y>
+     <x>100</x>
+     <y>65</y>
     </hint>
     <hint type="destinationlabel">
-     <x>604</x>
-     <y>370</y>
+     <x>780</x>
+     <y>235</y>
     </hint>
    </hints>
   </connection>
@@ -12815,12 +12815,108 @@
    <slot>onLaunchSimu()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>989</x>
-     <y>753</y>
+     <x>349</x>
+     <y>80</y>
     </hint>
     <hint type="destinationlabel">
      <x>918</x>
      <y>551</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DriftModel_RadioButton</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>TabWidget</receiver>
+   <slot>onDriftModelSelected(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>647</x>
+     <y>465</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>610</x>
+     <y>425</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>SinglePhase_RadioButton</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>TabWidget</receiver>
+   <slot>onSinglePhaseSelected(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>522</x>
+     <y>390</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>610</x>
+     <y>425</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>TransportEquation_RadioButton</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>TabWidget</receiver>
+   <slot>onTransportSelected(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>522</x>
+     <y>294</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>610</x>
+     <y>425</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DiffusionEquation_RadioButton</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>TabWidget</receiver>
+   <slot>onDiffusionSelected(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>522</x>
+     <y>330</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>610</x>
+     <y>425</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>IsothermalTwoFluid_RadioButton</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>TabWidget</receiver>
+   <slot>onIsothermal2FluidSelected(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>522</x>
+     <y>486</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>610</x>
+     <y>425</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>FiveEqsTwoFluid_RadioButton</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>TabWidget</receiver>
+   <slot>on5Eq2FluidSelected(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>522</x>
+     <y>522</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>610</x>
+     <y>425</y>
     </hint>
    </hints>
   </connection>
