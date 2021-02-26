@@ -16,8 +16,6 @@ class MainCFWidget(QtWidgets.QTabWidget):
       self.models += [self.widget(2+i)]
     for i in range(5):
       self.removeTab(3)
-#    for i in range(5):
-#      self.insertTab(3+i,self.models[i],"Physical model")
     
   def scanWidgets(self):
     print(self.tabModel)
