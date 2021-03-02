@@ -17,6 +17,7 @@ class MainCFWidget(QtWidgets.QTabWidget):
       self.models += [self.widget(2+i)]
     for i in range(5):
       self.removeTab(3)
+    self.setCurrentIndex(0)
     
   def scanWidgets(self):
     print(self.tabModel)
