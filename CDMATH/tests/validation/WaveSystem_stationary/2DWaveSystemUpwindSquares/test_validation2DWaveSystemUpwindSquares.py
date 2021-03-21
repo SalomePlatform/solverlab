@@ -40,8 +40,9 @@ def test_validation2DWaveSystemUpwindSquares(bctype,scaling):
         my_mesh=cdmath.Mesh(0,1,nx,0,1,nx)
         error_p_tab[i], error_u_tab[i], mesh_size_tab[i], t_final[i], ndt_final[i], max_vel[i], diag_data_press[i], diag_data_vel[i], time_tab[i] =WaveSystemUpwind.solve(my_mesh,"square"+str(nx)+'x'+str(nx), resolution,scaling,meshType,testColor,cfl,bctype)
         #error_p_tab[i], error_u_tab[i], mesh_size_tab[i], t_final[i], ndt_final[i], max_vel[i], diag_data_press[i], diag_data_vel[i], time_tab[i] =WaveSystemUpwind.solve_file(mesh_path+filename, mesh_name, resolution,scaling,meshType,testColor,cfl,bctype)
-        assert max_vel[i]>0.76 and max_vel[i]<1
-        error_p_tab[i]=log10(error_p_tab[i])
+        assert max_vel[i]>0.0001 and max_vel[i]<1.
+        print( "error_p_tab[i]=", error_p_tab[i], " zero leads to singularity in plotting of convergence curve")
+        #error_p_tab[i]=log10(error_p_tab[i])
         error_u_tab[i]=log10(error_u_tab[i])
         time_tab[i]=log10(time_tab[i])
         i=i+1
@@ -77,7 +78,7 @@ def test_validation2DWaveSystemUpwindSquares(bctype,scaling):
     plt.title('Number of times steps required for the stationary Wave System \n with upwind scheme on 2D square meshes')
     plt.savefig(mesh_name+"_2DWaveSystemUpwind_"+"TimeSteps.png")
     
-    # Plot of number of stationary time
+    # Plot of stationary time
     plt.close()
     plt.plot(mesh_size_tab, t_final, label='Time where stationary regime is reached')
     plt.legend()
@@ -108,12 +109,13 @@ def test_validation2DWaveSystemUpwindSquares(bctype,scaling):
     det=a1*a3-a2*a2
     assert det!=0, 'test_validation2DWaveSystemUpwind_squares() : Make sure you use distinct meshes and at least two meshes'
 
-    b1p=np.dot(error_p_tab,mesh_size_tab)   
-    b2p=np.sum(error_p_tab)
-    ap=( a3*b1p-a2*b2p)/det
-    bp=(-a2*b1p+a1*b2p)/det
+    #zero pressure leads to singularity
+    # b1p=np.dot(error_p_tab,mesh_size_tab)   
+    # b2p=np.sum(error_p_tab)
+    # ap=( a3*b1p-a2*b2p)/det
+    # bp=(-a2*b1p+a1*b2p)/det
     
-    print("FV upwind on 2D square meshes : scheme order for pressure is ", -ap)
+    # print("FV upwind on 2D square meshes : scheme order for pressure is ", -ap)
 
     b1u=np.dot(error_u_tab,mesh_size_tab)   
     b2u=np.sum(error_u_tab)
@@ -123,13 +125,13 @@ def test_validation2DWaveSystemUpwindSquares(bctype,scaling):
     print("FV upwind on 2D square meshes : scheme order for velocity is ", -au)
     
     # Plot of convergence curves
-    plt.close()
-    plt.plot(mesh_size_tab, error_p_tab, label='|error on stationary pressure|')
-    plt.legend()
-    plt.xlabel('1/2 log(number of cells)')
-    plt.ylabel('|error p|')
-    plt.title('Convergence of finite volumes for the stationary Wave System \n with upwind scheme on 2D square meshes')
-    plt.savefig(mesh_name+"_Pressure_2DWaveSystemUpwind_"+"ConvergenceCurve.png")
+    # plt.close()
+    # plt.plot(mesh_size_tab, error_p_tab, label='|error on stationary pressure|')
+    # plt.legend()
+    # plt.xlabel('1/2 log(number of cells)')
+    # plt.ylabel('|error p|')
+    # plt.title('Convergence of finite volumes for the stationary Wave System \n with upwind scheme on 2D square meshes')
+    # plt.savefig(mesh_name+"_Pressure_2DWaveSystemUpwind_"+"ConvergenceCurve.png")
     
     plt.close()
     plt.plot(mesh_size_tab, error_u_tab, label='log(|error on stationary velocity|)')
@@ -174,9 +176,9 @@ def test_validation2DWaveSystemUpwindSquares(bctype,scaling):
     convergence_synthesis["Max_vel_norm"]=max_vel
     convergence_synthesis["Final_time"]=t_final  
     convergence_synthesis["Final_time_step"]=ndt_final  
-    convergence_synthesis["Scheme_order"]=min(-au,-ap)
+    convergence_synthesis["Scheme_order"]=-au#min(-au,-ap)
     convergence_synthesis["Scheme_order_vel"]=-au
-    convergence_synthesis["Scheme_order_press"]=-ap
+    #convergence_synthesis["Scheme_order_press"]=-ap
     convergence_synthesis["Scaling_preconditioner"]="None"
     convergence_synthesis["Test_color"]=testColor
     convergence_synthesis["Computational_time"]=end-start
