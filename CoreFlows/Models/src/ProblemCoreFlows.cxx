@@ -53,6 +53,7 @@ ProblemCoreFlows::ProblemCoreFlows()
 	int _PetscIts=0;//the number of iterations of the linear solver
 	_ksptype = (char*)&KSPGMRES;
 	_pctype = (char*)&PCLU;
+	_nonLinearSolver = Newton_SOLVERLAB;
 	_heatPowerFieldSet=false;
 	_heatTransfertCoeff=0;
 	_rodTemperatureFieldSet=false;
@@ -184,7 +185,7 @@ void ProblemCoreFlows::setInitialField(string fileName, string fieldName, int ti
 void ProblemCoreFlows::setInitialFieldConstant(string fileName, const vector<double> Vconstant)
 {
 	Mesh M(fileName);
-	Field VV("Primitive", CELLS, M, Vconstant.size());
+	Field VV("SOLVERLAB results", CELLS, M, Vconstant.size());
 
 	for (int j = 0; j < M.getNumberOfCells(); j++) {
 		for (int i=0; i< VV.getNumberOfComponents(); i++)
@@ -195,7 +196,7 @@ void ProblemCoreFlows::setInitialFieldConstant(string fileName, const vector<dou
 }
 void ProblemCoreFlows::	setInitialFieldConstant(const Mesh& M, const Vector Vconstant)
 {
-	Field VV("Primitive", CELLS, M, Vconstant.getNumberOfRows());
+	Field VV("SOLVERLAB results", CELLS, M, Vconstant.getNumberOfRows());
 
 	for (int j = 0; j < M.getNumberOfCells(); j++) {
 		for (int i=0; i< VV.getNumberOfComponents(); i++)
@@ -205,7 +206,7 @@ void ProblemCoreFlows::	setInitialFieldConstant(const Mesh& M, const Vector Vcon
 }
 void ProblemCoreFlows::	setInitialFieldConstant(const Mesh& M, const vector<double> Vconstant)
 {
-	Field VV("Primitive", CELLS, M, Vconstant.size());
+	Field VV("SOLVERLAB results", CELLS, M, Vconstant.size());
 
 	for (int j = 0; j < M.getNumberOfCells(); j++) {
 		for (int i=0; i< VV.getNumberOfComponents(); i++)
@@ -255,7 +256,7 @@ void ProblemCoreFlows::setInitialFieldStepFunction(const Mesh M, const Vector VV
 		_runLogFile->close();
 		throw CdmathException( "ProblemCoreFlows::setStepFunctionInitialField: Vectors VV_Left and VV_Right have different sizes");
 	}
-	Field VV("Primitive", CELLS, M, VV_Left.getNumberOfRows());
+	Field VV("SOLVERLAB results", CELLS, M, VV_Left.getNumberOfRows());
 
 	double component_value;
 
@@ -402,6 +403,14 @@ void ProblemCoreFlows::setLinearSolver(linearSolver kspType, preconditioner pcTy
 	}
 }
 
+void ProblemCoreFlows::setNewtonSolver(double precision, int iterations, nonLinearSolver solverName)
+{
+	_maxNewtonIts=iterations;
+	_precision_Newton=precision;
+	_nonLinearSolver=solverName;
+}
+
+
 // Description:
 // Cette methode lance une execution du ProblemCoreFlows
 // Elle peut etre utilisee si le probleme n'est couple a aucun autre.
@@ -533,6 +542,7 @@ void ProblemCoreFlows::setFileName(string fileName){
 void ProblemCoreFlows::setFreqSave(int freqSave){
 	_freqSave = freqSave;
 }
+
 bool ProblemCoreFlows::solveTimeStep(){
 	_NEWTON_its=0;
 	bool converged=false, ok=true;

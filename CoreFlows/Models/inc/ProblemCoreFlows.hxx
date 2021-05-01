@@ -54,6 +54,17 @@ enum preconditioner
 	CHOLESKY/**< preconditioner is actually a direct solver for symmetric matrices (CHOLESKY factorisation)*/
 };
 
+//! enumeration nonLinearSolver
+/*! the nonLinearSolver can be Newton_SOLVERLAB or using PETSc, Newton_PETSC_LINESEARCH, Newton_PETSC_TRUSTREGION (see Petsc documentation) */
+enum nonLinearSolver
+{
+	Newton_SOLVERLAB,/**< nonLinearSolver is Newton_SOLVERLAB */
+	Newton_PETSC_LINESEARCH,/**< nonLinearSolver is Newton_PETSC_LINESEARCH */
+	Newton_PETSC_TRUSTREGION,/**< nonLinearSolver is Newton_PETSC_TRUSTREGION */
+	Newton_PETSC_NGMRES,/**< nonLinearSolver is Newton_PETSC_NGMRES */
+	Newton_PETSC_ASPIN/**< nonLinearSolver is Newton_PETSC_ASPIN */
+};
+
 //! enumeration saveFormat
 /*! the numerical results are saved using MED, VTK or CSV format */
 enum saveFormat
@@ -418,6 +429,16 @@ public :
 		return _ksptype;
 	};
 
+	/** \fn getNonLinearSolver
+	 * \brief renvoie _nonLinearSolver (le type du solveur de Newton utilisé)
+	 * \details
+	 * \param [in] void
+	 * \param [out] string
+	 *  */
+	nonLinearSolver getNonLinearSolver() {
+		return _nonLinearSolver;
+	};
+
 	/** \fn getNumberOfVariables
 	 * \brief le nombre d'inconnues du problème
 	 * \details
@@ -445,16 +466,13 @@ public :
 	void setLinearSolver(linearSolver solverName, preconditioner pcType);
 
 	/** \fn setNewtonSolver
-	 * \brief set the Newton algorithm parameters
-	 * \param [in] int maximum number of newton iterations
-	 * \param [in] double precision required for the convergence of the newton scheme
+	 * \brief sets the Newton type algorithm for solving the nonlinear algebraic system arising from the discretisation of the PDE
+	 * \param [in] double : precision required for the convergence of the newton scheme
+	 * \param [in] int : maximum number of newton iterations
+	 * \param [in] nonLinearSolver : the algorithm to be used to solve the nonlinear system
 	 * \param [out] void
 	 *  */
-	void setNewtonSolver(double precision,int iterations=20)
-	{
-		_maxNewtonIts=iterations;
-		_precision_Newton=precision;
-	};
+	void setNewtonSolver(double precision, int iterations=20, nonLinearSolver solverName=Newton_SOLVERLAB);
 
 	/** \fn displayConditionNumber
 	 * \brief display the condition number of the preconditioned linear systems
@@ -656,11 +674,12 @@ protected :
 	PC _pc;
 	PCType _pctype;
 	string _pc_hypre;
+	nonLinearSolver _nonLinearSolver;
 	int _maxPetscIts;//nombre maximum d'iteration gmres autorise au cours d'une resolution de systeme lineaire
 	int _PetscIts;//the number of iterations of the linear solver
 	int _maxNewtonIts;//nombre maximum d'iteration de Newton autorise au cours de la resolution d'un pas de temps
 	int _NEWTON_its;
-	Mat  _A;//Linear system matrix
+	Mat _A;//Linear system matrix
 	Vec _b;//Linear system right hand side
 	double _MaxIterLinearSolver;//nombre maximum d'iteration gmres obtenu au cours par les resolution de systemes lineaires au cours d'un pas de tmeps
 	bool _conditionNumber;//computes an estimate of the condition number
