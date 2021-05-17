@@ -1,5 +1,4 @@
 #include "ProblemFluid.hxx"
-#include "Fluide.h"
 #include "math.h"
 
 using namespace std;
@@ -145,14 +144,14 @@ void ProblemFluid::initialize()
 	VecCreateSeq(PETSC_COMM_SELF, _nVar, &_Vext);
 	VecCreateSeq(PETSC_COMM_SELF, _nVar, &_Uextdiff);
 	//	  VecCreateSeq(PETSC_COMM_SELF, _nVar*_Nmailles, &_conservativeVars);
-	VecCreate(PETSC_COMM_SELF, &_conservativeVars);
+	VecCreate(PETSC_COMM_SELF, &_conservativeVars);//Current conservative variables at Newton iteration k between time steps n and n+1
 	VecSetSizes(_conservativeVars,PETSC_DECIDE,_nVar*_Nmailles);
 	VecSetBlockSize(_conservativeVars,_nVar);
 	VecSetFromOptions(_conservativeVars);
-	VecDuplicate(_conservativeVars, &_old);
-	VecDuplicate(_conservativeVars, &_newtonVariation);
-	VecDuplicate(_conservativeVars, &_b);
-	VecDuplicate(_conservativeVars, &_primitiveVars);
+	VecDuplicate(_conservativeVars, &_old);//Old conservative variables at time step n
+	VecDuplicate(_conservativeVars, &_newtonVariation);//Newton variation Uk+1-Uk to be computed between time steps n and n+1
+	VecDuplicate(_conservativeVars, &_b);//Right hand side of Newton method at iteration k between time steps n and n+1
+	VecDuplicate(_conservativeVars, &_primitiveVars);//Current primitive variables at Newton iteration k between time steps n and n+1
 
 	if(_isScaling)
 	{
@@ -198,6 +197,49 @@ void ProblemFluid::initialize()
 	KSPGetPC(_ksp, &_pc);
 	PCSetType(_pc, _pctype);
 
+	// Creation du solveur de Newton de PETSc
+	if( _timeScheme == Implicit && _nonLinearSolver != Newton_SOLVERLAB)
+	{
+		SNESType snestype;
+	
+		// set nonlinear solver
+		if (_nonLinearSolver == Newton_PETSC_LINESEARCH || _nonLinearSolver == Newton_PETSC_LINESEARCH_BASIC || _nonLinearSolver == Newton_PETSC_LINESEARCH_BT || _nonLinearSolver == Newton_PETSC_LINESEARCH_SECANT || _nonLinearSolver == Newton_PETSC_LINESEARCH_NLEQERR)
+			snestype = (char*)&SNESNEWTONLS;
+		else if (_nonLinearSolver == Newton_PETSC_TRUSTREGION)
+			snestype = (char*)&SNESNEWTONTR;
+		else if (_nonLinearSolver == Newton_PETSC_NGMRES)
+			snestype = (char*)&SNESNGMRES;
+		else if (_nonLinearSolver ==Newton_PETSC_ASPIN)
+			snestype = (char*)&SNESASPIN;
+		else if(_nonLinearSolver != Newton_SOLVERLAB)
+		{
+			cout << "!!! Error : only 'Newton_PETSC_LINESEARCH', 'Newton_PETSC_TRUSTREGION', 'Newton_PETSC_NGMRES', 'Newton_PETSC_ASPIN' or 'Newton_SOLVERLAB' nonlinear solvers are acceptable !!!" << endl;
+			*_runLogFile << "!!! Error : only 'Newton_PETSC_LINESEARCH', 'Newton_PETSC_TRUSTREGION', 'Newton_PETSC_NGMRES', 'Newton_PETSC_ASPIN' or 'Newton_SOLVERLAB' nonlinear solvers are acceptable !!!" << endl;
+			_runLogFile->close();
+			throw CdmathException("!!! Error : only 'Newton_PETSC_LINESEARCH', 'Newton_PETSC_TRUSTREGION', 'Newton_PETSC_NGMRES', 'Newton_PETSC_ASPIN' or 'Newton_SOLVERLAB' nonlinear solvers are acceptable !!!" );
+		}
+
+		SNESCreate(PETSC_COMM_WORLD, &_snes);
+		SNESSetType( _snes, snestype);
+		SNESGetLineSearch( _snes, &_linesearch);
+		if(_nonLinearSolver == Newton_PETSC_LINESEARCH_BASIC)
+			SNESLineSearchSetType( _linesearch, 	SNESLINESEARCHBASIC );
+		else if(_nonLinearSolver == Newton_PETSC_LINESEARCH_BT)
+			SNESLineSearchSetType( _linesearch, 	SNESLINESEARCHBT );
+		else if(_nonLinearSolver == Newton_PETSC_LINESEARCH_SECANT)
+			SNESLineSearchSetType( _linesearch, 	SNESLINESEARCHL2 );
+		else if(_nonLinearSolver == Newton_PETSC_LINESEARCH_NLEQERR)
+			SNESLineSearchSetType( _linesearch, 	SNESLINESEARCHNLEQERR );
+
+		PetscViewerCreate(PETSC_COMM_WORLD,&_monitorLineSearch);
+		PetscViewerSetType(_monitorLineSearch, PETSCVIEWERASCII);		
+
+		SNESSetTolerances(_snes,_precision_Newton,_precision_Newton,_precision_Newton,_maxNewtonIts,-1);
+
+		SNESSetFunction(_snes,_newtonVariation,computeSnesRHS,this);
+		SNESSetJacobian(_snes,_A,_A,computeSnesJacobian,this);	
+	}
+
 	_initializedMemory=true;
 	save();//save initial data
 }
@@ -207,13 +249,58 @@ bool ProblemFluid::initTimeStep(double dt){
 	return _dt>0;//No need to call MatShift as the linear system matrix is filled at each Newton iteration (unlike linear problem)
 }
 
+bool ProblemFluid::solveTimeStep(){
+	if(_timeScheme == Implicit && _nonLinearSolver != Newton_SOLVERLAB)
+		return solveNewtonPETSc();
+	else
+		return ProblemCoreFlows::solveTimeStep();
+}
+
+bool ProblemFluid::solveNewtonPETSc()
+{	
+	if( (_nbTimeStep-1)%_freqSave ==0)
+		SNESLineSearchSetDefaultMonitor(_linesearch, _monitorLineSearch);
+	else
+		SNESLineSearchSetDefaultMonitor(_linesearch, NULL);
+
+    SNESSolve(_snes,NULL,_conservativeVars);
+
+    SNESConvergedReason reason;
+	SNESGetConvergedReason(_snes,&reason);
+	
+	if( (_nbTimeStep-1)%_freqSave ==0)
+	{	
+		if(reason == SNES_CONVERGED_FNORM_ABS  )
+			cout<<"Converged with absolute norm (absolute tolerance) less than "<<_precision_Newton<<", (||F|| < atol)"<<endl;
+		else if(reason == SNES_CONVERGED_FNORM_RELATIVE  )
+			cout<<"Converged because residual has decreased by a factor less than "<<_precision_Newton<<", (||F|| < rtol*||F_initial||)"<<endl;
+		else if(reason == SNES_CONVERGED_SNORM_RELATIVE  )
+			cout<<"Converged with  relative norm (relative tolerance) less than "<<_precision_Newton<<", (|| delta x || < stol || x ||)"<<endl;
+		else if(reason == SNES_CONVERGED_ITS  )
+			cout<<"SNESConvergedSkip() was chosen as the convergence test; thus the usual convergence criteria have not been checked and may or may not be satisfied"<<endl;
+		else if(reason == SNES_DIVERGED_LINEAR_SOLVE  )
+			cout<<"Solving linear system failed"<<endl;
+		else if(reason ==  SNES_DIVERGED_LINE_SEARCH   )
+			cout<<"Line search failed"<<endl;
+		else if(reason ==   SNES_DIVERGED_MAX_IT    )
+			cout<<"Reached the maximum number of iterations"<<endl;
+
+	    SNESGetIterationNumber(_snes, &_NEWTON_its);
+	    PetscPrintf(PETSC_COMM_WORLD,"Number of SNES iterations = %D\n\n", _NEWTON_its);
+		*_runLogFile <<endl;
+		*_runLogFile << "Nombre d'iterations de Newton "<< _NEWTON_its <<endl;
+	}
+	
+	return reason>0;
+}
+
 bool ProblemFluid::iterateTimeStep(bool &converged)
 {
 	bool stop=false;
 
 	if(_NEWTON_its>0){//Pas besoin de computeTimeStep à la première iteration de Newton
 		_maxvp=0.;
-		computeTimeStep(stop);//This compute timestep is just to update the linear system. The time step was imposed befor starting the Newton iterations
+		computeTimeStep(stop);//This compute timestep is just to update the linear system. The time step was imposed before starting the Newton iterations
 	}
 	if(stop){//Le compute time step ne s'est pas bien passé
 		cout<<"ComputeTimeStep failed"<<endl;
@@ -291,7 +378,7 @@ bool ProblemFluid::iterateTimeStep(bool &converged)
 		VecView(_conservativeVars,  PETSC_VIEWER_STDOUT_SELF);
 	}
 
-	if(_nbPhases==2 && _nbTimeStep%_freqSave ==0){
+	if(_nbPhases==2 && (_nbTimeStep-1)%_freqSave ==0){
 		if(_minm1<-_precision || _minm2<-_precision)
 		{
 			cout<<"!!!!!!!!! WARNING masse partielle negative sur " << _nbMaillesNeg << " faces, min m1= "<< _minm1 << " , minm2= "<< _minm2<< " precision "<<_precision<<endl;
@@ -303,18 +390,17 @@ bool ProblemFluid::iterateTimeStep(bool &converged)
 			*_runLogFile << "!!!!!!!!!!!!!!!!!!!!!!!! Complex eigenvalues on " << _nbVpCplx << " cells, max imag= " << _part_imag_max << endl;
 		}
 	}
-	_minm1=1e30;
-	_minm2=1e30;
-	_nbMaillesNeg=0;
-	_nbVpCplx =0;
-	_part_imag_max=0;
 
 	return true;
 }
 
-double ProblemFluid::computeTimeStep(bool & stop){
-	VecZeroEntries(_b);
+double ProblemFluid::computeTimeStep(bool & stop){//dt is not known and will not contribute to the Newton scheme
 
+	if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+	{
+		cout << "ProblemFluid::computeTimeStep : Début calcul matrice implicite et second membre"<<endl;
+		cout << endl;
+	}
 	if(_restartWithNewTimeScheme)//This is a change of time scheme during a simulation
 	{
 		if(_timeScheme == Implicit)
@@ -327,8 +413,9 @@ double ProblemFluid::computeTimeStep(bool & stop){
 		MatZeroEntries(_A);
 
 	VecAssemblyBegin(_b);
-	VecAssemblyBegin(_conservativeVars);
-	std::vector< int > idCells;
+	VecZeroEntries(_b);
+
+	std::vector< int > idCells(2);
 	PetscInt idm, idn, size = 1;
 
 	long nbFaces = _mesh.getNumberOfFaces();
@@ -374,7 +461,7 @@ double ProblemFluid::computeTimeStep(bool & stop){
 							_vec_normal[0] = 1;
 					}
 				}
-				if(_verbose && _nbTimeStep%_freqSave ==0)
+				if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 				{
 					cout << "face numero " << j << " cellule frontiere " << idCells[k] << " ; vecteur normal=(";
 					for(int p=0; p<_Ndim; p++)
@@ -406,7 +493,7 @@ double ProblemFluid::computeTimeStep(bool & stop){
 
 					jacobian(idCells[k],nameOfGroup,_vec_normal);
 					jacobianDiff(idCells[k],nameOfGroup);
-					if(_verbose && _nbTimeStep%_freqSave ==0){
+					if(_verbose && (_nbTimeStep-1)%_freqSave ==0){
 						cout << "Matrice Jacobienne CL convection:" << endl;
 						for(int p=0; p<_nVar; p++){
 							for(int q=0; q<_nVar; q++)
@@ -474,7 +561,7 @@ double ProblemFluid::computeTimeStep(bool & stop){
 						_vec_normal[0] = 1;
 				}
 			}
-			if(_verbose && _nbTimeStep%_freqSave ==0)
+			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 			{
 				cout << "face numero " << j << " cellule gauche " << idCells[0] << " cellule droite " << idCells[1];
 				cout<<" Normal vector= ";
@@ -500,7 +587,7 @@ double ProblemFluid::computeTimeStep(bool & stop){
 				_inv_dxj = 1/Ctemp2.getMeasure();
 			}
 
-			addConvectionToSecondMember( idCells[0],idCells[1], false);
+			addConvectionToSecondMember(idCells[0],idCells[1], false);
 			addDiffusionToSecondMember( idCells[0],idCells[1], false);
 			addSourceTermToSecondMember(idCells[0], Ctemp1.getNumberOfFaces(),idCells[1], _mesh.getCell(idCells[1]).getNumberOfFaces(),false,j,_inv_dxi*Ctemp1.getMeasure());
 
@@ -552,7 +639,7 @@ double ProblemFluid::computeTimeStep(bool & stop){
 			}
 		}
 		else if( Fj.getNumberOfCells()>2 && _Ndim==1 ){//inner face with more than two neighbours
-			if(_verbose && _nbTimeStep%_freqSave ==0)
+			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 				cout<<"lattice mesh junction at face "<<j<<" nbvoismax= "<<_neibMaxNb<<endl;
 			*_runLogFile<<"Warning: treatment of a junction node"<<endl;
 
@@ -574,7 +661,7 @@ double ProblemFluid::computeTimeStep(bool & stop){
 				_vec_normal[0] = 1;
 			else//j==16
 				_vec_normal[0] = -1;
-			if(_verbose && _nbTimeStep%_freqSave ==0)
+			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 			{
 				cout<<"Cell with largest section has index "<< largestSectionCellIndex <<" and number "<<idm<<endl;
 				cout << " ; vecteur normal=(";
@@ -591,7 +678,7 @@ double ProblemFluid::computeTimeStep(bool & stop){
 					convectionMatrices();
 					diffusionStateAndMatrices(idm, idn,false);
 
-					if(_verbose && _nbTimeStep%_freqSave ==0)
+					if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 						cout<<"Neighbour index "<<i<<" cell number "<< idn<<endl;
 
 					_inv_dxi = _sectionField(idn)/_sectionField(idm)/Ctemp1.getMeasure();
@@ -657,21 +744,23 @@ double ProblemFluid::computeTimeStep(bool & stop){
 		}
 
 	}
-	VecAssemblyEnd(_conservativeVars);
 	VecAssemblyEnd(_b);
 
 	if(_timeScheme == Implicit){
 		for(int imaille = 0; imaille<_Nmailles; imaille++)
 			MatSetValuesBlocked(_A, size, &imaille, size, &imaille, _GravityImplicitationMatrix, ADD_VALUES);
 
-		if(_verbose && _nbTimeStep%_freqSave ==0)
+		if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 			displayMatrix(_GravityImplicitationMatrix,_nVar,"Gravity matrix:");
 
 		MatAssemblyBegin(_A, MAT_FINAL_ASSEMBLY);
 		MatAssemblyEnd(_A, MAT_FINAL_ASSEMBLY);
-		if(_verbose && _nbTimeStep%_freqSave ==0){
-			cout << "Fin ProblemFluid.cxx : matrice implicite"<<endl;
+		if(_verbose && (_nbTimeStep-1)%_freqSave ==0){
+			cout << "ProblemFluid::computeTimeStep : Fin calcul matrice implicite et second membre"<<endl;
+			cout << "ProblemFluid::computeTimeStep : Matrice implicite :"<<endl;
 			MatView(_A,PETSC_VIEWER_STDOUT_SELF);
+			cout << "ProblemFluid::computeTimeStep : Second membre :"<<endl;
+			VecView(_b,  PETSC_VIEWER_STDOUT_WORLD);
 			cout << endl;
 		}
 	}
@@ -688,7 +777,7 @@ double ProblemFluid::computeTimeStep(bool & stop){
 
 void ProblemFluid::computeNewtonVariation()
 {
-	if(_verbose)
+	if(_system)
 	{
 		cout<<"Vecteur courant Uk "<<endl;
 		VecView(_conservativeVars,PETSC_VIEWER_STDOUT_SELF);
@@ -698,7 +787,7 @@ void ProblemFluid::computeNewtonVariation()
 	{
 		VecCopy(_b,_newtonVariation);
 		VecScale(_newtonVariation, _dt);
-		if(_verbose && _nbTimeStep%_freqSave ==0)
+		if(_system && (_nbTimeStep-1)%_freqSave ==0)
 		{
 			cout<<"Vecteur _newtonVariation =_b*dt"<<endl;
 			VecView(_newtonVariation,PETSC_VIEWER_STDOUT_SELF);
@@ -707,7 +796,7 @@ void ProblemFluid::computeNewtonVariation()
 	}
 	else
 	{
-		if(_verbose)
+		if(_system)
 		{
 			cout << "Matrice du système linéaire avant contribution delta t" << endl;
 			MatView(_A,PETSC_VIEWER_STDOUT_SELF);
@@ -729,7 +818,7 @@ void ProblemFluid::computeNewtonVariation()
 		KSPSetOperators(_ksp, _A, _A,SAME_NONZERO_PATTERN);
 #endif
 
-		if(_verbose)
+		if(_system)
 		{
 			cout << "Matrice du système linéaire après contribution delta t" << endl;
 			MatView(_A,PETSC_VIEWER_STDOUT_SELF);
@@ -788,13 +877,598 @@ void ProblemFluid::computeNewtonVariation()
 			KSPSolve(_ksp,_b, _bScaling);
 			VecPointwiseMult(_newtonVariation,_invVecScaling,_bScaling);
 		}
-		if(_verbose)
+		if(_system)
 		{
 			cout << "solution du systeme lineaire local:" << endl;
 			VecView(_newtonVariation, PETSC_VIEWER_STDOUT_SELF);
 			cout << endl;
 		}
 	}
+}
+
+void ProblemFluid::computeNewtonRHS( Vec X, Vec F_X){//dt is known and will contribute to the right hand side of the Newton scheme
+
+	if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+	{
+		cout << "ProblemFluid::computeNewtonRHS : Début calcul second membre pour PETSc, _dt="<<_dt<<endl;
+		cout << endl;
+		cout<<"Vecteur courant Uk "<<endl;
+		VecView(X,PETSC_VIEWER_STDOUT_SELF);
+		cout << endl;
+	}
+
+	VecCopy(X,_conservativeVars);
+	updatePrimitives();
+
+	VecAssemblyBegin(_b);
+	VecZeroEntries(_b);
+
+	std::vector< int > idCells(2);
+	PetscInt idm, idn, size = 1;
+
+	long nbFaces = _mesh.getNumberOfFaces();
+	Face Fj;
+	Cell Ctemp1,Ctemp2;
+	string nameOfGroup;
+
+	for (int j=0; j<nbFaces;j++){
+		Fj = _mesh.getFace(j);
+		_isBoundary=Fj.isBorder();
+		idCells = Fj.getCellsId();
+
+		// If Fj is on the boundary
+		if (_isBoundary)
+		{
+			for(int k=0;k<Fj.getNumberOfCells();k++)//there will be at most two neighours in the case of an inner wall
+			{
+				// compute the normal vector corresponding to face j : from Ctemp1 outward
+				Ctemp1 = _mesh.getCell(idCells[k]);//origin of the normal vector
+				if (_Ndim >1){
+					for(int l=0; l<Ctemp1.getNumberOfFaces(); l++)
+					{//we look for l the index of the face Fj for the cell Ctemp1
+						if (j == Ctemp1.getFacesId()[l])
+						{
+							for (int idim = 0; idim < _Ndim; ++idim)
+								_vec_normal[idim] = Ctemp1.getNormalVector(l,idim);
+							break;
+						}
+					}
+				}else{ // _Ndim = 1, build normal vector (bug cdmath)
+					if(!_sectionFieldSet)
+					{
+						if (Fj.x()<Ctemp1.x())
+							_vec_normal[0] = -1;
+						else
+							_vec_normal[0] = 1;
+					}
+					else
+					{
+						if(idCells[0]==0)
+							_vec_normal[0] = -1;
+						else//idCells[0]==31
+							_vec_normal[0] = 1;
+					}
+				}
+				if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+				{
+					cout << "face numero " << j << " cellule frontiere " << idCells[k] << " ; vecteur normal=(";
+					for(int p=0; p<_Ndim; p++)
+						cout << _vec_normal[p] << ",";
+					cout << "). "<<endl;
+				}
+				nameOfGroup = Fj.getGroupName();
+				_porosityi=_porosityField(idCells[k]);
+				_porosityj=_porosityi;
+				setBoundaryState(nameOfGroup,idCells[k],_vec_normal);
+				convectionState(idCells[k],0,true);
+				convectionMatrices();
+				diffusionStateAndMatrices(idCells[k], 0, true);
+				// compute 1/dxi
+				if (_Ndim > 1)
+					_inv_dxi = Fj.getMeasure()/Ctemp1.getMeasure();
+				else
+					_inv_dxi = 1/Ctemp1.getMeasure();
+
+				addConvectionToSecondMember(idCells[k],-1,true,nameOfGroup);
+				addDiffusionToSecondMember(idCells[k],-1,true);
+				addSourceTermToSecondMember(idCells[k],(_mesh.getCell(idCells[k])).getNumberOfFaces(),-1, -1,true,j,_inv_dxi*Ctemp1.getMeasure());
+			}
+		} else 	if (Fj.getNumberOfCells()==2 ){	// Fj is inside the domain and has two neighours (no junction)
+			// compute the normal vector corresponding to face j : from Ctemp1 to Ctemp2
+			Ctemp1 = _mesh.getCell(idCells[0]);//origin of the normal vector
+			Ctemp2 = _mesh.getCell(idCells[1]);
+			if (_Ndim >1){
+				for(int l=0; l<Ctemp1.getNumberOfFaces(); l++){//we look for l the index of the face Fj for the cell Ctemp1
+					if (j == Ctemp1.getFacesId()[l]){
+						for (int idim = 0; idim < _Ndim; ++idim)
+							_vec_normal[idim] = Ctemp1.getNormalVector(l,idim);
+						break;
+					}
+				}
+			}else{ // _Ndim = 1, build normal vector (bug cdmath)
+				if(!_sectionFieldSet)
+				{
+					if (Fj.x()<Ctemp1.x())
+						_vec_normal[0] = -1;
+					else
+						_vec_normal[0] = 1;
+				}
+				else
+				{
+					if(idCells[0]>idCells[1])
+						_vec_normal[0] = -1;
+					else
+						_vec_normal[0] = 1;
+				}
+			}
+			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+			{
+				cout << "face numero " << j << " cellule gauche " << idCells[0] << " cellule droite " << idCells[1];
+				cout<<" Normal vector= ";
+				for (int idim = 0; idim < _Ndim; ++idim)
+					cout<<_vec_normal[idim]<<", ";
+				cout<<endl;
+			}
+			_porosityi=_porosityField(idCells[0]);
+			_porosityj=_porosityField(idCells[1]);
+			convectionState(idCells[0],idCells[1],false);
+			convectionMatrices();
+			diffusionStateAndMatrices(idCells[0], idCells[1], false);
+
+			// compute 1/dxi and 1/dxj
+			if (_Ndim > 1)
+			{
+				_inv_dxi = Fj.getMeasure()/Ctemp1.getMeasure();
+				_inv_dxj = Fj.getMeasure()/Ctemp2.getMeasure();
+			}
+			else
+			{
+				_inv_dxi = 1/Ctemp1.getMeasure();
+				_inv_dxj = 1/Ctemp2.getMeasure();
+			}
+
+			addConvectionToSecondMember(idCells[0],idCells[1], false);
+			addDiffusionToSecondMember( idCells[0],idCells[1], false);
+			addSourceTermToSecondMember(idCells[0], Ctemp1.getNumberOfFaces(),idCells[1], _mesh.getCell(idCells[1]).getNumberOfFaces(),false,j,_inv_dxi*Ctemp1.getMeasure());
+
+		}
+		else if( Fj.getNumberOfCells()>2 && _Ndim==1 ){//inner face with more than two neighbours
+			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+				cout<<"lattice mesh junction at face "<<j<<" nbvoismax= "<<_neibMaxNb<<endl;
+			*_runLogFile<<"Warning: treatment of a junction node"<<endl;
+
+			if(!_sectionFieldSet)
+			{
+				_runLogFile->close();
+				throw CdmathException("ProblemFluid::ComputeTimeStep(): pipe network requires section field");
+			}
+			int largestSectionCellIndex=0;
+			for(int i=1;i<Fj.getNumberOfCells();i++){
+				if(_sectionField(idCells[i])>_sectionField(idCells[largestSectionCellIndex]))
+					largestSectionCellIndex=i;
+			}
+			idm = idCells[largestSectionCellIndex];
+			Ctemp1 = _mesh.getCell(idm);//origin of the normal vector
+			_porosityi=_porosityField(idm);
+
+			if (j==15)// bug cdmath (Fj.x() > _mesh.getCell(idm).x())
+				_vec_normal[0] = 1;
+			else//j==16
+				_vec_normal[0] = -1;
+			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+			{
+				cout<<"Cell with largest section has index "<< largestSectionCellIndex <<" and number "<<idm<<endl;
+				cout << " ; vecteur normal=(";
+				for(int p=0; p<_Ndim; p++)
+					cout << _vec_normal[p] << ",";
+				cout << "). "<<endl;
+			}
+			for(int i=0;i<Fj.getNumberOfCells();i++){
+				if(i != largestSectionCellIndex){
+					idn = idCells[i];
+					Ctemp2 = _mesh.getCell(idn);
+					_porosityj=_porosityField(idn);
+					convectionState(idm,idn,false);
+					convectionMatrices();
+					diffusionStateAndMatrices(idm, idn,false);
+
+					if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+						cout<<"Neighbour index "<<i<<" cell number "<< idn<<endl;
+
+					_inv_dxi = _sectionField(idn)/_sectionField(idm)/Ctemp1.getMeasure();
+					_inv_dxj = 1/Ctemp2.getMeasure();
+
+					addConvectionToSecondMember(idm,idn, false);
+					_inv_dxi = sqrt(_sectionField(idn)/_sectionField(idm))/Ctemp1.getMeasure();
+					addDiffusionToSecondMember(idm,idn, false);
+					_inv_dxi = _sectionField(idn)/_sectionField(idm)/Ctemp1.getMeasure();
+					addSourceTermToSecondMember(idm, Ctemp1.getNumberOfFaces()*(Fj.getNumberOfCells()-1),idn, Ctemp2.getNumberOfFaces(),false,j,_inv_dxi*Ctemp1.getMeasure());
+				}
+			}
+		}
+		else
+		{
+			cout<< "Face j="<<j<< " is not a boundary face and has "<<Fj.getNumberOfCells()<< " neighbour cells"<<endl;
+			_runLogFile->close();
+			throw CdmathException("ProblemFluid::ComputeTimeStep(): incompatible number of cells around a face");
+		}
+
+	}
+	
+	//Contribution from delta t
+	VecAXPY(_b, 1/_dt, _old);
+	VecAXPY(_b, -1/_dt, _conservativeVars);
+
+	VecAssemblyEnd(_b);
+	VecCopy(_b,F_X);
+	VecScale(F_X,-1.);
+	
+	if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+	{
+		cout << "ProblemFluid::computeNewtonRHS : Fin calcul second membre pour PETSc"<<endl;
+		VecView(F_X,  PETSC_VIEWER_STDOUT_WORLD);
+		cout << endl;
+	}
+}
+
+int ProblemFluid::computeSnesRHS(SNES snes, Vec X, Vec F_X, void *ctx)//Prototype imposé par PETSc
+{
+	ProblemFluid * myProblem = (ProblemFluid *) ctx;
+	myProblem->computeNewtonRHS( X, F_X);
+	
+	return 0;
+}
+
+void ProblemFluid::computeNewtonJacobian( Vec X, Mat A){//dt is known and will contribute to the jacobian matrix of the Newton scheme
+
+	if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+	{
+		cout << "ProblemFluid::computeNewtonJacobian : Début calcul Jacobienne schéma Newton pour PETSc, _dt="<<_dt<<endl;
+		cout << endl;
+	}
+
+	if(_timeScheme == Explicit){
+		MatCreateConstantDiagonal(PETSC_COMM_SELF, _nVar, _nVar, _nVar*_Nmailles, _nVar*_Nmailles,1./_dt, &A);
+		return ;
+	}
+
+	MatZeroEntries(A);
+	VecCopy(X,_conservativeVars);
+	
+	std::vector< int > idCells(2);
+	PetscInt idm, idn, size = 1;
+
+	long nbFaces = _mesh.getNumberOfFaces();
+	Face Fj;
+	Cell Ctemp1,Ctemp2;
+	string nameOfGroup;
+
+	for (int j=0; j<nbFaces;j++){
+		Fj = _mesh.getFace(j);
+		_isBoundary=Fj.isBorder();
+		idCells = Fj.getCellsId();
+
+		// If Fj is on the boundary
+		if (_isBoundary)
+		{
+			for(int k=0;k<Fj.getNumberOfCells();k++)//there will be at most two neighours in the case of an inner wall
+			{
+				// compute the normal vector corresponding to face j : from Ctemp1 outward
+				Ctemp1 = _mesh.getCell(idCells[k]);//origin of the normal vector
+				if (_Ndim >1){
+					for(int l=0; l<Ctemp1.getNumberOfFaces(); l++)
+					{//we look for l the index of the face Fj for the cell Ctemp1
+						if (j == Ctemp1.getFacesId()[l])
+						{
+							for (int idim = 0; idim < _Ndim; ++idim)
+								_vec_normal[idim] = Ctemp1.getNormalVector(l,idim);
+							break;
+						}
+					}
+				}else{ // _Ndim = 1, build normal vector (bug cdmath)
+					if(!_sectionFieldSet)
+					{
+						if (Fj.x()<Ctemp1.x())
+							_vec_normal[0] = -1;
+						else
+							_vec_normal[0] = 1;
+					}
+					else
+					{
+						if(idCells[0]==0)
+							_vec_normal[0] = -1;
+						else//idCells[0]==31
+							_vec_normal[0] = 1;
+					}
+				}
+				if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+				{
+					cout << "face numero " << j << " cellule frontiere " << idCells[k] << " ; vecteur normal=(";
+					for(int p=0; p<_Ndim; p++)
+						cout << _vec_normal[p] << ",";
+					cout << "). "<<endl;
+				}
+				nameOfGroup = Fj.getGroupName();
+				_porosityi=_porosityField(idCells[k]);
+				_porosityj=_porosityi;
+				setBoundaryState(nameOfGroup,idCells[k],_vec_normal);
+				convectionState(idCells[k],0,true);
+				convectionMatrices();
+				diffusionStateAndMatrices(idCells[k], 0, true);
+				// compute 1/dxi
+				if (_Ndim > 1)
+					_inv_dxi = Fj.getMeasure()/Ctemp1.getMeasure();
+				else
+					_inv_dxi = 1/Ctemp1.getMeasure();
+
+					for(int l=0; l<_nVar*_nVar;l++){
+						_AroeMinusImplicit[l] *= _inv_dxi;
+						_Diffusion[l] *=_inv_dxi*_inv_dxi;
+					}
+
+					jacobian(idCells[k],nameOfGroup,_vec_normal);
+					jacobianDiff(idCells[k],nameOfGroup);
+					if(_verbose && (_nbTimeStep-1)%_freqSave ==0){
+						cout << "Matrice Jacobienne CL convection:" << endl;
+						for(int p=0; p<_nVar; p++){
+							for(int q=0; q<_nVar; q++)
+								cout << _Jcb[p*_nVar+q] << "\t";
+							cout << endl;
+						}
+						cout << endl;
+						cout << "Matrice Jacobienne CL diffusion:" << endl;
+						for(int p=0; p<_nVar; p++){
+							for(int q=0; q<_nVar; q++)
+								cout << _JcbDiff[p*_nVar+q] << "\t";
+							cout << endl;
+						}
+						cout << endl;
+					}
+					idm = idCells[k];
+					//calcul et insertion de A^-*Jcb
+					Polynoms::matrixProduct(_AroeMinusImplicit, _nVar, _nVar, _Jcb, _nVar, _nVar, _a);
+					MatSetValuesBlocked(A, size, &idm, size, &idm, _a, ADD_VALUES);
+
+					if(_verbose)
+						displayMatrix(_a, _nVar, "produit A^-*Jcb pour CL");
+
+					//insertion de -A^-
+					for(int k=0; k<_nVar*_nVar;k++){
+						_AroeMinusImplicit[k] *= -1;
+					}
+					MatSetValuesBlocked(A, size, &idm, size, &idm, _AroeMinusImplicit, ADD_VALUES);
+					if(_verbose)
+						displayMatrix(_AroeMinusImplicit, _nVar,"-_AroeMinusImplicit: ");
+
+					//calcul et insertion de D*JcbDiff
+					Polynoms::matrixProduct(_Diffusion, _nVar, _nVar, _JcbDiff, _nVar, _nVar, _a);
+					MatSetValuesBlocked(A, size, &idm, size, &idm, _a, ADD_VALUES);
+					for(int k=0; k<_nVar*_nVar;k++)
+						_Diffusion[k] *= -1;
+					MatSetValuesBlocked(A, size, &idm, size, &idm, _Diffusion, ADD_VALUES);
+				}
+		} else 	if (Fj.getNumberOfCells()==2 ){	// Fj is inside the domain and has two neighours (no junction)
+			// compute the normal vector corresponding to face j : from Ctemp1 to Ctemp2
+			Ctemp1 = _mesh.getCell(idCells[0]);//origin of the normal vector
+			Ctemp2 = _mesh.getCell(idCells[1]);
+			if (_Ndim >1){
+				for(int l=0; l<Ctemp1.getNumberOfFaces(); l++){//we look for l the index of the face Fj for the cell Ctemp1
+					if (j == Ctemp1.getFacesId()[l]){
+						for (int idim = 0; idim < _Ndim; ++idim)
+							_vec_normal[idim] = Ctemp1.getNormalVector(l,idim);
+						break;
+					}
+				}
+			}else{ // _Ndim = 1, build normal vector (bug cdmath)
+				if(!_sectionFieldSet)
+				{
+					if (Fj.x()<Ctemp1.x())
+						_vec_normal[0] = -1;
+					else
+						_vec_normal[0] = 1;
+				}
+				else
+				{
+					if(idCells[0]>idCells[1])
+						_vec_normal[0] = -1;
+					else
+						_vec_normal[0] = 1;
+				}
+			}
+			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+			{
+				cout << "face numero " << j << " cellule gauche " << idCells[0] << " cellule droite " << idCells[1];
+				cout<<" Normal vector= ";
+				for (int idim = 0; idim < _Ndim; ++idim)
+					cout<<_vec_normal[idim]<<", ";
+				cout<<endl;
+			}
+			_porosityi=_porosityField(idCells[0]);
+			_porosityj=_porosityField(idCells[1]);
+			convectionState(idCells[0],idCells[1],false);
+			convectionMatrices();
+			diffusionStateAndMatrices(idCells[0], idCells[1], false);
+
+			// compute 1/dxi and 1/dxj
+			if (_Ndim > 1)
+			{
+				_inv_dxi = Fj.getMeasure()/Ctemp1.getMeasure();
+				_inv_dxj = Fj.getMeasure()/Ctemp2.getMeasure();
+			}
+			else
+			{
+				_inv_dxi = 1/Ctemp1.getMeasure();
+				_inv_dxj = 1/Ctemp2.getMeasure();
+			}
+
+				for(int k=0; k<_nVar*_nVar;k++)
+				{
+					_AroeMinusImplicit[k] *= _inv_dxi;
+					_Diffusion[k] *=_inv_dxi*2/(1/_inv_dxi+1/_inv_dxj);
+				}
+				idm = idCells[0];
+				idn = idCells[1];
+				//cout<<"idm= "<<idm<<"idn= "<<idn<<"nbvoismax= "<<_neibMaxNb<<endl;
+				MatSetValuesBlocked(A, size, &idm, size, &idn, _AroeMinusImplicit, ADD_VALUES);
+				MatSetValuesBlocked(A, size, &idm, size, &idn, _Diffusion, ADD_VALUES);
+
+				if(_verbose){
+					displayMatrix(_AroeMinusImplicit, _nVar, "+_AroeMinusImplicit: ");
+					displayMatrix(_Diffusion, _nVar, "+_Diffusion: ");
+				}
+				for(int k=0;k<_nVar*_nVar;k++){
+					_AroeMinusImplicit[k] *= -1;
+					_Diffusion[k] *= -1;
+				}
+				MatSetValuesBlocked(A, size, &idm, size, &idm, _AroeMinusImplicit, ADD_VALUES);
+				MatSetValuesBlocked(A, size, &idm, size, &idm, _Diffusion, ADD_VALUES);
+				if(_verbose){
+					displayMatrix(_AroeMinusImplicit, _nVar, "-_AroeMinusImplicit: ");
+					displayMatrix(_Diffusion, _nVar, "-_Diffusion: ");
+				}
+				for(int k=0; k<_nVar*_nVar;k++)
+				{
+					_AroePlusImplicit[k]  *= _inv_dxj;
+					_Diffusion[k] *=_inv_dxj/_inv_dxi;
+				}
+				MatSetValuesBlocked(A, size, &idn, size, &idn, _AroePlusImplicit, ADD_VALUES);
+				MatSetValuesBlocked(A, size, &idn, size, &idn, _Diffusion, ADD_VALUES);
+				if(_verbose)
+					displayMatrix(_AroePlusImplicit, _nVar, "+_AroePlusImplicit: ");
+
+				for(int k=0;k<_nVar*_nVar;k++){
+					_AroePlusImplicit[k] *= -1;
+					_Diffusion[k] *= -1;
+				}
+				MatSetValuesBlocked(A, size, &idn, size, &idm, _AroePlusImplicit, ADD_VALUES);
+				MatSetValuesBlocked(A, size, &idn, size, &idm, _Diffusion, ADD_VALUES);
+
+				if(_verbose)
+					displayMatrix(_AroePlusImplicit, _nVar, "-_AroePlusImplicit: ");
+		}
+		else if( Fj.getNumberOfCells()>2 && _Ndim==1 ){//inner face with more than two neighbours
+			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+				cout<<"lattice mesh junction at face "<<j<<" nbvoismax= "<<_neibMaxNb<<endl;
+			*_runLogFile<<"Warning: treatment of a junction node"<<endl;
+
+			if(!_sectionFieldSet)
+			{
+				_runLogFile->close();
+				throw CdmathException("ProblemFluid::ComputeTimeStep(): pipe network requires section field");
+			}
+			int largestSectionCellIndex=0;
+			for(int i=1;i<Fj.getNumberOfCells();i++){
+				if(_sectionField(idCells[i])>_sectionField(idCells[largestSectionCellIndex]))
+					largestSectionCellIndex=i;
+			}
+			idm = idCells[largestSectionCellIndex];
+			Ctemp1 = _mesh.getCell(idm);//origin of the normal vector
+			_porosityi=_porosityField(idm);
+
+			if (j==15)// bug cdmath (Fj.x() > _mesh.getCell(idm).x())
+				_vec_normal[0] = 1;
+			else//j==16
+				_vec_normal[0] = -1;
+			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+			{
+				cout<<"Cell with largest section has index "<< largestSectionCellIndex <<" and number "<<idm<<endl;
+				cout << " ; vecteur normal=(";
+				for(int p=0; p<_Ndim; p++)
+					cout << _vec_normal[p] << ",";
+				cout << "). "<<endl;
+			}
+			for(int i=0;i<Fj.getNumberOfCells();i++){
+				if(i != largestSectionCellIndex){
+					idn = idCells[i];
+					Ctemp2 = _mesh.getCell(idn);
+					_porosityj=_porosityField(idn);
+					convectionState(idm,idn,false);
+					convectionMatrices();
+					diffusionStateAndMatrices(idm, idn,false);
+
+					if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+						cout<<"Neighbour index "<<i<<" cell number "<< idn<<endl;
+
+					_inv_dxi = _sectionField(idn)/_sectionField(idm)/Ctemp1.getMeasure();
+					_inv_dxj = 1/Ctemp2.getMeasure();
+
+						for(int k=0; k<_nVar*_nVar;k++)
+						{
+							_AroeMinusImplicit[k] *= _inv_dxi;
+							_Diffusion[k] *=_inv_dxi*2/(1/_inv_dxi+1/_inv_dxj);//use sqrt as above
+						}
+						MatSetValuesBlocked(A, size, &idm, size, &idn, _AroeMinusImplicit, ADD_VALUES);
+						MatSetValuesBlocked(A, size, &idm, size, &idn, _Diffusion, ADD_VALUES);
+
+						if(_verbose){
+							displayMatrix(_AroeMinusImplicit, _nVar, "+_AroeMinusImplicit: ");
+							displayMatrix(_Diffusion, _nVar, "+_Diffusion: ");
+						}
+						for(int k=0;k<_nVar*_nVar;k++){
+							_AroeMinusImplicit[k] *= -1;
+							_Diffusion[k] *= -1;
+						}
+						MatSetValuesBlocked(A, size, &idm, size, &idm, _AroeMinusImplicit, ADD_VALUES);
+						MatSetValuesBlocked(A, size, &idm, size, &idm, _Diffusion, ADD_VALUES);
+						if(_verbose){
+							displayMatrix(_AroeMinusImplicit, _nVar, "-_AroeMinusImplicit: ");
+							displayMatrix(_Diffusion, _nVar, "-_Diffusion: ");
+						}
+						for(int k=0; k<_nVar*_nVar;k++)
+						{
+							_AroePlusImplicit[k] *= _inv_dxj;
+							_Diffusion[k] *=_inv_dxj/_inv_dxi;//use sqrt as above
+						}
+						MatSetValuesBlocked(A, size, &idn, size, &idn, _AroePlusImplicit, ADD_VALUES);
+						MatSetValuesBlocked(A, size, &idn, size, &idn, _Diffusion, ADD_VALUES);
+						if(_verbose)
+							displayMatrix(_AroePlusImplicit, _nVar, "+_AroePlusImplicit: ");
+
+						for(int k=0;k<_nVar*_nVar;k++){
+							_AroePlusImplicit[k] *= -1;
+							_Diffusion[k] *= -1;
+						}
+						MatSetValuesBlocked(A, size, &idn, size, &idm, _AroePlusImplicit, ADD_VALUES);
+						MatSetValuesBlocked(A, size, &idn, size, &idm, _Diffusion, ADD_VALUES);
+
+						if(_verbose)
+							displayMatrix(_AroePlusImplicit, _nVar, "-_AroePlusImplicit: ");
+					}
+				}
+		}
+		else
+		{
+			cout<< "Face j="<<j<< " is not a boundary face and has "<<Fj.getNumberOfCells()<< " neighbour cells"<<endl;
+			_runLogFile->close();
+			throw CdmathException("ProblemFluid::ComputeTimeStep(): incompatible number of cells around a face");
+		}
+
+	}
+
+	for(int imaille = 0; imaille<_Nmailles; imaille++)
+		MatSetValuesBlocked(A, size, &imaille, size, &imaille, _GravityImplicitationMatrix, ADD_VALUES);
+
+	MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
+	MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
+
+	MatShift(A, 1/_dt);
+
+	if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+	{
+		cout << "ProblemFluid::computeNewtonJacobian : Fin calcul Jacobienne schéma Newton pour PETSc"<<endl;
+		MatView(A,PETSC_VIEWER_STDOUT_SELF);
+		cout << endl;
+	}
+}
+
+int ProblemFluid::computeSnesJacobian(SNES snes, Vec X, Mat A, Mat Aapprox, void *ctx)//Propotype imposé par PETSc
+{
+	ProblemFluid * myProblem = (ProblemFluid *) ctx;
+	myProblem->computeNewtonJacobian( X, A);
+
+	Aapprox = A;
+
+	return 0;	
 }
 
 void ProblemFluid::validateTimeStep()
@@ -834,13 +1508,13 @@ void ProblemFluid::validateTimeStep()
 
 	VecCopy(_conservativeVars, _old);
 
-	if(_verbose && _nbTimeStep%_freqSave ==0){
+	if(_verbose && (_nbTimeStep-1)%_freqSave ==0){
 		if(!_usePrimitiveVarsInNewton)
 			testConservation();
 		cout <<"Valeur propre locale max: " << _maxvp << endl;
 	}
 
-	if(_nbPhases==2 && _nbTimeStep%_freqSave ==0){
+	if(_nbPhases==2 && (_nbTimeStep-1)%_freqSave ==0){
 		//Find minimum and maximum void fractions
 		double alphamin=1e30;
 		double alphamax=-1e30;
@@ -867,7 +1541,7 @@ void ProblemFluid::validateTimeStep()
 
 	_time+=_dt;
 	_nbTimeStep++;
-	if (_nbTimeStep%_freqSave ==0 || _isStationary || _time>=_timeMax || _nbTimeStep>=_maxNbOfTimeStep)
+	if ((_nbTimeStep-1)%_freqSave ==0 || _isStationary || _time>=_timeMax || _nbTimeStep>=_maxNbOfTimeStep)
 		save();
 }
 
@@ -880,7 +1554,7 @@ void ProblemFluid::addConvectionToSecondMember
 		const int &j, bool isBord, string groupname
 )
 {
-	if(_verbose && _nbTimeStep%_freqSave ==0)
+	if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 		cout<<"ProblemFluid::addConvectionToSecondMember start"<<endl;
 
 	//extraction des valeurs
@@ -904,7 +1578,7 @@ void ProblemFluid::addConvectionToSecondMember
 	_idm[0] = i;
 	_idn[0] = j;
 
-	if(_verbose && _nbTimeStep%_freqSave ==0)
+	if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 	{
 		cout << "addConvectionToSecondMember : état i= " << i << ", _Ui=" << endl;
 		for(int q=0; q<_nVar; q++)
@@ -960,7 +1634,7 @@ void ProblemFluid::addConvectionToSecondMember
 
 			Fij=convectionFlux(Uij,Vij,normale,porosityij);
 
-			if(_verbose && _nbTimeStep%_freqSave ==0)
+			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 			{
 				cout<<"Etat interfacial conservatif "<<i<<", "<<j<< endl;
 				cout<<Uij<<endl;
@@ -981,7 +1655,7 @@ void ProblemFluid::addConvectionToSecondMember
 				else if(_nonLinearFormulation==Roe)//Roe
 					Fij=(Fi+Fj)/2+absAroe*(Ui-Uj)/2;
 
-				if(_verbose && _nbTimeStep%_freqSave ==0)
+				if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 				{
 					cout<<"Flux cellule "<<i<<" = "<< endl;
 					cout<<Fi<<endl;
@@ -993,7 +1667,7 @@ void ProblemFluid::addConvectionToSecondMember
 		for(int i1=0;i1<_nVar;i1++)
 			_phi[i1]=-Fij(i1)*_inv_dxi;
 		VecSetValuesBlocked(_b, 1, _idm, _phi, ADD_VALUES);
-		if(_verbose && _nbTimeStep%_freqSave ==0)
+		if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 		{
 			cout << "Ajout convection au 2nd membre pour les etats " << i << "," << j << endl;
 			cout<<"Flux interfacial "<<i<<", "<<j<< endl;
@@ -1007,7 +1681,7 @@ void ProblemFluid::addConvectionToSecondMember
 			for(int i1=0;i1<_nVar;i1++)
 				_phi[i1]*=-_inv_dxj/_inv_dxi;
 			VecSetValuesBlocked(_b, 1, _idn, _phi, ADD_VALUES);
-			if(_verbose && _nbTimeStep%_freqSave ==0)
+			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 			{
 				cout << "Contribution convection à " << j << ", Fij(i1)*_inv_dxj= "<<endl;
 				for(int q=0; q<_nVar; q++)
@@ -1022,7 +1696,7 @@ void ProblemFluid::addConvectionToSecondMember
 		Polynoms::matrixProdVec(_AroeMinus, _nVar, _nVar, _temp, _phi);//phi=A^-(U_i-U_j)/dx
 		VecSetValuesBlocked(_b, 1, _idm, _phi, ADD_VALUES);
 
-		if(_verbose && _nbTimeStep%_freqSave ==0)
+		if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 		{
 			cout << "Ajout convection au 2nd membre pour les etats " << i << "," << j << endl;
 			cout << "(Ui - Uj)*_inv_dxi= "<<endl;;
@@ -1042,7 +1716,7 @@ void ProblemFluid::addConvectionToSecondMember
 			Polynoms::matrixProdVec(_AroePlus, _nVar, _nVar, _temp, _phi);//phi=A^+(U_i-U_j)/dx
 			VecSetValuesBlocked(_b, 1, _idn, _phi, ADD_VALUES);
 
-			if(_verbose && _nbTimeStep%_freqSave ==0)
+			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 			{
 				cout << "Contribution convection à  " << j << ", A^+*(Ui - Uj)*_inv_dxi= "<<endl;
 				for(int q=0; q<_nVar; q++)
@@ -1051,7 +1725,7 @@ void ProblemFluid::addConvectionToSecondMember
 			}
 		}
 	}
-	if(_verbose && _nbTimeStep%_freqSave ==0)
+	if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 	{
 		cout<<"ProblemFluid::addConvectionToSecondMember end : matrices de décentrement cellules i= " << i << ", et j= " << j<< "):"<<endl;
 		displayMatrix(_absAroe,   _nVar,"Valeur absolue matrice de Roe");
@@ -1066,7 +1740,7 @@ void ProblemFluid::addSourceTermToSecondMember
 		const int j, int nbVoisinsj,
 		bool isBord, int ij, double mesureFace)//To do : generalise to unstructured meshes
 {
-	if(_verbose && _nbTimeStep%_freqSave ==0)
+	if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 		cout<<"ProblemFluid::addSourceTerm cell i= "<<i<< " cell j= "<< j<< " isbord "<<isBord<<endl;
 
 	_idm[0] = i*_nVar;
@@ -1076,7 +1750,7 @@ void ProblemFluid::addSourceTermToSecondMember
 	VecGetValues(_primitiveVars, _nVar, _idm, _Vi);
 	sourceVector(_Si,_Ui,_Vi,i);
 
-	if (_verbose && _nbTimeStep%_freqSave ==0)
+	if (_verbose && (_nbTimeStep-1)%_freqSave ==0)
 	{
 		cout << "Terme source S(Ui), i= " << i<<endl;
 		for(int q=0; q<_nVar; q++)
@@ -1097,7 +1771,7 @@ void ProblemFluid::addSourceTermToSecondMember
 		consToPrim(_Uj, _Vj,_porosityj);
 		sourceVector(_Sj,_Uj,_Vj,i);
 	}
-	if (_verbose && _nbTimeStep%_freqSave ==0)
+	if (_verbose && (_nbTimeStep-1)%_freqSave ==0)
 	{
 		if(!isBord)
 			cout << "Terme source S(Uj), j= " << j<<endl;
@@ -1119,7 +1793,7 @@ void ProblemFluid::addSourceTermToSecondMember
 		for(int k=0; k<_nVar;k++)
 			_pressureLossVector[k]=0;
 	}
-	if (_verbose && _nbTimeStep%_freqSave ==0)
+	if (_verbose && (_nbTimeStep-1)%_freqSave ==0)
 	{
 		cout<<"interface i= "<<i<<", j= "<<j<<", ij="<<ij<<", K="<<K<<endl;
 		for(int k=0; k<_nVar;k++)
@@ -1134,7 +1808,7 @@ void ProblemFluid::addSourceTermToSecondMember
 			_porosityGradientSourceVector[k]=0;
 	}
 
-	if (_verbose && _nbTimeStep%_freqSave ==0)
+	if (_verbose && (_nbTimeStep-1)%_freqSave ==0)
 	{
 		if(!isBord)
 			cout<<"interface i= "<<i<<", j= "<<j<<", ij="<<ij<<", dxi= "<<1/_inv_dxi<<", dxj= "<<1/_inv_dxj<<endl;
@@ -1155,7 +1829,7 @@ void ProblemFluid::addSourceTermToSecondMember
 				_Si[k]=(_phi[k]-_l[k])*mesureFace/_perimeters(i);///nbVoisinsi;
 				_Sj[k]=(_phi[k]+_l[k])*mesureFace/_perimeters(j);///nbVoisinsj;
 			}
-			if (_verbose && _nbTimeStep%_freqSave ==0)
+			if (_verbose && (_nbTimeStep-1)%_freqSave ==0)
 			{
 				cout << "Contribution au terme source Si de la cellule i= " << i<<" venant  (après décentrement) de la face (i,j), j="<<j<<endl;
 				for(int q=0; q<_nVar; q++)
@@ -1174,7 +1848,7 @@ void ProblemFluid::addSourceTermToSecondMember
 				_Si[k]=_Si[k]/nbVoisinsi+_pressureLossVector[k]/2+_porosityGradientSourceVector[k]/2;//mesureFace/_perimeters(i)
 				_Sj[k]=_Sj[k]/nbVoisinsj+_pressureLossVector[k]/2+_porosityGradientSourceVector[k]/2;//mesureFace/_perimeters(j)
 			}
-			if (_verbose && _nbTimeStep%_freqSave ==0)
+			if (_verbose && (_nbTimeStep-1)%_freqSave ==0)
 			{
 				cout << "Contribution au terme source Si de la cellule i = " << i<<" venant  de la face (i,j), j="<<j<<endl;
 				for(int q=0; q<_nVar; q++)
@@ -1194,7 +1868,7 @@ void ProblemFluid::addSourceTermToSecondMember
 			Polynoms::matrixProdVec(_signAroe, _nVar, _nVar, _phi, _l);
 			for(int k=0; k<_nVar;k++)
 				_Si[k]=(_phi[k]-_l[k])*mesureFace/_perimeters(i);///nbVoisinsi;
-			if (_verbose && _nbTimeStep%_freqSave ==0)
+			if (_verbose && (_nbTimeStep-1)%_freqSave ==0)
 			{
 				cout << "Contribution au terme source Si de la cellule i= " << i<<" venant  (après décentrement) de la face (i,bord)"<<endl;
 				for(int q=0; q<_nVar; q++)
@@ -1207,7 +1881,7 @@ void ProblemFluid::addSourceTermToSecondMember
 		{
 			for(int k=0; k<_nVar;k++)
 				_Si[k]=_Si[k]/nbVoisinsi+_pressureLossVector[k]/2+_porosityGradientSourceVector[k]/2;//mesureFace/_perimeters(i);//
-			if (_verbose && _nbTimeStep%_freqSave ==0)
+			if (_verbose && (_nbTimeStep-1)%_freqSave ==0)
 			{
 				cout << "Contribution au terme source Si de la cellule i = " << i<<" venant de la face (i,bord) "<<endl;
 				for(int q=0; q<_nVar; q++)
@@ -1219,7 +1893,7 @@ void ProblemFluid::addSourceTermToSecondMember
 	_idm[0] = i;
 	VecSetValuesBlocked(_b, 1, _idm, _Si, ADD_VALUES);
 
-	if(_verbose && _nbTimeStep%_freqSave ==0 && _wellBalancedCorrection)
+	if(_verbose && (_nbTimeStep-1)%_freqSave ==0 && _wellBalancedCorrection)
 		displayMatrix( _signAroe,_nVar,"Signe matrice de Roe");
 }
 
@@ -1234,7 +1908,7 @@ void ProblemFluid::updatePrimitives()
 
 		VecGetValues(_conservativeVars, _nVar, _idm, _Ui);
 		consToPrim(_Ui,_Vi,_porosityField(i-1));
-		if(_verbose && _nbTimeStep%_freqSave ==0)
+		if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 		{
 			cout << "ProblemFluid::updatePrimitives() cell " << i-1 << endl;
 			cout << "Ui = ";
@@ -1280,7 +1954,7 @@ void ProblemFluid::updateConservatives()
 		_idm[0] = i-1;
 		VecSetValuesBlocked(_conservativeVars, 1, _idm, _Ui, INSERT_VALUES);
 
-		if(_verbose && _nbTimeStep%_freqSave ==0)
+		if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
 		{
 			cout << "ProblemFluid::updateConservatives() cell " << i-1 << endl;
 			cout << "Vi = ";
@@ -1508,4 +2182,8 @@ void ProblemFluid::terminate(){
 	KSPDestroy(&_ksp);
 	for(int i=0;i<_nbPhases;i++)
 		delete _fluides[i];
+
+	// Destruction du solveur de Newton de PETSc
+	if(_timeScheme == Implicit && _nonLinearSolver != Newton_SOLVERLAB)
+		SNESDestroy(&_snes);
 }

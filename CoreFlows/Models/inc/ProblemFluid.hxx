@@ -142,6 +142,14 @@ public :
 	 *  */
 	virtual void validateTimeStep();
 
+	/** \fn solveTimeStep
+	 * \brief calcule les valeurs inconnues au pas de temps +1 .
+	 *  \details c'est une fonction virtuelle, qui surcharge  celle de la classe ProblemCoreFlows
+	 *  @param  void
+	 *  \return Renvoie false en cas de problème durant le calcul (valeurs non physiques..)
+	 *  */
+	virtual bool solveTimeStep();//
+
 	/* Boundary conditions */
 	/** \fn setNeumannBoundaryCondition
 	 * \brief adds a new boundary condition of type Neumann
@@ -243,12 +251,6 @@ public :
 	int getNumberOfPhases() const {
 		return _nbPhases;
 	};
-
-	/** \fn computeNewtonVariation
-	 * \brief Builds and solves the linear system to obtain the variation Ukp1-Uk in a Newton scheme
-	 * @param void
-	 * */
-	virtual void computeNewtonVariation();
 
 	/** \fn testConservation
 	 * \brief Teste et affiche la conservation de masse et de la quantité de mouvement
@@ -495,6 +497,11 @@ protected :
 	/** the formulation used to compute the non viscous fluxes **/
 	NonLinearFormulation _nonLinearFormulation;
 
+	/** PETSc nonlinear solver and line search **/
+	SNES _snes;
+	SNESLineSearch _linesearch;
+	PetscViewer _monitorLineSearch;
+
 	map<string, LimitField> _limitField;
 
 	/** boolean used to specify that an entropic correction should be used **/
@@ -541,6 +548,38 @@ protected :
 	int _nbMaillesNeg, _nbVpCplx;
 	bool _isBoundary;// la face courante est elle une face de bord ?
 	double _maxvploc;
+
+	bool solveNewtonPETSc();//Use PETSc Newton methods to solve time step
+
+	/** \fn computeNewtonVariation
+	 * \brief Builds and solves the linear system to obtain the variation Ukp1-Uk in a Newton scheme
+	 * @param void
+	 * */
+	virtual void computeNewtonVariation();
+
+	/** \fn computeNewtonRHS
+	 * \brief Builds the right hand side F_X(X) of the linear system in the Newton method to obtain the variation Ukp1-Uk
+	 * @param void
+	 * */
+	void computeNewtonRHS( Vec X, Vec F_X);
+
+	/** \fn computeSnesRHS
+	 * \brief Static function calling computeNewtonRHS to match PETSc nonlinear solver (SNES) structure
+	 * @param void
+	 * */
+	static int computeSnesRHS(SNES snes, Vec X, Vec F_X, void *ctx);
+
+	/** \fn computeNewtonJacobian
+	 * \brief Static function calling computeNewtonJacobian to match PETSc nonlinear solver (SNES) structure
+	 * @param void
+	 * */
+	void computeNewtonJacobian( Vec X, Mat A);
+
+	/** \fn computeSnesJacobian
+	 * \brief Builds the matrix A(X) of the linear system in the Newton method to obtain the variation Ukp1-Uk
+	 * @param void
+	 * */
+	static int computeSnesJacobian(SNES snes, Vec X, Mat A, Mat Aapprox, void *ctx);
 
 	/** \fn convectionState
 	 * \brief calcule l'etat de Roe entre deux cellules voisinnes

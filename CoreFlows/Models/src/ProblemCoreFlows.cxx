@@ -550,7 +550,7 @@ bool ProblemCoreFlows::solveTimeStep(){
 	while(!converged && ok && _NEWTON_its < _maxNewtonIts){
 		ok=iterateTimeStep(converged);//resolution du systeme lineaire si schema implicite
 
-		if(_timeScheme == Implicit && _nbTimeStep%_freqSave ==0)//To monitor the convergence of the newton scheme
+		if(_timeScheme == Implicit && (_nbTimeStep-1)%_freqSave ==0)//To monitor the convergence of the newton scheme
 		{
 			cout << " Newton iteration " << _NEWTON_its<< ", "<< _ksptype << " iterations : " << _PetscIts<< " maximum variation ||Uk+1-Uk||: " << _erreur_rel << endl;
 			*_runLogFile<< " Newton iteration " << _NEWTON_its<< ", "<< _ksptype << " iterations : " << _PetscIts<< " maximum variation ||Uk+1-Uk||: " << _erreur_rel << endl;
@@ -575,7 +575,7 @@ bool ProblemCoreFlows::solveTimeStep(){
 			*_runLogFile<<"iterateTimeStep: solving Newton iteration "<<_NEWTON_its<<" Failed"<<endl;
 		}
 	}
-	else if(_timeScheme == Implicit && _nbTimeStep%_freqSave ==0)
+	else if(_timeScheme == Implicit && (_nbTimeStep-1)%_freqSave ==0)
 	{
 		cout << "Nombre d'iterations de Newton "<< _NEWTON_its << ", Nombre max d'iterations "<< _ksptype << " : " << _MaxIterLinearSolver << endl << endl;
 		*_runLogFile <<endl;
