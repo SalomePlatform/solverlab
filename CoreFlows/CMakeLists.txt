@@ -46,6 +46,7 @@ set( CoreFlows_INCLUDES
   ${CDMATH_INCLUDES}											    #
   ${PETSC_INCLUDES}											    #
   ${CoreFlows_MODELS}/inc											    #    
+  ${CoreFlows_MODELS}/inc/EOS   										    #    
   )													    #
 
 add_subdirectory (${CoreFlows_MODELS})
