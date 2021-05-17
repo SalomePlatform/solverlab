@@ -467,7 +467,7 @@ public :
 	 * @param kspType linear solver type (GMRES or BICGSTAB)
 	 * @param pcType preconditioner (ILU,LU or NONE)
 	 */
-	void setLinearSolver(linearSolver solverName, preconditioner pcType);
+	void setLinearSolver(linearSolver solverName, preconditioner pcType, double maxIts=50);
 
 	/** \fn setNewtonSolver
 	 * \brief sets the Newton type algorithm for solving the nonlinear algebraic system arising from the discretisation of the PDE
