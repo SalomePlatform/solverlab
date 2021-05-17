@@ -60,6 +60,10 @@ enum nonLinearSolver
 {
 	Newton_SOLVERLAB,/**< nonLinearSolver is Newton_SOLVERLAB */
 	Newton_PETSC_LINESEARCH,/**< nonLinearSolver is Newton_PETSC_LINESEARCH */
+	Newton_PETSC_LINESEARCH_BASIC,/**< nonLinearSolver is Newton_PETSC_LINESEARCH_BASIC */
+	Newton_PETSC_LINESEARCH_BT,/**< nonLinearSolver is Newton_PETSC_LINESEARCH_BT */
+	Newton_PETSC_LINESEARCH_SECANT,/**< nonLinearSolver is Newton_PETSC_LINESEARCH_SECANT */
+	Newton_PETSC_LINESEARCH_NLEQERR,/**< nonLinearSolver is Newton_PETSC_LINESEARCH_LEQERR */
 	Newton_PETSC_TRUSTREGION,/**< nonLinearSolver is Newton_PETSC_TRUSTREGION */
 	Newton_PETSC_NGMRES,/**< nonLinearSolver is Newton_PETSC_NGMRES */
 	Newton_PETSC_ASPIN/**< nonLinearSolver is Newton_PETSC_ASPIN */
@@ -89,7 +93,7 @@ public :
 	ProblemCoreFlows();
 	virtual ~ProblemCoreFlows();
 	
-	// -*-*-*- Gestion du calcul (interface ICoCo -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+	// -*-*-*- Gestion du calcul (interface ICoCo) -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
 	/** \fn initialize
 	 * \brief Alloue la mémoire et vérifie que  le maillage et les conditions limites/initiales sont bien définis
@@ -711,6 +715,7 @@ protected :
 
 	string _path;//path to execution directory used for saving results
 	saveFormat _saveFormat;//file saving format : MED, VTK or CSV
+	
 };
 
 #endif /* PROBLEMCOREFLOWS_HXX_ */
