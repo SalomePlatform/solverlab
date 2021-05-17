@@ -368,9 +368,9 @@ Mesh ProblemCoreFlows::getMesh()
 	return _mesh;
 }
 
-void ProblemCoreFlows::setLinearSolver(linearSolver kspType, preconditioner pcType)
+void ProblemCoreFlows::setLinearSolver(linearSolver kspType, preconditioner pcType, double maxIts)
 {
-	//_maxPetscIts=maxIterationsPetsc;
+	_maxPetscIts=maxIts;
 	// set linear solver algorithm
 	if (kspType==GMRES)
 		_ksptype = (char*)&KSPGMRES;
@@ -586,6 +586,7 @@ bool ProblemCoreFlows::solveTimeStep(){
 
 	return converged;
 }
+
 ProblemCoreFlows::~ProblemCoreFlows()
 {
 	/*
