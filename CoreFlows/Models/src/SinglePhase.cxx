@@ -69,6 +69,7 @@ void SinglePhase::initialize(){
 		_Pressure=Field("Pressure",CELLS,_mesh,1);
 		_Density=Field("Density",CELLS,_mesh,1);
 		_Temperature=Field("Temperature",CELLS,_mesh,1);
+		_MachNumber=Field("MachNumber",CELLS,_mesh,1);
 		_VitesseX=Field("Velocity x",CELLS,_mesh,1);
 		if(_Ndim>1)
 		{
@@ -2885,7 +2886,7 @@ void SinglePhase::save(){
 
 	if(_saveAllFields)
 	{
-		double p,T,rho, h, vx,vy,vz;
+		double p,T,rho, h, vx,vy,vz,v2;
 		int Ii;
 		for (long i = 0; i < _Nmailles; i++){
 			Ii = i*_nVar;
@@ -2913,17 +2914,24 @@ void SinglePhase::save(){
 			_Pressure(i)=p;
 			_Temperature(i)=T;
 			_VitesseX(i)=vx;
+			v2=vx*vx;
 			if(_Ndim>1)
 			{
 				_VitesseY(i)=vy;
+				v2+=vy*vy;
 				if(_Ndim>2)
+				{
 					_VitesseZ(i)=vz;
+					v2+=vz*vz;
+				}
 			}
+			_MachNumber(i)=sqrt(v2)/_fluides[0]->vitesseSonEnthalpie(h);
 		}
 		_Enthalpy.setTime(_time,_nbTimeStep);
 		_Density.setTime(_time,_nbTimeStep);
 		_Pressure.setTime(_time,_nbTimeStep);
 		_Temperature.setTime(_time,_nbTimeStep);
+		_MachNumber.setTime(_time,_nbTimeStep);
 		_VitesseX.setTime(_time,_nbTimeStep);
 		if(_Ndim>1)
 		{
@@ -2939,6 +2947,7 @@ void SinglePhase::save(){
 				_Density.writeVTK(allFields+"_Density");
 				_Pressure.writeVTK(allFields+"_Pressure");
 				_Temperature.writeVTK(allFields+"_Temperature");
+				_MachNumber.writeVTK(allFields+"_MachNumber");
 				_VitesseX.writeVTK(allFields+"_VelocityX");
 				if(_Ndim>1)
 				{
@@ -2952,6 +2961,7 @@ void SinglePhase::save(){
 				_Density.writeMED(allFields+"_Density");
 				_Pressure.writeMED(allFields+"_Pressure");
 				_Temperature.writeMED(allFields+"_Temperature");
+				_MachNumber.writeMED(allFields+"_MachNumber");
 				_VitesseX.writeMED(allFields+"_VelocityX");
 				if(_Ndim>1)
 				{
@@ -2965,6 +2975,7 @@ void SinglePhase::save(){
 				_Density.writeCSV(allFields+"_Density");
 				_Pressure.writeCSV(allFields+"_Pressure");
 				_Temperature.writeCSV(allFields+"_Temperature");
+				_MachNumber.writeCSV(allFields+"_MachNumber");
 				_VitesseX.writeCSV(allFields+"_VelocityX");
 				if(_Ndim>1)
 				{
@@ -2983,6 +2994,7 @@ void SinglePhase::save(){
 				_Density.writeVTK(allFields+"_Density",false);
 				_Pressure.writeVTK(allFields+"_Pressure",false);
 				_Temperature.writeVTK(allFields+"_Temperature",false);
+				_MachNumber.writeVTK(allFields+"_MachNumber",false);
 				_VitesseX.writeVTK(allFields+"_VelocityX",false);
 				if(_Ndim>1)
 				{
@@ -2996,6 +3008,7 @@ void SinglePhase::save(){
 				_Density.writeMED(allFields+"_Density",false);
 				_Pressure.writeMED(allFields+"_Pressure",false);
 				_Temperature.writeMED(allFields+"_Temperature",false);
+				_MachNumber.writeMED(allFields+"_MachNumber",false);
 				_VitesseX.writeMED(allFields+"_VelocityX",false);
 				if(_Ndim>1)
 				{
@@ -3009,6 +3022,7 @@ void SinglePhase::save(){
 				_Density.writeCSV(allFields+"_Density");
 				_Pressure.writeCSV(allFields+"_Pressure");
 				_Temperature.writeCSV(allFields+"_Temperature");
+				_MachNumber.writeCSV(allFields+"_MachNumber");
 				_VitesseX.writeCSV(allFields+"_VelocityX");
 				if(_Ndim>1)
 				{

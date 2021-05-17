@@ -149,11 +149,14 @@ public :
 	Field& getPressureField();
 	Field& getVelocityField();
 	Field& getVelocityXField();
+	Field& getVelocityYField();
+	Field& getVelocityZField();
 	Field& getTemperatureField();
 	Field& getDensityField();
 	Field& getMomentumField();
 	Field& getTotalEnergyField();
 	Field& getEnthalpyField();
+	Field& getMachNumberField();
 
 protected :
 	double  _drho_sur_dp,   _drho_sur_dT;//derivatives of the density rho wrt cv, p, T
@@ -217,7 +220,7 @@ protected :
 	void getDensityDerivatives( double pressure, double temperature, double v2);
 
 	bool _saveAllFields;
-	Field _Enthalpy, _Pressure, _Density, _Temperature, _Momentum, _TotalEnergy, _Vitesse, _VitesseX, _VitesseY, _VitesseZ;
+	Field _Enthalpy, _Pressure, _Density, _Temperature, _Momentum, _TotalEnergy, _Vitesse, _VitesseX, _VitesseY, _VitesseZ, _MachNumber;
 
 	};
 #endif /* SINGLEPHASE_HXX_*/
