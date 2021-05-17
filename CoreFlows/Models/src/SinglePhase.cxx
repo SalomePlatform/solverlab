@@ -3090,6 +3090,9 @@ void SinglePhase::save(){
 
 Field& SinglePhase::getPressureField()
 {
+	if(!_initializedMemory)
+		throw CdmathException("SinglePhase::getPressureField, Call initialize first");
+
 	if(!_saveAllFields)
 	{
 		_Pressure=Field("Pressure",CELLS,_mesh,1);
@@ -3105,6 +3108,9 @@ Field& SinglePhase::getPressureField()
 
 Field& SinglePhase::getTemperatureField()
 {
+	if(!_initializedMemory)
+		throw CdmathException("SinglePhase::getTemperatureField, Call initialize first");
+
 	if(!_saveAllFields)
 	{
 		_Temperature=Field("Temperature",CELLS,_mesh,1);
@@ -3120,6 +3126,9 @@ Field& SinglePhase::getTemperatureField()
 
 Field& SinglePhase::getVelocityField()
 {
+	if(!_initializedMemory)
+		throw CdmathException("SinglePhase::getVelocityField, Call initialize first");
+
 	if(!_saveAllFields )
 	{
 		_Vitesse=Field("Vitesse",CELLS,_mesh,3);
@@ -3143,8 +3152,46 @@ Field& SinglePhase::getVelocityField()
 	return _Vitesse;
 }
 
+Field& SinglePhase::getMachNumberField()
+{
+	if(!_initializedMemory)
+		throw CdmathException("SinglePhase::getMachNumberField, Call initialize first");
+
+	if(!_saveAllFields )
+	{
+		_MachNumber=Field("Mach number",CELLS,_mesh,1);
+		int Ii;
+		double p,T,rho,h, temp, u2=0;
+		for (long i = 0; i < _Nmailles; i++){
+			Ii = i*_nVar;
+			VecGetValues(_primitiveVars,1,&Ii,&p);
+			Ii = i*_nVar +_nVar-1;
+			VecGetValues(_primitiveVars,1,&Ii,&T);
+			
+			for (int j = 0; j < _Ndim; j++)//On récupère les composantes de vitesse
+			{
+				int Ii = i*_nVar +1+j;
+				VecGetValues(_primitiveVars,1,&Ii,&temp);
+				u2+=temp*temp;
+			}
+	
+			rho=_fluides[0]->getDensity(p,T);
+			h  =_fluides[0]->getEnthalpy(T,rho);
+			_MachNumber[i]  =sqrt(u2)/_fluides[0]->vitesseSonEnthalpie(h);
+			//cout<<"u="<<sqrt(u2)<<", c= "<<_fluides[0]->vitesseSonEnthalpie(h)<<", MachNumberField[i] = "<<MachNumberField[i] <<endl;
+		}
+		_MachNumber.setTime(_time,_nbTimeStep);
+	}
+	//cout<<", MachNumberField = "<<MachNumberField <<endl;
+
+	return _MachNumber;
+}
+
 Field& SinglePhase::getVelocityXField()
 {
+	if(!_initializedMemory)
+		throw CdmathException("SinglePhase::getVelocityXField, Call initialize first");
+
 	if(!_saveAllFields )
 	{
 		_VitesseX=Field("Velocity X",CELLS,_mesh,1);
@@ -3161,8 +3208,59 @@ Field& SinglePhase::getVelocityXField()
 	return _VitesseX;
 }
 
+Field& SinglePhase::getVelocityYField()
+{
+	if(!_initializedMemory)
+		throw CdmathException("SinglePhase::getVelocityYField, Call initialize first");
+
+	if(_Ndim<2)
+        throw CdmathException("SinglePhase::getVelocityYField() error : dimension should be at least 2");	
+	else
+		if(!_saveAllFields )
+		{
+			_VitesseY=Field("Velocity Y",CELLS,_mesh,1);
+			int Ii;
+			for (long i = 0; i < _Nmailles; i++)
+			{
+				int Ii = i*_nVar +2;
+				VecGetValues(_primitiveVars,1,&Ii,&_VitesseY(i));
+			}
+			_VitesseY.setTime(_time,_nbTimeStep);
+			_VitesseY.setInfoOnComponent(0,"Velocity_y_(m/s)");
+		}
+		
+		return _VitesseY;
+}
+
+Field& SinglePhase::getVelocityZField()
+{
+	if(!_initializedMemory)
+		throw CdmathException("SinglePhase::getVelocityZField, Call initialize first");
+
+	if(_Ndim<3)
+        throw CdmathException("SinglePhase::getvelocityZField() error : dimension should be 3");	
+	else
+		if(!_saveAllFields )
+		{
+			_VitesseZ=Field("Velocity Z",CELLS,_mesh,1);
+			int Ii;
+			for (long i = 0; i < _Nmailles; i++)
+			{
+				int Ii = i*_nVar +3;
+				VecGetValues(_primitiveVars,1,&Ii,&_VitesseZ(i));
+			}
+			_VitesseZ.setTime(_time,_nbTimeStep);
+			_VitesseZ.setInfoOnComponent(0,"Velocity_z_(m/s)");
+		}
+		
+		return _VitesseZ;
+}
+
 Field& SinglePhase::getDensityField()
 {
+	if(!_initializedMemory)
+		throw CdmathException("SinglePhase::getDensityField, Call initialize first");
+		
 	if(!_saveAllFields )
 	{
 		_Density=Field("Density",CELLS,_mesh,1);
@@ -3178,6 +3276,9 @@ Field& SinglePhase::getDensityField()
 
 Field& SinglePhase::getMomentumField()//not yet managed by parameter _saveAllFields
 {
+	if(!_initializedMemory)
+		throw CdmathException("SinglePhase::getMomentumField, Call initialize first");
+
 	_Momentum=Field("Momentum",CELLS,_mesh,_Ndim);
 	int Ii;
 	for (long i = 0; i < _Nmailles; i++)
@@ -3193,6 +3294,9 @@ Field& SinglePhase::getMomentumField()//not yet managed by parameter _saveAllFie
 
 Field& SinglePhase::getTotalEnergyField()//not yet managed by parameter _saveAllFields
 {
+	if(!_initializedMemory)
+		throw CdmathException("SinglePhase::getTotalEnergyField, Call initialize first");
+
 	_TotalEnergy=Field("TotalEnergy",CELLS,_mesh,1);
 	int Ii;
 	for (long i = 0; i < _Nmailles; i++){
@@ -3206,6 +3310,9 @@ Field& SinglePhase::getTotalEnergyField()//not yet managed by parameter _saveAll
 
 Field& SinglePhase::getEnthalpyField()
 {
+	if(!_initializedMemory)
+		throw CdmathException("SinglePhase::getEnthalpyField, Call initialize first");
+
 	if(!_saveAllFields )
 	{
 		_Enthalpy=Field("Enthalpy",CELLS,_mesh,1);
@@ -3250,6 +3357,10 @@ Field& SinglePhase::getOutputField(const string& nameField )
 		return getVelocityField();
 	else if(nameField=="velocityX" || nameField=="VelocityX" || nameField=="VELOCITYX" || nameField=="VitesseX" || nameField=="VITESSEX" || nameField=="vitesseX" )
 		return getVelocityXField();
+	else if(nameField=="velocityY" || nameField=="VelocityY" || nameField=="VELOCITYY" || nameField=="VitesseY" || nameField=="VITESSEY" || nameField=="vitesseY" )
+		return getVelocityYField();
+	else if(nameField=="velocityZ" || nameField=="VelocityZ" || nameField=="VELOCITYZ" || nameField=="VitesseZ" || nameField=="VITESSEZ" || nameField=="vitesseZ" )
+		return getVelocityZField();
 	else if(nameField=="temperature" || nameField=="Temperature" || nameField=="TEMPERATURE" || nameField=="temperature" )
 		return getTemperatureField();
 	else if(nameField=="density" || nameField=="Density" || nameField=="DENSITY" || nameField=="Densite" || nameField=="DENSITE" || nameField=="densite" )
@@ -3262,7 +3373,7 @@ Field& SinglePhase::getOutputField(const string& nameField )
 		return getTotalEnergyField();
     else
     {
-        cout<<"Error : Field name "<< nameField << " does not exist, call getOutputFieldsNames first" << endl;
+        cout<<"Error : Field name "<< nameField << " does not exist, call getOutputFieldsNames first to check" << endl;
         throw CdmathException("SinglePhase::getOutputField error : Unknown Field name");
     }
 }
