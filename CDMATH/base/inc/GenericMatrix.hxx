@@ -17,7 +17,7 @@
  */
 
 #include <iostream>
-
+#include <vector>
 #include "DoubleTab.hxx"
 
 class GenericMatrix
@@ -45,17 +45,7 @@ class GenericMatrix
      */
     int getNumberOfColumns ( void ) const ;
 
-    const DoubleTab& getValues( void ) const ;
-
-	DoubleTab getValues( void ) ;
-
-	void setValues(const DoubleTab& values) ;
-
     virtual double operator ()( int i, int j ) const = 0;
-
-    double max() const;
-
-    double min() const;
 
     virtual bool isSymmetric(double tol=1e-6) const ;
 
@@ -64,8 +54,6 @@ class GenericMatrix
     bool isSparseMatrix( void ) const ;
 
     virtual  bool containsPetscMatrix() const { return false; };
-
-    int coefficient(int index) const ;
 
     void view() const ;
 
@@ -83,7 +71,6 @@ class GenericMatrix
 
     bool _isSparseMatrix ;
 
-    DoubleTab _values ;
 };
 
 #endif /* GENERICMATRIX_HXX_ */

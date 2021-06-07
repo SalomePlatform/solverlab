@@ -60,6 +60,21 @@ class Matrix: public GenericMatrix
      */
     virtual ~Matrix ( void ) ;
 
+    const DoubleTab& getValues( void ) const ;
+
+	DoubleTab getValues( void ) ;
+
+	void setValues(const DoubleTab& values) ;
+
+	//returns the array of matrix coefficients
+	std::vector< double > getArray();
+
+	//returns the maximum coefficient
+    double max() const;
+
+	//returns the minimum coefficient
+    double min() const;
+
     bool isSparseMatrix( void ) const ;
 
     double& operator () ( int i, int j ) ;
@@ -100,6 +115,13 @@ class Matrix: public GenericMatrix
 
     friend std::ostream& operator<<(std::ostream& out, const Matrix& matrix ) ;
 
+
+    protected: //----------------------------------------------------------------
+
+    DoubleTab _values ;
+
+	//This function is used in the computation of the determinant
+    int coefficient(int index) const ;
 };
 
 #endif /* MATRIX_HXX_ */

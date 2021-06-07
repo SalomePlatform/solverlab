@@ -5,6 +5,7 @@
  *      Authors: CDMATH
  */
 #include <iostream>
+#include <cstring>
 
 #include "Matrix.hxx"
 #include "Vector.hxx"
@@ -44,6 +45,53 @@ Matrix::Matrix(const Matrix& matrix)
 	_numberOfColumns = matrix.getNumberOfColumns();
 	_isSparseMatrix=matrix.isSparseMatrix();
 	_values=DoubleTab (_numberOfRows*_numberOfColumns,matrix.getValues().getValues());
+}
+
+const DoubleTab&
+Matrix::getValues( void ) const
+{
+	return _values;
+}
+
+//----------------------------------------------------------------------
+DoubleTab
+Matrix::getValues()
+//----------------------------------------------------------------------
+{
+	return _values;
+}
+
+void
+Matrix::setValues(const DoubleTab& values)
+{
+	_values=values;
+}
+
+double
+Matrix::max() const
+{
+    return _values.max();
+}
+
+double 
+Matrix::min() const
+{
+    return _values.max();	
+}
+
+std::vector< double > 
+Matrix::getArray() 
+{
+	int numberOfRows  =getNumberOfRows();
+	int numberOfColums=getNumberOfColumns();
+	int size=_numberOfRows*numberOfColums;
+	
+	vector< double >  result(size);	
+	double* values = result.data();
+	
+    memcpy(values,_values.getPointer(),size*sizeof(double)) ;
+
+	return result;
 }
 
 bool
@@ -138,6 +186,14 @@ Matrix::partMatrix(int row, int column) const
 		}
 	}
 	return res;
+}
+
+int
+Matrix::coefficient(int index) const
+{
+	if(! (index % 2) )
+		return (1);
+	return (-1);
 }
 
 double

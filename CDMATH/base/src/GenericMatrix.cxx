@@ -6,6 +6,7 @@
  */
 
 #include <math.h> 
+#include <cstring>
 
 #include "GenericMatrix.hxx"
 #include "CdmathException.hxx"
@@ -42,26 +43,6 @@ GenericMatrix::getNumberOfColumns() const
 	return _numberOfColumns ;
 }
 
-const DoubleTab&
-GenericMatrix::getValues( void ) const
-{
-	return _values;
-}
-
-//----------------------------------------------------------------------
-DoubleTab
-GenericMatrix::getValues()
-//----------------------------------------------------------------------
-{
-	return _values;
-}
-
-void
-GenericMatrix::setValues(const DoubleTab& values)
-{
-	_values=values;
-}
-
 bool
 GenericMatrix::isSymmetric(double tol) const
 {
@@ -89,29 +70,6 @@ GenericMatrix::isSquare() const
 		return true;
 	return false;
 }
-
-int
-GenericMatrix::coefficient(int index) const
-{
-	if(! (index % 2) )
-		return (1);
-	return (-1);
-}
-
-
-double 
-GenericMatrix::max() const
-{
-    return _values.max();
-}
-
-
-double 
-GenericMatrix::min() const
-{
-    return _values.max();	
-}
-
 
 void
 GenericMatrix::view() const
