@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include <vector>
+#include <cstring>
 
 #include "MEDCouplingUMesh.hxx"
 #include "Vector.hxx"
@@ -101,10 +102,14 @@ public:
 	friend SparseMatrixPetsc operator*(const SparseMatrixPetsc& M, const SparseMatrixPetsc& N) ;
 
 	void viewMatrix() const ;
+	//Save matrix coefficients into a file in ascii or binary mode
+	void saveMatrix(std::string filename, bool binaryMode=false) const ;
 	double getMatrixCoeff(int i, int j) const;    
 
 	bool containsPetscMatrix() const;
 	Mat getPetscMatrix() const;
+	//returns the array of matrix coefficients
+	std::vector< double > getArray();
     
     void diagonalShift(double lambda);
     void zeroEntries();//sets the matrix coefficients to zero
