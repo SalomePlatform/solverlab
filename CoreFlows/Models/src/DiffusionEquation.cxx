@@ -42,21 +42,26 @@ int DiffusionEquation::globalNodeIndex(int unknownNodeIndex, std::vector< int > 
 
     if(j+1==boundarySize)
         return unknownNodeIndex+boundarySize;
-    else //unknownNodeMax>=unknownNodeIndex) hence our node global number is between dirichletNodes[j-1] and dirichletNodes[j]
+    else //unknownNodeMax>=unknownNodeIndex, hence our node global number is between dirichletNodes[j-1] and dirichletNodes[j]
         return unknownNodeIndex - unknownNodeMax + dirichletNodes[j]-1;
 }
 
-Vector DiffusionEquation::gradientNodal(Matrix M, vector< double > values){
-    vector< Matrix > matrices(_Ndim);
+Vector DiffusionEquation::gradientNodal(Matrix M, vector< double > values)
+{
+	if(! M.isSquare() )
+		throw CdmathException("DiffusionEquation::gradientNodal Matrix M should be square !!!");
+		
+	int Ndim = M.getNumberOfRows();
+    vector< Matrix > matrices(Ndim);
     
-    for (int idim=0; idim<_Ndim;idim++){
+    for (int idim=0; idim<Ndim;idim++){
         matrices[idim]=M.deepCopy();
-        for (int jdim=0; jdim<_Ndim+1;jdim++)
+        for (int jdim=0; jdim<Ndim+1;jdim++)
 			matrices[idim](jdim,idim) = values[jdim] ;
     }
 
-	Vector result(_Ndim);
-    for (int idim=0; idim<_Ndim;idim++)
+	Vector result(Ndim);
+    for (int idim=0; idim<Ndim;idim++)
         result[idim] = matrices[idim].determinant();
 
 	return result;    
@@ -66,17 +71,17 @@ DiffusionEquation::DiffusionEquation(int dim, bool FECalculation,double rho,doub
     /* Control input value are acceptable */
     if(rho<_precision or cp<_precision)
     {
-        std::cout<<"rho="<<rho<<", cp= "<<cp<< ", precision= "<<_precision;
+        std::cout<<"rho = "<<rho<<", cp = "<<cp<< ", precision = "<<_precision;
         throw CdmathException("Error : parameters rho and cp should be strictly positive");
     }
     if(lambda < 0.)
     {
-        std::cout<<"conductivity="<<lambda<<endl;
+        std::cout<<"Conductivity = "<<lambda<<endl;
         throw CdmathException("Error : conductivity parameter lambda cannot  be negative");
     }
     if(dim<=0)
     {
-        std::cout<<"space dimension="<<dim<<endl;
+        std::cout<<"Space dimension = "<<dim<<endl;
         throw CdmathException("Error : parameter dim cannot  be negative");
     }
 
@@ -95,6 +100,8 @@ DiffusionEquation::DiffusionEquation(int dim, bool FECalculation,double rho,doub
     _NboundaryNodes=0;
     _NdirichletNodes=0;
     _NunknownNodes=0;
+    _dirichletValuesSet=false;   
+    _neumannValuesSet=false;   
 
     /* Physical parameters */
 	_conductivity=lambda;
@@ -155,29 +162,15 @@ void DiffusionEquation::initialize()
 	/**************** Field creation *********************/
 
 	if(!_heatPowerFieldSet){
-        if(_FECalculation){
-            _heatPowerField=Field("Heat power",NODES,_mesh,1);
-            for(int i =0; i<_Nnodes; i++)
-                _heatPowerField(i) = _heatSource;
-        }
-        else{
-            _heatPowerField=Field("Heat power",CELLS,_mesh,1);
-            for(int i =0; i<_Nmailles; i++)
-                _heatPowerField(i) = _heatSource;
-        }
+        _heatPowerField=Field("Heat power",_VV.getTypeOfField(),_mesh,1);
+        for(int i =0; i<_VV.getNumberOfElements(); i++)
+            _heatPowerField(i) = _heatSource;
         _heatPowerFieldSet=true;
     }
 	if(!_fluidTemperatureFieldSet){
-        if(_FECalculation){
-            _fluidTemperatureField=Field("Fluid temperature",NODES,_mesh,1);
-            for(int i =0; i<_Nnodes; i++)
-                _fluidTemperatureField(i) = _fluidTemperature;
-        }
-        else{
-            _fluidTemperatureField=Field("Fluid temperature",CELLS,_mesh,1);
-            for(int i =0; i<_Nmailles; i++)
-                _fluidTemperatureField(i) = _fluidTemperature;
-        }
+		_fluidTemperatureField=Field("Fluid temperature",_VV.getTypeOfField(),_mesh,1);
+		for(int i =0; i<_VV.getNumberOfElements(); i++)
+			_fluidTemperatureField(i) = _fluidTemperature;
         _fluidTemperatureFieldSet=true;
 	}
 
@@ -252,12 +245,8 @@ void DiffusionEquation::initialize()
 	VecDuplicate(_Tk, &_b);//RHS of the linear system: _b=Tn/dt + _b0 + puisance volumique + couplage thermique avec le fluide
 	VecDuplicate(_Tk, &_b0);//part of the RHS that comes from the boundary conditions. Computed only once at the first time step
 
-    if(!_FECalculation)
-        for(int i =0; i<_Nmailles;i++)
-            VecSetValue(_Tn,i,_VV(i), INSERT_VALUES);
-    else
-        for(int i =0; i<_Nnodes;i++)
-            VecSetValue(_Tn,i,_VV(i), INSERT_VALUES);
+	for(int i =0; i<_VV.getNumberOfElements();i++)
+		VecSetValue(_Tn,i,_VV(i), INSERT_VALUES);
 
 	//Linear solver
 	KSPCreate(PETSC_COMM_SELF, &_ksp);
@@ -307,7 +296,7 @@ double DiffusionEquation::computeDiffusionMatrix(bool & stop)
 double DiffusionEquation::computeDiffusionMatrixFE(bool & stop){
 	Cell Cj;
 	string nameOfGroup;
-	double dij;//Diffusion coefficients between nodes i and j
+	double coeff;//Diffusion coefficients between nodes i and j
 	MatZeroEntries(_A);
 	VecZeroEntries(_b);
     
@@ -352,30 +341,56 @@ double DiffusionEquation::computeDiffusionMatrixFE(bool & stop){
                     if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),nodeIds[jdim])==_dirichletNodeIds.end())//!_mesh.isBorderNode(nodeIds[jdim])
                     {//Second node of the edge is not Dirichlet node
                         j_int= unknownNodeIndex(nodeIds[jdim], _dirichletNodeIds);//assumes Dirichlet boundary node numbering is strictly increasing
-                        dij=_conductivity*(_DiffusionTensor*GradShapeFuncs[idim])*GradShapeFuncs[jdim]/Cj.getMeasure();
-                        MatSetValue(_A,i_int,j_int,dij, ADD_VALUES);
-                        if(fabs(dij)>_maxvp)
-                            _maxvp=fabs(dij);
+                        MatSetValue(_A,i_int,j_int,_conductivity*(_DiffusionTensor*GradShapeFuncs[idim])*GradShapeFuncs[jdim]/Cj.getMeasure(), ADD_VALUES);
                     }
                     else if (!dirichletCell_treated)
                     {//Second node of the edge is a Dirichlet node
                         dirichletCell_treated=true;
                         for (int kdim=0; kdim<_Ndim+1;kdim++)
                         {
-                            if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),nodeIds[kdim])!=_dirichletNodeIds.end())
-                                valuesBorder[kdim]=_limitField[nameOfGroup].T;
+							std::map<int,double>::iterator it=_dirichletBoundaryValues.find(nodeIds[kdim]);
+							if( it != _dirichletBoundaryValues.end() )
+                            {
+                                if( _dirichletValuesSet )
+                                    valuesBorder[kdim]=_dirichletBoundaryValues[it->second];
+                                else    
+                                    valuesBorder[kdim]=_limitField[_mesh.getNode(nodeIds[kdim]).getGroupName()].T;
+                            }
                             else
                                 valuesBorder[kdim]=0;                            
                         }
                         GradShapeFuncBorder=gradientNodal(M,valuesBorder)/fact(_Ndim);
-                        dij =-_conductivity*(_DiffusionTensor*GradShapeFuncBorder)*GradShapeFuncs[idim]/Cj.getMeasure();
-                        VecSetValue(_b,i_int,dij, ADD_VALUES);                        
+                        coeff =-_conductivity*(_DiffusionTensor*GradShapeFuncBorder)*GradShapeFuncs[idim]/Cj.getMeasure();
+                        VecSetValue(_b,i_int,coeff, ADD_VALUES);                        
                     }
                 }
             }
         }            
 	}
     
+    //Calcul de la contribution de la condition limite de Neumann au second membre
+    if( _NdirichletNodes !=_NboundaryNodes)
+    {
+        vector< int > boundaryFaces = _mesh.getBoundaryFaceIds();
+        int NboundaryFaces=boundaryFaces.size();
+        for(int i = 0; i< NboundaryFaces ; i++)//On parcourt les faces du bord
+        {
+            Face Fi = _mesh.getFace(i);
+            for(int j = 0 ; j<_Ndim ; j++)//On parcourt les noeuds de la face
+            {
+                if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),Fi.getNodeId(j))==_dirichletNodeIds.end())//node j is an Neumann BC node (not a Dirichlet BC node)
+                {
+                    j_int=unknownNodeIndex(Fi.getNodeId(j), _dirichletNodeIds);//indice du noeud j en tant que noeud inconnu
+                    if( _neumannValuesSet )
+                        coeff =Fi.getMeasure()/_Ndim*_neumannBoundaryValues[Fi.getNodeId(j)];
+                    else    
+                        coeff =Fi.getMeasure()/_Ndim*_limitField[_mesh.getNode(Fi.getNodeId(j)).getGroupName()].normalFlux;
+                    VecSetValue(_b, j_int, coeff, ADD_VALUES);
+                }
+            }
+        }
+    }
+
     MatAssemblyBegin(_A, MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(_A, MAT_FINAL_ASSEMBLY);
 	VecAssemblyBegin(_b);
@@ -384,11 +399,11 @@ double DiffusionEquation::computeDiffusionMatrixFE(bool & stop){
 	_diffusionMatrixSet=true;
     stop=false ;
 
-	cout<<"_maxvp= "<<_maxvp<< " cfl= "<<_cfl<<" minl= "<<_minl<<endl;
+	cout<<"Maximum diffusivity is "<<_maxvp<< " CFL = "<<_cfl<<" Delta x = "<<_minl<<endl;
 	if(fabs(_maxvp)<_precision)
-		throw CdmathException("DiffusionEquation::computeDiffusionMatrix(): maximum eigenvalue for time step is zero");
+		throw CdmathException("DiffusionEquation::computeDiffusionMatrixFE(): Error computing time step ! Maximum diffusivity is zero => division by zero");
 	else
-		return _cfl/_maxvp;
+		return _cfl*_minl*_minl/_maxvp;
 }
 
 double DiffusionEquation::computeDiffusionMatrixFV(bool & stop){
@@ -492,9 +507,9 @@ double DiffusionEquation::computeDiffusionMatrixFV(bool & stop){
 	_diffusionMatrixSet=true;
     stop=false ;
 
-	cout<<"_maxvp= "<<_maxvp<< " cfl= "<<_cfl<<" minl= "<<_minl<<endl;
+	cout<<"Maximum diffusivity is "<<_maxvp<< " CFL = "<<_cfl<<" Delta x = "<<_minl<<endl;
 	if(fabs(_maxvp)<_precision)
-		throw CdmathException("DiffusionEquation::computeDiffusionMatrixFV(): maximum eigenvalue for time step is zero");
+		throw CdmathException("DiffusionEquation::computeDiffusionMatrixFV(): Error computing time step ! Maximum diffusivity is zero => division by zero");
 	else
 		return _cfl*_minl*_minl/_maxvp;
 }
@@ -632,28 +647,20 @@ bool DiffusionEquation::iterateTimeStep(bool &converged)
 			converged=false;
 			return false;
 		}
-		else{
+		else
+		{
 			VecCopy(_Tk, _deltaT);//ici on a deltaT=Tk
 			VecAXPY(_deltaT,  -1, _Tkm1);//On obtient deltaT=Tk-Tkm1
 			_erreur_rel= 0;
 			double Ti, dTi;
 
-            if(!_FECalculation)
-                for(int i=0; i<_Nmailles; i++)
-                {
-                    VecGetValues(_deltaT, 1, &i, &dTi);
-                    VecGetValues(_Tk, 1, &i, &Ti);
-                    if(_erreur_rel < fabs(dTi/Ti))
-                        _erreur_rel = fabs(dTi/Ti);
-                }
-            else
-                for(int i=0; i<_Nnodes; i++)
-                {
-                    VecGetValues(_deltaT, 1, &i, &dTi);
-                    VecGetValues(_Tk, 1, &i, &Ti);
-                    if(_erreur_rel < fabs(dTi/Ti))
-                        _erreur_rel = fabs(dTi/Ti);
-                }
+			for(int i=0; i<_VV.getNumberOfElements(); i++)
+			{
+				VecGetValues(_deltaT, 1, &i, &dTi);
+				VecGetValues(_Tk, 1, &i, &Ti);
+				if(_erreur_rel < fabs(dTi/Ti))
+					_erreur_rel = fabs(dTi/Ti);
+			}
 			converged = (_erreur_rel <= _precision) ;//converged=convergence des iterations de Newton
 		}
 	}
@@ -670,22 +677,13 @@ void DiffusionEquation::validateTimeStep()
 	_erreur_rel= 0;
 	double Ti, dTi;
 
-    if(!_FECalculation)
-        for(int i=0; i<_Nmailles; i++)
-        {
-            VecGetValues(_deltaT, 1, &i, &dTi);
-            VecGetValues(_Tk, 1, &i, &Ti);
-            if(_erreur_rel < fabs(dTi/Ti))
-                _erreur_rel = fabs(dTi/Ti);
-        }
-    else
-        for(int i=0; i<_Nnodes; i++)
-        {
-            VecGetValues(_deltaT, 1, &i, &dTi);
-            VecGetValues(_Tk, 1, &i, &Ti);
-            if(_erreur_rel < fabs(dTi/Ti))
-                _erreur_rel = fabs(dTi/Ti);
-        }
+	for(int i=0; i<_VV.getNumberOfElements(); i++)
+	{
+		VecGetValues(_deltaT, 1, &i, &dTi);
+		VecGetValues(_Tk, 1, &i, &Ti);
+		if(_erreur_rel < fabs(dTi/Ti))
+			_erreur_rel = fabs(dTi/Ti);
+	}
 
 	_isStationary =(_erreur_rel <_precision);
 
@@ -805,6 +803,21 @@ void DiffusionEquation::terminate(){
 	VecDestroy(&_b);
 	MatDestroy(&_A);
 }
+
+void 
+DiffusionEquation::setDirichletValues(map< int, double> dirichletBoundaryValues)
+{
+    _dirichletValuesSet=true;
+    _dirichletBoundaryValues=dirichletBoundaryValues;
+}
+
+void 
+DiffusionEquation::setNeumannValues(map< int, double> neumannBoundaryValues)
+{
+    _neumannValuesSet=true;
+    _neumannBoundaryValues=neumannBoundaryValues;
+}
+
 
 vector<string> DiffusionEquation::getOutputFieldsNames()
 {
