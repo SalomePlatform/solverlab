@@ -9,7 +9,7 @@ set (SOLVERLAB_VERSION_MINOR 7)
 set (SOLVERLAB_VERSION_SUBMINOR alpha)
 
 option (SOLVERLAB_WITH_DOCUMENTATION "Generate SOLVERLAB documentation" ON)
-option (SOLVERLAB_WITH_PYTHON        "Compile Python interface of SOLVERLAB" ON)
+option (SOLVERLAB_WITH_PYTHON        "Generate Python interface of SOLVERLAB using SWIG" ON)
 option (SOLVERLAB_WITH_GUI           "Compile a Graphic user Interface for SOLVERLAB" OFF)
 option (SOLVERLAB_WITH_PACKAGE       "Generate RPM, Debian and tarball packages" OFF)
 option (SOLVERLAB_WITH_COREFLOWS     "Generate COREFLOWS module" ON)
@@ -146,7 +146,32 @@ endif( DEFINED ENV{HDF5_ROOT_DIR} OR DEFINED HDF5_ROOT_DIR )
       set(PETSC_INCLUDES  /usr/include/petsc /usr/include/petsc/petsc/mpiuni)
       set(PETSC_LIBRARIES /usr/lib64/libpetsc.so)
 
-      set(PETSC_VERSION "3.8") #3.8 for fedora 26 , 3.9 for fedora 29 , 3.10 for fedora 30, , 3.12 for fedora 32
+      file(STRINGS /usr/include/petsc/petscversion.h petscversion_file)
+      FOREACH(line ${petscversion_file})
+        string(FIND "${line}" "#define PETSC_VERSION_MAJOR      " pos)
+        IF(NOT ${pos} EQUAL -1)
+          string(LENGTH ${line} line_length_major)#length of the line
+          MATH(EXPR petsc_version_major "${line_length_major}-1")#line ends with "x", that counts for 1 character
+          string(SUBSTRING ${line} ${petsc_version_major} 1 PETSC_VERSION_MAJOR)
+          break()
+        ENDIF(NOT ${pos} EQUAL -1)
+      ENDFOREACH(line ${petscversion_file})
+      FOREACH(line ${petscversion_file})
+        string(FIND "${line}" "#define PETSC_VERSION_MINOR      " pos)
+        IF(NOT ${pos} EQUAL -1)
+          string(LENGTH ${line} line_length_minor)#length of the line
+          if(${line_length_minor} EQUAL ${line_length_major})
+            MATH(EXPR petsc_version_minor "${line_length_minor}-1")#line ends with "y", that counts for 1 character
+            string(SUBSTRING ${line} ${petsc_version_minor} 1 PETSC_VERSION_MINOR)
+          break()
+          else(${line_length_minor} EQUAL ${line_length_major})
+            MATH(EXPR petsc_version_minor "${line_length_minor}-2")#line ends with "yy", that counts for two characters
+            string(SUBSTRING ${line} ${petsc_version_minor} 2 PETSC_VERSION_MINOR)
+          endif(${line_length_minor} EQUAL ${line_length_major})
+        ENDIF(NOT ${pos} EQUAL -1)
+      ENDFOREACH(line ${petscversion_file})
+      set(PETSC_VERSION ${PETSC_VERSION_MAJOR}.${PETSC_VERSION_MINOR}) #3.8 for fedora 26 , 3.9 for fedora 29 , 3.10 for fedora 30 , 3.12 for fedora 32 , 3.14 for fedora 34 , 3.15 for fedora 35
+      message(STATUS "PETSc detected, version is ${PETSC_VERSION_MAJOR}.${PETSC_VERSION_MINOR}" )
       
       set(CPACK_RPM_PACKAGE_REQUIRES   "${CPACK_RPM_PACKAGE_REQUIRES}, petsc-devel (>= 3.4)") # This is not fully working yet. 
       set(PETSC_INSTALL ${PETSC_DIR})
@@ -158,6 +183,32 @@ endif( DEFINED ENV{HDF5_ROOT_DIR} OR DEFINED HDF5_ROOT_DIR )
         set(SLEPC_DIR /usr/)
         set(SLEPC_INCLUDES  ${SLEPC_DIR}/include)
         set(SLEPC_LIBRARIES ${SLEPC_DIR}/lib/libslepc.so)
+        file(STRINGS /usr/include/slepc/slepcversion.h slepcversion_file)
+        FOREACH(line ${slepcversion_file})
+          string(FIND "${line}" "#define SLEPC_VERSION_MAJOR      " pos)
+          IF(NOT ${pos} EQUAL -1)
+            string(LENGTH ${line} line_length_major)#length of the line
+            MATH(EXPR slepc_version_major "${line_length_major}-1")#line ends with "x", that counts for 1 character
+            string(SUBSTRING ${line} ${slepc_version_major} 1 SLEPC_VERSION_MAJOR)
+            break()
+          ENDIF(NOT ${pos} EQUAL -1)
+        ENDFOREACH(line ${slepcversion_file})
+        FOREACH(line ${slepcversion_file})
+          string(FIND "${line}" "#define SLEPC_VERSION_MINOR      " pos)
+          IF(NOT ${pos} EQUAL -1)
+            string(LENGTH ${line} line_length_minor)#length of the line
+            if(${line_length_minor} EQUAL ${line_length_major})
+              MATH(EXPR slepc_version_minor "${line_length_minor}-1")#line ends with "y", that counts for 1 character
+              string(SUBSTRING ${line} ${slepc_version_minor} 1 SLEPC_VERSION_MINOR)
+            break()
+            else(${line_length_minor} EQUAL ${line_length_major})
+              MATH(EXPR slepc_version_minor "${line_length_minor}-2")#line ends with "yy", that counts for two characters
+              string(SUBSTRING ${line} ${slepc_version_minor} 2 SLEPC_VERSION_MINOR)
+            endif(${line_length_minor} EQUAL ${line_length_major})
+          ENDIF(NOT ${pos} EQUAL -1)
+        ENDFOREACH(line ${slepcversion_file})
+        set(SLEPC_VERSION ${SLEPC_VERSION_MAJOR}.${SLEPC_VERSION_MINOR}) #3.8 for fedora 26 , 3.9 for fedora 29 , 3.10 for fedora 30 , 3.12 for fedora 32 , 3.14 for fedora 34 , 3.15 for fedora 35
+        message(STATUS "SLEPc detected, version is ${SLEPC_VERSION_MAJOR}.${SLEPC_VERSION_MINOR}" )
         set (CPACK_RPM_PACKAGE_REQUIRES   "${CPACK_RPM_PACKAGE_REQUIRES}, slepc-devel (>= 3.4)") # This is not fully working yet. 
       else ( IS_DIRECTORY "/usr/include/slepc/" AND EXISTS "/usr/lib64/libslepc.so" )
         message( FATAL_ERROR "SLEPc not found in the system" )
@@ -442,9 +493,9 @@ if  ( PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
     set( PARAVIEW_LIBRARIES_DIR $ENV{PARAVIEW_ROOT_DIR}/lib)
   endif( PARAVIEW_ROOT_DIR )
 else( PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
-  message(STATUS "PARAVIEW_ROOT_DIR not set. Trying to detect paraview.")
+  message(STATUS "PARAVIEW_ROOT_DIR not set. Trying to detect paraview in the system.")
   set( PARAVIEW_INCLUDE_DIR /usr/include/paraview/)
-  set( PARAVIEW_LIBRARIES_DIR /usr/lib/paraview/:/usr/lib64/paraview/:/usr/lib64/vtk/:/usr/lib/vtk/)
+  set( PARAVIEW_LIBRARIES_DIR /usr/lib/paraview/:/usr/lib64/paraview/:/usr/lib64/vtk/:/usr/lib/vtk/:/usr/lib/x86_64-linux-gnu)
 endif( PARAVIEW_ROOT_DIR OR DEFINED ENV{PARAVIEW_ROOT_DIR})
 
 if  ( DEFINED PARAVIEW_VERSION OR DEFINED ENV{PARAVIEW_VERSION} )
@@ -507,6 +558,34 @@ ELSE (${CMAKE_VERSION} VERSION_GREATER "3.12.0")
   set(Python_VERSION_MINOR ${PYTHON_VERSION_MINOR})
 ENDIF(${CMAKE_VERSION} VERSION_GREATER "3.12.0")
 
+message(STATUS "Python version found is ${Python_VERSION}")
+
+#Paraview library paths
+set (PV_LIB_DIR    /usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:${MATPLOTLIB_ROOT_DIR}/lib/:${PARAVIEW_LIBRARIES_DIR})
+set (PV_PYTHON_DIR /usr/lib/python${Python_VERSION_MAJOR}/dist-packages/:/usr/lib/python${Python_VERSION_MAJOR}/dist-packages/paraview/:/usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:/usr/lib64/paraview/site-packages/:/usr/lib64/paraview/site-packages/paraview/:/usr/lib64/paraview/site-packages/vtk/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/paraview/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules:/usr/lib/paraview/site-packages/paraview:/usr/lib/paraview/site-packages/paraview/vtk:${PARAVIEW_ROOT_DIR}/lib/:${PARAVIEW_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:${PARAVIEW_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules/:${MATPLOTLIB_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages:${PYQT5_ROOT_DIR}:${PYQT5_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages)
+
+# Detection of python-paraview
+string(REPLACE ":" ";"  PV_PYTHON_DIR_PATHS "${PV_PYTHON_DIR}")# use semicolon instead of colon in PATH search
+find_file(python-paraview simple.py PATHS ${PV_PYTHON_DIR_PATHS})
+if( ${python-paraview} STREQUAL "python-paraview-NOTFOUND" )
+  message(WARNING "Python Paraview library not found. Post processing will fail in SOLVERLAB scripts.")
+  set(PRELOAD_NETCDF_ON_UBUNTU20 OFF)
+else( ${python-paraview} STREQUAL "python-paraview-NOTFOUND" )
+  if(    ${python-paraview} STREQUAL "/usr/lib/python3/dist-packages/paraview/simple.py" )
+    message ( STATUS "Using system Paraview python libraries on Ubuntu 20.04 requires the presence and preload of library netcdf (bug in linkage)." )
+    if(    EXISTS "/usr/lib/x86_64-linux-gnu/libnetcdf.so" )
+      message ( STATUS "Library netcdf found in the system. Paraview python libraries should be functional." )
+      set(PRELOAD_NETCDF_ON_UBUNTU20 ON)
+    else(  EXISTS "/usr/lib/x86_64-linux-gnu/libnetcdf.so" )
+      message ( WARNING "Library netcdf not found in system. Paraview python libraries may not be functional (bug in linkage)." )
+      set(PRELOAD_NETCDF_ON_UBUNTU20 OFF)
+    endif( EXISTS "/usr/lib/x86_64-linux-gnu/libnetcdf.so" )
+  else(  ${python-paraview} STREQUAL "/usr/lib/python3/dist-packages/paraview/simple.py" )
+    message(STATUS "Python Paraview library found. Post processing will work in SOLVERLAB scripts.")
+    set(PRELOAD_NETCDF_ON_UBUNTU20 OFF)
+  endif( ${python-paraview} STREQUAL "/usr/lib/python3/dist-packages/paraview/simple.py" )
+endif( ${python-paraview} STREQUAL "python-paraview-NOTFOUND" )
+
 #PyQt5 root dir
 IF   ( NOT DEFINED PYQT5_ROOT_DIR )
     set(PYQT5_ROOT_DIR $ENV{PYQT5_ROOT_DIR} )
@@ -525,13 +604,6 @@ IF   ( NOT HDF5_ROOT_DIR )
     set(HDF5_ROOT_DIR ${HDF5_ROOT} )
   ENDIF( ENV{HDF5_ROOT_DIR} )
 ENDIF( NOT HDF5_ROOT_DIR )
-
-
-#Paraview library paths
-set (PV_LIB_DIR    /usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:${MATPLOTLIB_ROOT_DIR}/lib/:${PARAVIEW_LIBRARIES_DIR})
-set (PV_PYTHON_DIR /usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:/usr/lib64/paraview/site-packages/:/usr/lib64/paraview/site-packages/paraview/:/usr/lib64/paraview/site-packages/vtk/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/paraview/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules:/usr/lib/paraview/site-packages/paraview:/usr/lib/paraview/site-packages/paraview/vtk:${PARAVIEW_ROOT_DIR}/lib/:${PARAVIEW_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:${PARAVIEW_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules/:${MATPLOTLIB_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages:${PYQT5_ROOT_DIR}:${PYQT5_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages)
-
-message(STATUS "Python version found is ${Python_VERSION}")
 
 # Find SWIG
 IF   ( DEFINED SWIG_ROOT_DIR OR DEFINED ENV{SWIG_ROOT_DIR})
@@ -589,5 +661,4 @@ configure_file(
     ${CMAKE_INSTALL_PREFIX}/env_SOLVERLAB.sh
     @ONLY
 )
-
 
