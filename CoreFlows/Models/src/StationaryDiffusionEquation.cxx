@@ -151,29 +151,15 @@ void StationaryDiffusionEquation::initialize()
 	/**************** Field creation *********************/
 
 	if(!_heatPowerFieldSet){
-        if(_FECalculation){
-            _heatPowerField=Field("Heat power",NODES,_mesh,1);
-            for(int i =0; i<_Nnodes; i++)
-                _heatPowerField(i) = _heatSource;
-        }
-        else{
-            _heatPowerField=Field("Heat power",CELLS,_mesh,1);
-            for(int i =0; i<_Nmailles; i++)
-                _heatPowerField(i) = _heatSource;
-        }
+		_heatPowerField=Field("Heat power",_VV.getTypeOfField(),_mesh,1);
+		for(int i =0; i<_VV.getNumberOfElements(); i++)
+			_heatPowerField(i) = _heatSource;
         _heatPowerFieldSet=true;
     }
 	if(!_fluidTemperatureFieldSet){
-        if(_FECalculation){
-            _fluidTemperatureField=Field("Fluid temperature",NODES,_mesh,1);
-            for(int i =0; i<_Nnodes; i++)
-                _fluidTemperatureField(i) = _fluidTemperature;
-        }
-        else{
-            _fluidTemperatureField=Field("Fluid temperature",CELLS,_mesh,1);
-            for(int i =0; i<_Nmailles; i++)
-                _fluidTemperatureField(i) = _fluidTemperature;
-        }
+		_fluidTemperatureField=Field("Fluid temperature",_VV.getTypeOfField(),_mesh,1);
+		for(int i =0; i<_VV.getNumberOfElements(); i++)
+			_fluidTemperatureField(i) = _fluidTemperature;
         _fluidTemperatureFieldSet=true;
 	}
 
@@ -293,17 +279,22 @@ double StationaryDiffusionEquation::computeTimeStep(bool & stop){
 	return _dt_src;
 }
 
-Vector StationaryDiffusionEquation::gradientNodal(Matrix M, vector< double > values){
-    vector< Matrix > matrices(_Ndim);
+Vector StationaryDiffusionEquation::gradientNodal(Matrix M, vector< double > values)
+{
+	if(! M.isSquare() )
+		throw CdmathException("DiffusionEquation::gradientNodal Matrix M should be square !!!");
+		
+	int Ndim = M.getNumberOfRows();
+    vector< Matrix > matrices(Ndim);
     
-    for (int idim=0; idim<_Ndim;idim++){
+    for (int idim=0; idim<Ndim;idim++){
         matrices[idim]=M.deepCopy();
-        for (int jdim=0; jdim<_Ndim+1;jdim++)
+        for (int jdim=0; jdim<Ndim+1;jdim++)
 			matrices[idim](jdim,idim) = values[jdim] ;
     }
 
-	Vector result(_Ndim);
-    for (int idim=0; idim<_Ndim;idim++)
+	Vector result(Ndim);
+    for (int idim=0; idim<Ndim;idim++)
         result[idim] = matrices[idim].determinant();
 
 	return result;    
@@ -332,7 +323,7 @@ double StationaryDiffusionEquation::computeDiffusionMatrix(bool & stop)
 double StationaryDiffusionEquation::computeDiffusionMatrixFE(bool & stop){
 	Cell Cj;
 	string nameOfGroup;
-	double dn, coeff;
+	double coeff;
 	MatZeroEntries(_A);
 	VecZeroEntries(_b);
     
@@ -660,22 +651,13 @@ bool StationaryDiffusionEquation::iterateNewtonStep(bool &converged)
         VecAssemblyBegin(_deltaT);
         VecAssemblyEnd(  _deltaT);
 
-        if(!_FECalculation)
-            for(int i=0; i<_Nmailles; i++)
-            {
-                VecGetValues(_deltaT, 1, &i, &dTi);
-                VecGetValues(_Tk, 1, &i, &Ti);
-                if(_erreur_rel < fabs(dTi/Ti))
-                    _erreur_rel = fabs(dTi/Ti);
-            }
-        else
-            for(int i=0; i<_NunknownNodes; i++)
-            {
-                VecGetValues(_deltaT, 1, &i, &dTi);
-                VecGetValues(_Tk, 1, &i, &Ti);
-                if(_erreur_rel < fabs(dTi/Ti))
-                    _erreur_rel = fabs(dTi/Ti);
-            }
+		for(int i=0; i<_VV.getNumberOfElements(); i++)
+		{
+			VecGetValues(_deltaT, 1, &i, &dTi);
+			VecGetValues(_Tk, 1, &i, &Ti);
+			if(_erreur_rel < fabs(dTi/Ti))
+				_erreur_rel = fabs(dTi/Ti);
+		}
         stop=false;
         converged = (_erreur_rel <= _precision) ;//converged=convergence des iterations de Newton
     }
@@ -1005,10 +987,7 @@ StationaryDiffusionEquation::getEigenvectorsField(int nev, EPSWhich which, doubl
   MEDCoupling::DataArrayDouble * d = A.getEigenvectorsDataArrayDouble( nev, which, tol);
   Field my_eigenfield;
   
-  if(_FECalculation)
-    my_eigenfield = Field("Eigenvectors field", NODES, _mesh, nev);
-  else
-    my_eigenfield = Field("Eigenvectors field", CELLS, _mesh, nev);
+    my_eigenfield = Field("Eigenvectors field", _VV.getTypeOfField(), _mesh, nev);
 
   my_eigenfield.setFieldByDataArrayDouble(d);
   

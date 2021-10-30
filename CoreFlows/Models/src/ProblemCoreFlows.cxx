@@ -124,6 +124,12 @@ void ProblemCoreFlows::setInitialField(const Field &VV)
 		_runLogFile->close();
 		throw CdmathException("ProblemCoreFlows::setInitialField: Initial field has incorrect number of components");
 	}
+	if(_FECalculation && VV.getTypeOfField()!=NODES)
+	{
+		*_runLogFile<<"ProblemCoreFlows::setInitialField: Initial field has incorrect support : should be on nodes for the Finite Element method"<<endl;
+		_runLogFile->close();
+		throw CdmathException("ProblemCoreFlows::setInitialField: Initial field has incorrect support : should be on nodes for the Finite Element method");
+	}
 
 	_VV=VV;
 	_VV.setName("SOLVERLAB results");
@@ -622,10 +628,7 @@ ProblemCoreFlows::getEigenvectorsField(int nev, EPSWhich which, double tol) cons
   MEDCoupling::DataArrayDouble * d = A.getEigenvectorsDataArrayDouble( nev, which, tol);
   Field my_eigenfield;
   
-  if(_FECalculation)
-    my_eigenfield = Field("Eigenvectors field", NODES, _mesh, nev);
-  else
-    my_eigenfield = Field("Eigenvectors field", CELLS, _mesh, nev);
+  my_eigenfield = Field("Eigenvectors field", _VV.getTypeOfField(), _mesh, nev);
 
   my_eigenfield.setFieldByDataArrayDouble(d);
   
