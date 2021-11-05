@@ -5,7 +5,7 @@
  * \version 1.0
  * \date 24 March 2015
  * \brief Heat diffusion equation
- * dT/dt - \lambda\Delta T = \Phi + \lambda_{sf} (T_{fluid}-T)
+ * rho*cp*dT/dt - \lambda\Delta T = \Phi + \lambda_{sf} (T_{fluid}-T)
  * Dirichlet (imposed temperature) or Neumann (imposed normal flux) boundary conditions.
  * */
 //============================================================================
@@ -13,7 +13,7 @@
 /*! \class DiffusionEquation DiffusionEquation.hxx "DiffusionEquation.hxx"
  *  \brief Scalar heat equation for the Uranium rods temperature
  *  \details see \ref DiffusionEqPage for more details
- * dT/dt - \lambda\Delta T = \Phi + \lambda_{sf} (T_{fluid}-T)
+ * rho*cp*dT/dt - \lambda\Delta T = \Phi + \lambda_{sf} (T_{fluid}-T)
  */
 #ifndef DiffusionEquation_HXX_
 #define DiffusionEquation_HXX_
@@ -52,7 +52,7 @@ public :
 			 * \param [in] double : solid conductivity
 			 *  */
 
-	DiffusionEquation( int dim,bool FECalculation=true,double rho=10000,double cp=300,double lambda=5);
+	DiffusionEquation( int dim,bool FECalculation=true,double rho=10000,double cp=300,double lambda=5, MPI_Comm comm = MPI_COMM_WORLD);
 
 	//Gestion du calcul
 	void initialize();
@@ -121,9 +121,16 @@ public :
 		return _fluidTemperatureField;
 	}
 
+    /*********** Generic functions for finite element method ***********/
+    static Vector gradientNodal(Matrix M, vector< double > v);//gradient of nodal shape functions
+    static int fact(int n);
+    static int unknownNodeIndex(int globalIndex, std::vector< int > dirichletNodes);
+    static int globalNodeIndex(int unknownIndex, std::vector< int > dirichletNodes);
+
 protected :
 	double computeDiffusionMatrix(bool & stop);
 	double computeDiffusionMatrixFV(bool & stop);
+	double computeDiffusionMatrixFE(bool & stop);
 	double computeRHS(bool & stop);
 
 	Field _fluidTemperatureField;
@@ -137,20 +144,11 @@ protected :
 	double _dt_diffusion, _dt_src;
     
     /************ Data for FE calculation *************/
-    bool _FECalculation;
-	int _neibMaxNbNodes;/* maximum number of nodes around a node */
 	int _NunknownNodes;/* number of unknown nodes for FE calculation */
 	int _NboundaryNodes;/* total number of boundary nodes */
 	int _NdirichletNodes;/* number of boundary nodes with Dirichlet BC for FE calculation */
     std::vector< int > _boundaryNodeIds;/* List of boundary nodes */
     std::vector< int > _dirichletNodeIds;/* List of boundary nodes with Dirichlet BC */
-
-    /*********** Functions for finite element method ***********/
-    static Vector gradientNodal(Matrix M, vector< double > v);//gradient of nodal shape functions
-	double computeDiffusionMatrixFE(bool & stop);
-    static int fact(int n);
-    static int unknownNodeIndex(int globalIndex, std::vector< int > dirichletNodes);
-    static int globalNodeIndex(int unknownIndex, std::vector< int > dirichletNodes);
 
 	TimeScheme _timeScheme;
 	map<string, LimitFieldDiffusion> _limitField;

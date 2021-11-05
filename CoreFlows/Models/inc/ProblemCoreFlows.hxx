@@ -90,7 +90,7 @@ class ProblemCoreFlows
 {
 public :
 	//! Constructeur par défaut
-	ProblemCoreFlows();
+	ProblemCoreFlows(MPI_Comm comm = MPI_COMM_WORLD);
 	virtual ~ProblemCoreFlows();
 	
 	// -*-*-*- Gestion du calcul (interface ICoCo) -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
@@ -250,41 +250,56 @@ public :
 	void setInitialField(const Field &VV);
 
 	/** \fn setInitialField
+	 * \brief sets the initial field from a field in a med file. 
+	 * \details This function is added because we have not been able yet to swig properly the enum EntityType. It is replaced by an integer.
+	 * \param [in] string : the file name
+	 * \param [in] string : the field name
+	 * \param [in] int : the time step number
+	 * \param [in] int : int corresponding to the enum CELLS, NODES or FACES
+	 * \param [out] void
+	 *  */
+	void setInitialField(string fileName, string fieldName, int timeStepNumber, int field_support_type);
+
+	/** \fn setInitialField
 	 * \brief sets the initial field from a field in a med file
 	 * \details
 	 * \param [in] string : the file name
 	 * \param [in] string : the field name
 	 * \param [in] int : the time step number
+	 * \param [in] EntityType : CELLS, NODES or FACES
 	 * \param [out] void
 	 *  */
-	void setInitialField(string fileName, string fieldName, int timeStepNumber);
+	void setInitialField(string fileName, string fieldName, int timeStepNumber, EntityType typeField = CELLS);
 
 	/** \fn setInitialFieldConstant
 	 * \brief sets a constant initial field on a mesh stored in a med file
 	 * \details
 	 * \param [in] string : the file name
 	 * \param [in] vector<double> : the value in each cell
+	 * \param [in] EntityType : CELLS, NODES or FACES
 	 * \param [out] void
 	 *  */
-	void setInitialFieldConstant(string fileName, const vector<double> Vconstant);
+	void setInitialFieldConstant(string fileName, const vector<double> Vconstant, EntityType typeField = CELLS);
 
 	/** \fn setInitialFieldConstant
 	 * \brief sets a constant initial field 
 	 * \details
 	 * \param [in] Mesh 
 	 * \param [in] Vector
+	 * \param [in] EntityType : CELLS, NODES or FACES
 	 * \param [out] void
 	 *  */
-	void setInitialFieldConstant(const Mesh& M, const Vector Vconstant);
+	void setInitialFieldConstant(const Mesh& M, const Vector Vconstant, EntityType typeField = CELLS);
 
 	/** \fn setInitialFieldConstant
 	 * \brief sets a constant initial field
 	 * \details
 	 * \param [in] Mesh
 	 * \param [in] vector<double>
+	 * \param [in] EntityType : CELLS, NODES or FACES
 	 * \param [out] void
 	 *  */
-	void setInitialFieldConstant(const Mesh& M, const vector<double> Vconstant);
+	void setInitialFieldConstant(const Mesh& M, const vector<double> Vconstant, EntityType typeField = CELLS);
 
 	/** \fn setInitialFieldConstant
 	 * \brief sets a constant initial field
@@ -303,11 +318,36 @@ public :
 	 * \param [in] double the highest value in the z direction
 	 * \param [in] string name of the bottom boundary
 	 * \param [in] string name of the top boundary
+	 * \param [in] EntityType : CELLS, NODES or FACES
 	 * \param [out] void
 	 *  */
 	void setInitialFieldConstant( int nDim, const vector<double> Vconstant, double xmin, double xmax,int nx, string leftSide, string rightSide,
 			double ymin=0, double ymax=0, int ny=0, string backSide="", string frontSide="",
-			double zmin=0, double zmax=0, int nz=0, string bottomSide="", string topSide="");
+			double zmin=0, double zmax=0, int nz=0, string bottomSide="", string topSide="", EntityType typeField = CELLS);
+
+	/** \fn setInitialFieldConstant
+	 * \brief sets a constant initial field
+	 * \details This function is added because we have not been able yet to swig roperly the enum EntityType. It is replaced by an integer.
+	 * \param [in] int the space dimension
+	 * \param [in] vector<double> the value in each cell
+	 * \param [in] double the lowest value in the x direction
+	 * \param [in] double the highest value in the x direction
+	 * \param [in] string name of the left boundary
+	 * \param [in] string name of the right boundary
+	 * \param [in] double the lowest value in the y direction
+	 * \param [in] double the highest value in the y direction
+	 * \param [in] string name of the back boundary
+	 * \param [in] string name of the front boundary
+	 * \param [in] double the lowest value in the z direction
+	 * \param [in] double the highest value in the z direction
+	 * \param [in] string name of the bottom boundary
+	 * \param [in] string name of the top boundary
+	 * \param [in] integer corresponding to the field support enum : CELLS, NODES or FACES
+	 * \param [out] void
+	 *  */
+	void setInitialFieldConstant( int nDim, const vector<double> Vconstant, double xmin, double xmax,int nx, string leftSide, string rightSide,
+			double ymin, double ymax, int ny, string backSide, string frontSide,
+			double zmin, double zmax, int nz, string bottomSide, string topSide, int type_of_field );
 
 	/** \fn setInitialFieldStepFunction
 	 * \brief sets a step function initial field (Riemann problem)
@@ -317,9 +357,10 @@ public :
 	 * \param [in] Vector
 	 * \param [in] double position of the discontinuity on one of the three axis
 	 * \param [in] int direction (axis carrying the discontinuity) : 0 for x, 1 for y, 2 for z
+	 * \param [in] EntityType : CELLS, NODES or FACES
 	 * \param [out] void
 	 *  */
-	void setInitialFieldStepFunction(const Mesh M, const Vector Vleft, const Vector Vright, double disc_pos, int direction=0);
+	void setInitialFieldStepFunction(const Mesh M, const Vector Vleft, const Vector Vright, double disc_pos, int direction=0, EntityType typeField = CELLS);
 
 	/** \fn setInitialFieldStepFunction
 	 * \brief sets a constant initial field
@@ -340,12 +381,13 @@ public :
 	 * \param [in] double the highest value in the z direction
 	 * \param [in] string name of the bottom boundary
 	 * \param [in] string name of the top boundary
+	 * \param [in] EntityType : CELLS, NODES or FACES
 	 * \param [out] void
 	 *  */
 	void setInitialFieldStepFunction( int nDim, const vector<double> VV_Left, vector<double> VV_Right, double xstep,
 			double xmin, double xmax,int nx, string leftSide, string rightSide,
 			double ymin=0, double ymax=0, int ny=0, string backSide="", string frontSide="",
-			double zmin=0, double zmax=0, int nz=0, string bottomSide="", string topSide="");
+			double zmin=0, double zmax=0, int nz=0, string bottomSide="", string topSide="", EntityType typeField = CELLS);
 
 	/** \fn setInitialFieldSphericalStepFunction
 	 * \brief sets a step function initial field with value Vin inside the ball with radius Radius and Vout outside
@@ -355,9 +397,10 @@ public :
 	 * \param [in] Vector Vout, value outside the ball
 	 * \param [in] double radius of the ball
 	 * \param [in] Vector Center, coordinates of the ball center
+	 * \param [in] EntityType : CELLS, NODES or FACES
 	 * \param [out] void
 	 *  */
-	void setInitialFieldSphericalStepFunction(const Mesh M, const Vector Vin, const Vector Vout, double Radius, Vector Center);
+	void setInitialFieldSphericalStepFunction(const Mesh M, const Vector Vin, const Vector Vout, double Radius, Vector Center, EntityType typeField = CELLS);
 
 	/** \fn getTime
 	 * \brief renvoie _time (le temps courant du calcul)
@@ -606,8 +649,8 @@ public :
 		_heatTransfertCoeff=heatTransfertCoeff;
 	}
 
-	/** \fn setDISPLAY
-	 * \brief met à jour les paramètres de l'affichage
+	/** \fn setVerbose
+	 * \brief Updates display options
 	 * \details
 	 * \param [in] bool
 	 * \param [in] bool
@@ -715,6 +758,11 @@ protected :
 
 	string _path;//path to execution directory used for saving results
 	saveFormat _saveFormat;//file saving format : MED, VTK or CSV
+	
+	//MPI variables
+	PetscMPIInt    _size;        /* size of communicator */
+	PetscMPIInt    _rank;        /* processor rank */
+	
 	
 };
 

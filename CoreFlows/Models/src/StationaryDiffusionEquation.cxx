@@ -1,4 +1,5 @@
 #include "StationaryDiffusionEquation.hxx"
+#include "DiffusionEquation.hxx"
 #include "Node.hxx"
 #include "SparseMatrixPetsc.hxx"
 #include "math.h"
@@ -8,51 +9,24 @@
 
 using namespace std;
 
-int StationaryDiffusionEquation::fact(int n)
-{
-  return (n == 1 || n == 0) ? 1 : fact(n - 1) * n;
-}
-int StationaryDiffusionEquation::unknownNodeIndex(int globalIndex, std::vector< int > dirichletNodes) 
-{//assumes Dirichlet node numbering is strictly increasing
-    int j=0;//indice de parcours des noeuds frontière avec CL Dirichlet
-    int boundarySize=dirichletNodes.size();
-    while(j<boundarySize and dirichletNodes[j]<globalIndex)
-        j++;
-    if(j==boundarySize)
-        return globalIndex-boundarySize;
-    else if (dirichletNodes[j]>globalIndex)
-        return globalIndex-j;
-    else
-        throw CdmathException("StationaryDiffusionEquation::unknownNodeIndex : Error : node is a Dirichlet boundary node");
-}
-
-int StationaryDiffusionEquation::globalNodeIndex(int unknownNodeIndex, std::vector< int > dirichletNodes)
-{//assumes Dirichlet boundary node numbering is strictly increasing
-    int boundarySize=dirichletNodes.size();
-    /* trivial case where all boundary nodes are Neumann BC */
-    if(boundarySize==0)
-        return unknownNodeIndex;
-        
-    double unknownNodeMax=-1;//max unknown node number in the interval between jth and (j+1)th Dirichlet boundary nodes
-    int j=0;//indice de parcours des noeuds frontière
-    //On cherche l'intervale [j,j+1] qui contient le noeud de numéro interieur unknownNodeIndex
-    while(j+1<boundarySize and unknownNodeMax<unknownNodeIndex)
-    {
-        unknownNodeMax += dirichletNodes[j+1]-dirichletNodes[j]-1;
-        j++;
-    }    
-
-    if(j+1==boundarySize)
-        return unknownNodeIndex+boundarySize;
-    else //unknownNodeMax>=unknownNodeIndex, hence our node global number is between dirichletNodes[j-1] and dirichletNodes[j]
-        return unknownNodeIndex - unknownNodeMax + dirichletNodes[j]-1;
-}
-
-StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalculation, double lambda){
+StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalculation, double lambda,MPI_Comm comm){
+	/* Initialisation of PETSC */
+	//check if PETSC is already initialised
 	PetscBool petscInitialized;
 	PetscInitialized(&petscInitialized);
 	if(!petscInitialized)
-		PetscInitialize(NULL,NULL,0,0);
+	{//check if MPI is already initialised
+		int mpiInitialized;
+		MPI_Initialized(&mpiInitialized);
+		if(mpiInitialized)
+			PETSC_COMM_WORLD = comm;
+		PetscInitialize(NULL,NULL,0,0);//Note this is ok if MPI has been been initialised independently from PETSC
+	}
+	MPI_Comm_rank(PETSC_COMM_WORLD,&_rank);
+	MPI_Comm_size(PETSC_COMM_WORLD,&_size);
+	PetscPrintf(PETSC_COMM_WORLD,"Simulation on %d processors\n",_size);//Prints to standard out, only from the first processor in the communicator. Calls from other processes are ignored. 
+	PetscSynchronizedPrintf(PETSC_COMM_WORLD,"Processor [%d] ready for action\n",_rank);//Prints synchronized output from several processors. Output of the first processor is followed by that of the second, etc. 
+	PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);
 
     if(lambda < 0.)
     {
@@ -121,6 +95,11 @@ StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalcula
 	_heatPowerFieldSet=false;
 	_heatTransfertCoeff=0;
 	_heatSource=0;
+
+    /* Default diffusion tensor is diagonal */
+   	_DiffusionTensor=Matrix(_Ndim);
+	for(int idim=0;idim<_Ndim;idim++)
+		_DiffusionTensor(idim,idim)=_conductivity;
 }
 
 void StationaryDiffusionEquation::initialize()
@@ -145,9 +124,6 @@ void StationaryDiffusionEquation::initialize()
         }
     }
     
-	_DiffusionTensor=Matrix(_Ndim);
-	for(int idim=0;idim<_Ndim;idim++)
-		_DiffusionTensor(idim,idim)=1;
 	/**************** Field creation *********************/
 
 	if(!_heatPowerFieldSet){
@@ -279,27 +255,6 @@ double StationaryDiffusionEquation::computeTimeStep(bool & stop){
 	return _dt_src;
 }
 
-Vector StationaryDiffusionEquation::gradientNodal(Matrix M, vector< double > values)
-{
-	if(! M.isSquare() )
-		throw CdmathException("DiffusionEquation::gradientNodal Matrix M should be square !!!");
-		
-	int Ndim = M.getNumberOfRows();
-    vector< Matrix > matrices(Ndim);
-    
-    for (int idim=0; idim<Ndim;idim++){
-        matrices[idim]=M.deepCopy();
-        for (int jdim=0; jdim<Ndim+1;jdim++)
-			matrices[idim](jdim,idim) = values[jdim] ;
-    }
-
-	Vector result(Ndim);
-    for (int idim=0; idim<Ndim;idim++)
-        result[idim] = matrices[idim].determinant();
-
-	return result;    
-}
-
 double StationaryDiffusionEquation::computeDiffusionMatrix(bool & stop)
 {
     double result;
@@ -354,21 +309,21 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFE(bool & stop){
             M(idim,_Ndim)=1;
         }
         for (int idim=0; idim<_Ndim+1;idim++)
-            GradShapeFuncs[idim]=gradientNodal(M,values[idim])/fact(_Ndim);
+            GradShapeFuncs[idim]=DiffusionEquation::gradientNodal(M,values[idim])/DiffusionEquation::fact(_Ndim);
 
         /* Loop on the edges of the cell */
         for (int idim=0; idim<_Ndim+1;idim++)
         {
             if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),nodeIds[idim])==_dirichletNodeIds.end())//!_mesh.isBorderNode(nodeIds[idim])
             {//First node of the edge is not Dirichlet node
-                i_int=unknownNodeIndex(nodeIds[idim], _dirichletNodeIds);//assumes Dirichlet boundary node numbering is strictly increasing
+                i_int=DiffusionEquation::unknownNodeIndex(nodeIds[idim], _dirichletNodeIds);//assumes Dirichlet boundary node numbering is strictly increasing
                 dirichletCell_treated=false;
                 for (int jdim=0; jdim<_Ndim+1;jdim++)
                 {
                     if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),nodeIds[jdim])==_dirichletNodeIds.end())//!_mesh.isBorderNode(nodeIds[jdim])
                     {//Second node of the edge is not Dirichlet node
-                        j_int= unknownNodeIndex(nodeIds[jdim], _dirichletNodeIds);//assumes Dirichlet boundary node numbering is strictly increasing
-                        MatSetValue(_A,i_int,j_int,_conductivity*(_DiffusionTensor*GradShapeFuncs[idim])*GradShapeFuncs[jdim]/Cj.getMeasure(), ADD_VALUES);
+                        j_int= DiffusionEquation::unknownNodeIndex(nodeIds[jdim], _dirichletNodeIds);//assumes Dirichlet boundary node numbering is strictly increasing
+                        MatSetValue(_A,i_int,j_int,(_DiffusionTensor*GradShapeFuncs[idim])*GradShapeFuncs[jdim]/Cj.getMeasure(), ADD_VALUES);
                     }
                     else if (!dirichletCell_treated)
                     {//Second node of the edge is a Dirichlet node
@@ -386,8 +341,8 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFE(bool & stop){
                             else
                                 valuesBorder[kdim]=0;                            
                         }
-                        GradShapeFuncBorder=gradientNodal(M,valuesBorder)/fact(_Ndim);
-                        coeff =-_conductivity*(_DiffusionTensor*GradShapeFuncBorder)*GradShapeFuncs[idim]/Cj.getMeasure();
+                        GradShapeFuncBorder=DiffusionEquation::gradientNodal(M,valuesBorder)/DiffusionEquation::fact(_Ndim);
+                        coeff =-1.*(_DiffusionTensor*GradShapeFuncBorder)*GradShapeFuncs[idim]/Cj.getMeasure();
                         VecSetValue(_b,i_int,coeff, ADD_VALUES);                        
                     }
                 }
@@ -402,21 +357,22 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFE(bool & stop){
         int NboundaryFaces=boundaryFaces.size();
         for(int i = 0; i< NboundaryFaces ; i++)//On parcourt les faces du bord
         {
-            Face Fi = _mesh.getFace(i);
+            Face Fi = _mesh.getFace(boundaryFaces[i]);
             for(int j = 0 ; j<_Ndim ; j++)//On parcourt les noeuds de la face
             {
-                if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),Fi.getNodeId(j))==_dirichletNodeIds.end())//node j is an Neumann BC node (not a Dirichlet BC node)
+                if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),Fi.getNodeId(j))==_dirichletNodeIds.end())//node j is a Neumann BC node (not a Dirichlet BC node)
                 {
-                    j_int=unknownNodeIndex(Fi.getNodeId(j), _dirichletNodeIds);//indice du noeud j en tant que noeud inconnu
+                    j_int=DiffusionEquation::unknownNodeIndex(Fi.getNodeId(j), _dirichletNodeIds);//indice du noeud j en tant que noeud inconnu
                     if( _neumannValuesSet )
                         coeff =Fi.getMeasure()/_Ndim*_neumannBoundaryValues[Fi.getNodeId(j)];
-                    else    
+                    else
                         coeff =Fi.getMeasure()/_Ndim*_limitField[_mesh.getNode(Fi.getNodeId(j)).getGroupName()].normalFlux;
                     VecSetValue(_b, j_int, coeff, ADD_VALUES);
                 }
             }
         }
     }
+
     MatAssemblyBegin(_A, MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(_A, MAT_FINAL_ASSEMBLY);
 	VecAssemblyBegin(_b);
@@ -469,7 +425,7 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFV(bool & stop){
         }
 
 		//Compute velocity at the face Fj
-		dn=_conductivity*(_DiffusionTensor*normale)*normale;
+		dn=(_DiffusionTensor*normale)*normale;
 
 		// compute 1/dxi = volume of Ci/area of Fj
         inv_dxi = Fj.getMeasure()/Cell1.getMeasure();
@@ -503,8 +459,7 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFV(bool & stop){
                     MatSetValue(_A,idm,idm,dn*inv_dxi/barycenterDistance                           , ADD_VALUES);
                     VecSetValue(_b,idm,    dn*inv_dxi/barycenterDistance*_limitField[nameOfGroup].T, ADD_VALUES);
                 }
-                else {//Problem for 3D tetrahera 
-					//cout<< "Fj.getGroupNames().size()= "<<Fj.getGroupNames().size()<<", Fj.x()= "<<Fj.x()<<", Fj.y()= "<<Fj.y()<<", Fj.z()= "<<Fj.z()<<endl;
+                else {
                     stop=true ;
                     cout<<"!!!!!!!!!!!!!!! Error StationaryDiffusionEquation::computeDiffusionMatrixFV !!!!!!!!!!"<<endl;
                     cout<<"!!!!!! No boundary condition set for boundary named "<<nameOfGroup<< "!!!!!!!!!! _limitField[nameOfGroup].bcType= "<<_limitField[nameOfGroup].bcType<<endl;
@@ -567,13 +522,13 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFV(bool & stop){
     return INFINITY;
 }
 
-double StationaryDiffusionEquation::computeRHS(bool & stop)//Contribution of the PDE RHS to the linear systemm RHS (boundary conditions do contribute to the system RHS via the function computeDiffusionMatrix)
+double StationaryDiffusionEquation::computeRHS(bool & stop)//Contribution of the PDE RHS to the linear systemm RHS (boundary conditions do contribute to the system RHS via the function computeDiffusionMatrix
 {
 	VecAssemblyBegin(_b);
 
     if(!_FECalculation)
         for (int i=0; i<_Nmailles;i++)
-            VecSetValue(_b,i,_heatTransfertCoeff*_fluidTemperatureField(i) + _heatPowerField(i),ADD_VALUES);
+            VecSetValue(_b,i, _heatTransfertCoeff*_fluidTemperatureField(i) + _heatPowerField(i) ,ADD_VALUES);
     else
         {
             Cell Ci;
@@ -586,7 +541,7 @@ double StationaryDiffusionEquation::computeRHS(bool & stop)//Contribution of the
                     if(!_mesh.isBorderNode(nodesId[j])) 
                     {
                         double coeff = _heatTransfertCoeff*_fluidTemperatureField(nodesId[j]) + _heatPowerField(nodesId[j]);
-                        VecSetValue(_b,unknownNodeIndex(nodesId[j], _dirichletNodeIds), coeff*Ci.getMeasure()/(_Ndim+1),ADD_VALUES);
+                        VecSetValue(_b,DiffusionEquation::unknownNodeIndex(nodesId[j], _dirichletNodeIds), coeff*Ci.getMeasure()/(_Ndim+1),ADD_VALUES);
                     }
             }
         }
@@ -651,13 +606,18 @@ bool StationaryDiffusionEquation::iterateNewtonStep(bool &converged)
         VecAssemblyBegin(_deltaT);
         VecAssemblyEnd(  _deltaT);
 
-		for(int i=0; i<_VV.getNumberOfElements(); i++)
+		if(_verbose)
+			cout<<"Début calcul de la variation relative"<<endl;
+
+		for(int i=0; i<_NunknownNodes; i++)
 		{
 			VecGetValues(_deltaT, 1, &i, &dTi);
 			VecGetValues(_Tk, 1, &i, &Ti);
 			if(_erreur_rel < fabs(dTi/Ti))
 				_erreur_rel = fabs(dTi/Ti);
 		}
+		if(_verbose)
+			cout<<"Fin calcul de la variation relative, erreur relative maximale : " << _erreur_rel <<endl;
         stop=false;
         converged = (_erreur_rel <= _precision) ;//converged=convergence des iterations de Newton
     }
@@ -753,7 +713,7 @@ void StationaryDiffusionEquation::setLinearSolver(linearSolver kspType, precondi
 		throw CdmathException("!!! Error : only 'GMRES', 'CG' or 'BCGS' algorithm is acceptable !!!");
 	}
 	// set preconditioner
-	if (pcType == NONE)
+	if (pcType == NOPC)
 		_pctype = (char*)&PCNONE;
 	else if (pcType ==LU)
 		_pctype = (char*)&PCLU;
@@ -764,10 +724,10 @@ void StationaryDiffusionEquation::setLinearSolver(linearSolver kspType, precondi
 	else if (pcType == ICC)
 		_pctype = (char*)&PCICC;
 	else {
-		cout << "!!! Error : only 'NONE', 'LU', 'ILU', 'CHOLESKY' or 'ICC' preconditioners are acceptable !!!" << endl;
-		*_runLogFile << "!!! Error : only 'NONE' or 'LU' or 'ILU' preconditioners are acceptable !!!" << endl;
+		cout << "!!! Error : only 'NOPC', 'LU', 'ILU', 'CHOLESKY' or 'ICC' preconditioners are acceptable !!!" << endl;
+		*_runLogFile << "!!! Error : only 'NOPC' or 'LU' or 'ILU' preconditioners are acceptable !!!" << endl;
 		_runLogFile->close();
-		throw CdmathException("!!! Error : only 'NONE' or 'LU' or 'ILU' preconditioners are acceptable !!!" );
+		throw CdmathException("!!! Error : only 'NOPC' or 'LU' or 'ILU' preconditioners are acceptable !!!" );
 	}
 }
 
@@ -881,7 +841,7 @@ void StationaryDiffusionEquation::save(){
         for(int i=0; i<_NunknownNodes; i++)
         {
             VecGetValues(_Tk, 1, &i, &Ti);
-            globalIndex = globalNodeIndex(i, _dirichletNodeIds);
+            globalIndex = DiffusionEquation::globalNodeIndex(i, _dirichletNodeIds);
             _VV(globalIndex)=Ti;
         }
 
@@ -962,7 +922,7 @@ StationaryDiffusionEquation::getEigenvalues(int nev, EPSWhich which, double tol)
         {
             if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),Ci.getNodeId(j))==_dirichletNodeIds.end())//node j is an unknown node (not a Dirichlet node)
 			{
-                j_int=unknownNodeIndex(Ci.getNodeId(j), _dirichletNodeIds);//indice du noeud j en tant que noeud inconnu
+                j_int=DiffusionEquation::unknownNodeIndex(Ci.getNodeId(j), _dirichletNodeIds);//indice du noeud j en tant que noeud inconnu
                 nodal_volumes[j_int]+=Ci.getMeasure()/(_Ndim+1);
             }
         }

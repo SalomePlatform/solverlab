@@ -51,7 +51,7 @@ Vector DiffusionEquation::gradientNodal(Matrix M, vector< double > values)
 	if(! M.isSquare() )
 		throw CdmathException("DiffusionEquation::gradientNodal Matrix M should be square !!!");
 		
-	int Ndim = M.getNumberOfRows();
+	int Ndim = M.getNumberOfRows()-1;
     vector< Matrix > matrices(Ndim);
     
     for (int idim=0; idim<Ndim;idim++){
@@ -67,34 +67,34 @@ Vector DiffusionEquation::gradientNodal(Matrix M, vector< double > values)
 	return result;    
 }
 
-DiffusionEquation::DiffusionEquation(int dim, bool FECalculation,double rho,double cp, double lambda){
+DiffusionEquation::DiffusionEquation(int dim, bool FECalculation,double rho,double cp, double lambda, MPI_Comm comm ):ProblemCoreFlows(comm)
+{
     /* Control input value are acceptable */
     if(rho<_precision or cp<_precision)
     {
-        std::cout<<"rho = "<<rho<<", cp = "<<cp<< ", precision = "<<_precision;
+        PetscPrintf(PETSC_COMM_WORLD,"rho = %.2f, cp = %.2f, precision = %.2f\n",rho,cp,_precision);
         throw CdmathException("Error : parameters rho and cp should be strictly positive");
     }
     if(lambda < 0.)
     {
-        std::cout<<"Conductivity = "<<lambda<<endl;
+        PetscPrintf(PETSC_COMM_WORLD,"Conductivity = %.2f\n",lambda);
         throw CdmathException("Error : conductivity parameter lambda cannot  be negative");
     }
     if(dim<=0)
     {
-        std::cout<<"Space dimension = "<<dim<<endl;
+        PetscPrintf(PETSC_COMM_WORLD,"Space dimension = %.2f\n",dim);
         throw CdmathException("Error : parameter dim cannot  be negative");
     }
 
-    cout<<"Diffusion problem with density "<<rho<<", specific heat "<< cp<<", conductivity "<< lambda;
+    PetscPrintf(PETSC_COMM_WORLD,"Diffusion problem with density %.2f, specific heat %.2f, conductivity %.2f", rho,cp,lambda);
     if(FECalculation)
-        cout<<" and finite elements method"<<endl;
+        PetscPrintf(PETSC_COMM_WORLD," and finite elements method\n");
     else
-        cout<<" and finite volumes method"<<endl;
+        PetscPrintf(PETSC_COMM_WORLD," and finite volumes method\n");
     
     _FECalculation=FECalculation;
     
     /* Finite element data */
-    _neibMaxNbNodes=0;    
     _boundaryNodeIds=std::vector< int >(0);
     _dirichletNodeIds=std::vector< int >(0);
     _NboundaryNodes=0;
@@ -118,14 +118,14 @@ DiffusionEquation::DiffusionEquation(int dim, bool FECalculation,double rho,doub
 	_dt_src=0;
 	_diffusionMatrixSet=false;
 
-	_fileName = "CoreFlowsDiffusionProblem";
+	_fileName = "SolverlabDiffusionProblem";
 
 	_runLogFile=new ofstream;
 
-    /* Default diffusion tensor is identity matrix */
+    /* Default diffusion tensor is diagonal */
    	_DiffusionTensor=Matrix(_Ndim);
 	for(int idim=0;idim<_Ndim;idim++)
-		_DiffusionTensor(idim,idim)=1;
+		_DiffusionTensor(idim,idim)=_diffusivity;
 }
 
 void DiffusionEquation::initialize()
@@ -134,7 +134,7 @@ void DiffusionEquation::initialize()
 
 	if(_Ndim != _mesh.getSpaceDimension() or _Ndim!=_mesh.getMeshDimension())//for the moment we must have space dim=mesh dim
 	{
-        cout<< "Problem : dimension defined is "<<_Ndim<< " but mesh dimension= "<<_mesh.getMeshDimension()<<", and space dimension is "<<_mesh.getSpaceDimension()<<endl;
+        PetscPrintf(PETSC_COMM_WORLD,"Problem : dimension defined is %d but mesh dimension= %d, and space dimension is %d",_Ndim,_mesh.getMeshDimension(),_mesh.getSpaceDimension());
 		*_runLogFile<< "Problem : dim = "<<_Ndim<< " but mesh dim= "<<_mesh.getMeshDimension()<<", mesh space dim= "<<_mesh.getSpaceDimension()<<endl;
 		*_runLogFile<<"DiffusionEquation::initialize: mesh has incorrect dimension"<<endl;
 		_runLogFile->close();
@@ -145,16 +145,16 @@ void DiffusionEquation::initialize()
 		throw CdmathException("DiffusionEquation::initialize() set initial data first");
 	else
         {
-            cout<<"Initialising the diffusion of a solid temperature using ";
+            PetscPrintf(PETSC_COMM_WORLD,"Initialising the diffusion of a solid temperature using ");
             *_runLogFile<<"Initialising the diffusion of a solid temperature using ";
             if(!_FECalculation)
             {
-                cout<< "Finite volumes method"<<endl<<endl;
+                PetscPrintf(PETSC_COMM_WORLD,"Finite volumes method\n\n");
                 *_runLogFile<< "Finite volumes method"<<endl<<endl;
             }
             else
             {
-                cout<< "Finite elements method"<<endl<<endl;
+                PetscPrintf(PETSC_COMM_WORLD,"Finite elements method\n\n");
                 *_runLogFile<< "Finite elements method"<<endl<<endl;
             }
         }
@@ -178,16 +178,16 @@ void DiffusionEquation::initialize()
     if(_FECalculation)
     {
         if(_Ndim==1 )//The 1D cdmath mesh is necessarily made of segments
-			cout<<"1D Finite element method on segments"<<endl;
+			PetscPrintf(PETSC_COMM_WORLD,"1D Finite element method on segments\n");
         else if(_Ndim==2)
         {
 			if( _mesh.isTriangular() )//Mesh dim=2
-				cout<<"2D Finite element method on triangles"<<endl;
+				PetscPrintf(PETSC_COMM_WORLD,"2D Finite element method on triangles\n");
 			else if (_mesh.getMeshDimension()==1)//Mesh dim=1
-				cout<<"1D Finite element method on a 2D network : space dimension is "<<_Ndim<< ", mesh dimension is "<<_mesh.getMeshDimension()<<endl;			
+				PetscPrintf(PETSC_COMM_WORLD,"1D Finite element method on a 2D network : space dimension is %d, mesh dimension is %d\n",_Ndim,_mesh.getMeshDimension());			
 			else
 			{
-				cout<<"Error Finite element with Space dimension "<<_Ndim<< ", and mesh dimension  "<<_mesh.getMeshDimension()<< ", mesh should be either triangular either 1D network"<<endl;
+				PetscPrintf(PETSC_COMM_WORLD,"Error Finite element with space dimension %, and mesh dimension  %d, mesh should be either triangular either 1D network\n",_Ndim,_mesh.getMeshDimension());
 				*_runLogFile<<"DiffusionEquation::initialize mesh has incorrect dimension"<<endl;
 				_runLogFile->close();
 				throw CdmathException("DiffusionEquation::initialize: mesh has incorrect cell types");
@@ -196,14 +196,14 @@ void DiffusionEquation::initialize()
         else if(_Ndim==3)
         {
 			if( _mesh.isTetrahedral() )//Mesh dim=3
-				cout<<"3D Finite element method on tetrahedra"<<endl;
+				PetscPrintf(PETSC_COMM_WORLD,"3D Finite element method on tetrahedra\n");
 			else if (_mesh.getMeshDimension()==2 and _mesh.isTriangular())//Mesh dim=2
-				cout<<"2D Finite element method on a 3D surface : space dimension is "<<_Ndim<< ", mesh dimension is "<<_mesh.getMeshDimension()<<endl;			
+				PetscPrintf(PETSC_COMM_WORLD,"2D Finite element method on a 3D surface : space dimension is %d, mesh dimension is %d\n",_Ndim,_mesh.getMeshDimension());			
 			else if (_mesh.getMeshDimension()==1)//Mesh dim=1
-				cout<<"1D Finite element method on a 3D network : space dimension is "<<_Ndim<< ", mesh dimension is "<<_mesh.getMeshDimension()<<endl;			
+				PetscPrintf(PETSC_COMM_WORLD,"1D Finite element method on a 3D network : space dimension is %d, mesh dimension is %d\n",_Ndim,_mesh.getMeshDimension());			
 			else
 			{
-				cout<<"Error Finite element with Space dimension "<<_Ndim<< ", and mesh dimension  "<<_mesh.getMeshDimension()<< ", mesh should be either tetrahedral, either a triangularised surface or 1D network"<<endl;
+				PetscPrintf(PETSC_COMM_WORLD,"Error Finite element with space dimension %d, and mesh dimension  %d, mesh should be either tetrahedral, either a triangularised surface or 1D network",_Ndim,_mesh.getMeshDimension());
 				*_runLogFile<<"DiffusionEquation::initialize mesh has incorrect dimension"<<endl;
 				_runLogFile->close();
 				throw CdmathException("DiffusionEquation::initialize: mesh has incorrect cell types");
@@ -214,14 +214,14 @@ void DiffusionEquation::initialize()
         _NboundaryNodes=_boundaryNodeIds.size();
 
         if(_NboundaryNodes==_Nnodes)
-            cout<<"!!!!! Warning : all nodes are boundary nodes !!!!!"<<endl;
+            PetscPrintf(PETSC_COMM_WORLD,"!!!!! Warning : all nodes are boundary nodes !!!!!");
 
         for(int i=0; i<_NboundaryNodes; i++)
             if(_limitField[(_mesh.getNode(_boundaryNodeIds[i])).getGroupName()].bcType==DirichletDiffusion)
                 _dirichletNodeIds.push_back(_boundaryNodeIds[i]);
         _NdirichletNodes=_dirichletNodeIds.size();
         _NunknownNodes=_Nnodes - _NdirichletNodes;
-        cout<<"Number of unknown nodes " << _NunknownNodes <<", Number of boundary nodes " << _NboundaryNodes<< ", Number of Dirichlet boundary nodes " << _NdirichletNodes <<endl<<endl;
+        PetscPrintf(PETSC_COMM_WORLD,"Number of unknown nodes %d, Number of boundary nodes %d, Number of Dirichlet boundary nodes %d\n\n", _NunknownNodes,_NboundaryNodes, _NdirichletNodes);
         *_runLogFile<<"Number of unknown nodes " << _NunknownNodes <<", Number of boundary nodes " << _NboundaryNodes<< ", Number of Dirichlet boundary nodes " << _NdirichletNodes <<endl<<endl;
     }
 
@@ -294,6 +294,7 @@ double DiffusionEquation::computeDiffusionMatrix(bool & stop)
 }
 
 double DiffusionEquation::computeDiffusionMatrixFE(bool & stop){
+
 	Cell Cj;
 	string nameOfGroup;
 	double coeff;//Diffusion coefficients between nodes i and j
@@ -341,7 +342,7 @@ double DiffusionEquation::computeDiffusionMatrixFE(bool & stop){
                     if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),nodeIds[jdim])==_dirichletNodeIds.end())//!_mesh.isBorderNode(nodeIds[jdim])
                     {//Second node of the edge is not Dirichlet node
                         j_int= unknownNodeIndex(nodeIds[jdim], _dirichletNodeIds);//assumes Dirichlet boundary node numbering is strictly increasing
-                        MatSetValue(_A,i_int,j_int,_conductivity*(_DiffusionTensor*GradShapeFuncs[idim])*GradShapeFuncs[jdim]/Cj.getMeasure(), ADD_VALUES);
+                        MatSetValue(_A,i_int,j_int,(_DiffusionTensor*GradShapeFuncs[idim])*GradShapeFuncs[jdim]/Cj.getMeasure(), ADD_VALUES);
                     }
                     else if (!dirichletCell_treated)
                     {//Second node of the edge is a Dirichlet node
@@ -360,7 +361,7 @@ double DiffusionEquation::computeDiffusionMatrixFE(bool & stop){
                                 valuesBorder[kdim]=0;                            
                         }
                         GradShapeFuncBorder=gradientNodal(M,valuesBorder)/fact(_Ndim);
-                        coeff =-_conductivity*(_DiffusionTensor*GradShapeFuncBorder)*GradShapeFuncs[idim]/Cj.getMeasure();
+                        coeff =-1.*(_DiffusionTensor*GradShapeFuncBorder)*GradShapeFuncs[idim]/Cj.getMeasure();
                         VecSetValue(_b,i_int,coeff, ADD_VALUES);                        
                     }
                 }
@@ -375,15 +376,15 @@ double DiffusionEquation::computeDiffusionMatrixFE(bool & stop){
         int NboundaryFaces=boundaryFaces.size();
         for(int i = 0; i< NboundaryFaces ; i++)//On parcourt les faces du bord
         {
-            Face Fi = _mesh.getFace(i);
+            Face Fi = _mesh.getFace(boundaryFaces[i]);
             for(int j = 0 ; j<_Ndim ; j++)//On parcourt les noeuds de la face
             {
-                if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),Fi.getNodeId(j))==_dirichletNodeIds.end())//node j is an Neumann BC node (not a Dirichlet BC node)
+                if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),Fi.getNodeId(j))==_dirichletNodeIds.end())//node j is a Neumann BC node (not a Dirichlet BC node)
                 {
                     j_int=unknownNodeIndex(Fi.getNodeId(j), _dirichletNodeIds);//indice du noeud j en tant que noeud inconnu
                     if( _neumannValuesSet )
                         coeff =Fi.getMeasure()/_Ndim*_neumannBoundaryValues[Fi.getNodeId(j)];
-                    else    
+                    else
                         coeff =Fi.getMeasure()/_Ndim*_limitField[_mesh.getNode(Fi.getNodeId(j)).getGroupName()].normalFlux;
                     VecSetValue(_b, j_int, coeff, ADD_VALUES);
                 }
@@ -399,7 +400,8 @@ double DiffusionEquation::computeDiffusionMatrixFE(bool & stop){
 	_diffusionMatrixSet=true;
     stop=false ;
 
-	cout<<"Maximum diffusivity is "<<_maxvp<< " CFL = "<<_cfl<<" Delta x = "<<_minl<<endl;
+	_maxvp=_diffusivity;//To do : optimise value with the mesh while respecting stability
+	PetscPrintf(PETSC_COMM_SELF,"Maximum diffusivity is %.2f, CFL = %.2f, Delta x = %.2f\n",_maxvp,_cfl,_minl);
 	if(fabs(_maxvp)<_precision)
 		throw CdmathException("DiffusionEquation::computeDiffusionMatrixFE(): Error computing time step ! Maximum diffusivity is zero => division by zero");
 	else
@@ -436,7 +438,7 @@ double DiffusionEquation::computeDiffusionMatrixFV(bool & stop){
         }
 
 		//Compute velocity at the face Fj
-		dn=_conductivity*(_DiffusionTensor*normale)*normale;
+		dn=(_DiffusionTensor*normale)*normale;
 		if(fabs(dn)>_maxvp)
 			_maxvp=fabs(dn);
 
@@ -514,22 +516,19 @@ double DiffusionEquation::computeDiffusionMatrixFV(bool & stop){
 		return _cfl*_minl*_minl/_maxvp;
 }
 
-double DiffusionEquation::computeRHS(bool & stop){
+double DiffusionEquation::computeRHS(bool & stop){//Contribution of the PDE RHS to the linear systemm RHS (boundary conditions do contribute to the system RHS via the function computeDiffusionMatrix
 	VecAssemblyBegin(_b);          
     double Ti;  
     if(!_FECalculation)
         for (int i=0; i<_Nmailles;i++)
-        {
-            VecSetValue(_b,i,_heatPowerField(i)/(_rho*_cp),ADD_VALUES);//Contribution of the volumic heat power
-            //Contribution due to fluid/solide heat exchange
+            //Contribution due to fluid/solide heat exchange + Contribution of the volumic heat power
             if(_timeScheme == Explicit)
             {
                 VecGetValues(_Tn, 1, &i, &Ti);
-                VecSetValue(_b,i,_heatTransfertCoeff/(_rho*_cp)*(_fluidTemperatureField(i)-Ti),ADD_VALUES);
+                VecSetValue(_b,i,(_heatTransfertCoeff*(_fluidTemperatureField(i)-Ti)+_heatPowerField(i))/(_rho*_cp),ADD_VALUES);
             }
             else//Implicit scheme    
-                VecSetValue(_b,i,_heatTransfertCoeff/(_rho*_cp)* _fluidTemperatureField(i)    ,ADD_VALUES);
-        }
+                VecSetValue(_b,i,(_heatTransfertCoeff* _fluidTemperatureField(i)    +_heatPowerField(i))/(_rho*_cp)    ,ADD_VALUES);
     else
         {
             Cell Ci;
@@ -541,7 +540,7 @@ double DiffusionEquation::computeRHS(bool & stop){
                 for (int j=0; j<nodesId.size();j++)
                     if(!_mesh.isBorderNode(nodesId[j])) //or for better performance nodeIds[idim]>dirichletNodes.upper_bound()
                     {
-                        double coeff = _heatTransfertCoeff*_fluidTemperatureField(nodesId[j]) + _heatPowerField(nodesId[j]);
+                        double coeff = (_heatTransfertCoeff*_fluidTemperatureField(nodesId[j]) + _heatPowerField(nodesId[j]))/(_rho*_cp);
                         VecSetValue(_b,unknownNodeIndex(nodesId[j], _dirichletNodeIds), coeff*Ci.getMeasure()/(_Ndim+1),ADD_VALUES);
                     }
             }
@@ -549,8 +548,10 @@ double DiffusionEquation::computeRHS(bool & stop){
 	VecAssemblyEnd(_b);
 
     if(_verbose or _system)
+	{
+		PetscPrintf(PETSC_COMM_WORLD,"Right hand side of the linear system\n");
         VecView(_b,PETSC_VIEWER_STDOUT_SELF);
-
+	}
     stop=false ;
     if(_heatTransfertCoeff>_precision)
         return _rho*_cp/_heatTransfertCoeff;
@@ -576,7 +577,7 @@ bool DiffusionEquation::initTimeStep(double dt){
     }
     else//dt<=0
     {
-        cout<<"DiffusionEquation::initTimeStep dt= "<<dt<<endl;
+        PetscPrintf(PETSC_COMM_WORLD,"DiffusionEquation::initTimeStep %.2f = \n",dt);
         throw CdmathException("Error DiffusionEquation::initTimeStep : cannot set time step to zero");        
     }
     //At this stage _b contains _b0 + power + heat exchange
@@ -585,8 +586,11 @@ bool DiffusionEquation::initTimeStep(double dt){
 	_dt = dt;
 
 	if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
+	{
+		PetscPrintf(PETSC_COMM_WORLD,"Matrix of the linear system\n");
 		MatView(_A,PETSC_VIEWER_STDOUT_SELF);
-
+	}
+	
 	return _dt>0;
 }
 
@@ -642,7 +646,7 @@ bool DiffusionEquation::iterateTimeStep(bool &converged)
 			_MaxIterLinearSolver = _PetscIts;
 		if(_PetscIts>=_maxPetscIts)
 		{
-			cout<<"Systeme lineaire : pas de convergence de Petsc. Itérations maximales "<<_maxPetscIts<<" atteintes"<<endl;
+			PetscPrintf(PETSC_COMM_WORLD,"Systeme lineaire : pas de convergence de Petsc. Itérations maximales %d atteintes \n",_maxPetscIts);
 			*_runLogFile<<"Systeme lineaire : pas de convergence de Petsc. Itérations maximales "<<_maxPetscIts<<" atteintes"<<endl;
 			converged=false;
 			return false;
@@ -691,7 +695,7 @@ void DiffusionEquation::validateTimeStep()
 	VecCopy(_Tk, _Tkm1);
 
 	if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
-		cout <<"Valeur propre locale max: " << _maxvp << endl;
+		PetscPrintf(PETSC_COMM_WORLD,"Valeur propre locale max: %.2f\n", _maxvp);
 
 	_time+=_dt;
 	_nbTimeStep++;
@@ -700,7 +704,7 @@ void DiffusionEquation::validateTimeStep()
 }
 
 void DiffusionEquation::save(){
-    cout<< "Saving numerical results"<<endl<<endl;
+    PetscPrintf(PETSC_COMM_SELF,"Saving numerical results\n\n");
     *_runLogFile<< "Saving numerical results"<< endl<<endl;
 
 	string resultFile(_path+"/DiffusionEquation");//Results
@@ -709,8 +713,10 @@ void DiffusionEquation::save(){
 	resultFile+=_fileName;
 
     if(_verbose or _system)
+	{
+		PetscPrintf(PETSC_COMM_WORLD,"Unknown of the linear system :\n");
         VecView(_Tk,PETSC_VIEWER_STDOUT_SELF);
-
+	}
     //On remplit le champ
     double Ti;
     if(!_FECalculation)
