@@ -25,11 +25,11 @@ IF (CDMATH_WITH_TESTS)
         )
       SET(_extra_lib_TESTS linearsolver ${PETSC_LIBRARIES} ${SLEPC_LIBRARIES})
       SET_TARGET_PROPERTIES(TestCDMATH PROPERTIES COMPILE_FLAGS -DCDMATH_WITH_PETSC)
-      SET(TESTS_LIBRARY_PATH ${CMAKE_BINARY_DIR}/CDMATH/base/lib:${CMAKE_BINARY_DIR}/CDMATH/mesh/lib:${CMAKE_BINARY_DIR}/CDMATH/linearsolver/lib:${MEDCOUPLING_ROOT_DIR}/lib:${MEDFILE_ROOT_DIR}/lib:${CMAKE_INSTALL_PREFIX}/lib/medcoupling:${CMAKE_INSTALL_PREFIX}/lib/med:${PETSC_DIR}/${PETSC_ARCH}/lib:${HDF5_ROOT_DIR}/lib:${Python_ROOT_DIR}/lib/:${PV_LIB_DIR} ) 
+      SET(TESTS_LIBRARY_PATH ${CMAKE_BINARY_DIR}/CDMATH/base/lib:${CMAKE_BINARY_DIR}/CDMATH/mesh/lib:${CMAKE_BINARY_DIR}/CDMATH/linearsolver/lib:${MEDCOUPLING_ROOT_DIR}/lib:${MEDFILE_ROOT_DIR}/lib:${CMAKE_INSTALL_PREFIX}/lib/medcoupling:${CMAKE_INSTALL_PREFIX}/lib/med:${PETSC_DIR}/${PETSC_ARCH}/lib:${HDF5_ROOT}/lib:${Python_ROOT_DIR}/lib/:${PV_LIB_DIR} ) 
   else (CDMATH_WITH_PETSC)
       SET(_extra_lib_TESTS)
       SET_TARGET_PROPERTIES(TestCDMATH PROPERTIES COMPILE_FLAGS "")
-      SET(TESTS_LIBRARY_PATH ${CMAKE_BINARY_DIR}/CDMATH/base/lib:${CMAKE_BINARY_DIR}/CDMATH/mesh/lib:${MEDCOUPLING_ROOT_DIR}/lib:${MEDFILE_ROOT_DIR}/lib:${CMAKE_INSTALL_PREFIX}/lib/medcoupling:${CMAKE_INSTALL_PREFIX}/lib/med:${HDF5_ROOT_DIR}/lib:${Python_ROOT_DIR}/lib/:${PV_LIB_DIR}) 
+      SET(TESTS_LIBRARY_PATH ${CMAKE_BINARY_DIR}/CDMATH/base/lib:${CMAKE_BINARY_DIR}/CDMATH/mesh/lib:${MEDCOUPLING_ROOT_DIR}/lib:${MEDFILE_ROOT_DIR}/lib:${CMAKE_INSTALL_PREFIX}/lib/medcoupling:${CMAKE_INSTALL_PREFIX}/lib/med:${HDF5_ROOT}/lib:${Python_ROOT_DIR}/lib/:${PV_LIB_DIR}) 
   endif(CDMATH_WITH_PETSC)
 
   if   (CDMATH_WITH_PYTHON)
@@ -38,7 +38,7 @@ IF (CDMATH_WITH_TESTS)
 
   TARGET_LINK_LIBRARIES(TestCDMATH TestMesh base mesh ${CPPUNIT_LIBS} ${_extra_lib_TESTS})
 
-  ADD_TEST(UnitTestCDMATH TestCDMATH)
+  ADD_TEST(UnitTestCDMATH.exe TestCDMATH)
   INSTALL(TARGETS TestCDMATH DESTINATION bin/unit_tests)
 
   if   ( ${CPPUNIT_IS_OK} )
@@ -61,8 +61,12 @@ if (CDMATH_WITH_PYTHON AND CDMATH_WITH_PETSC AND CDMATH_WITH_POSTPRO)
   add_subdirectory (examples) #basic test that run a single calculation
   add_subdirectory (validation) # convergence studies (several runs)
 
-  add_custom_target (tests_CDMATH COMMAND ctest -O testsCDMATH.log)
+  add_custom_target (CDMATH COMMAND ctest -O testsCDMATH.log)
+
   add_custom_target (check COMMAND ctest -E 'validation|Example')# may be replace ctest -E with ctest -LE
+  add_custom_target (MEDCoupling COMMAND ctest -R MEDCoupling)
+  add_custom_target (vtk COMMAND ctest -R VTK)
+  add_custom_target (pv COMMAND ctest -R PV)
   add_custom_target (examples COMMAND ctest -R Example)# may be replace ctest -R with ctest -L
   add_custom_target (validation COMMAND ctest -R validation)# may be replace ctest -R with ctest -L
 
