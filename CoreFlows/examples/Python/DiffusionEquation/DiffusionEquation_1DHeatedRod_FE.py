@@ -2,6 +2,7 @@
 # -*-coding:utf-8 -*
 
 import CoreFlows as cf
+import cdmath as cm
 
 def DiffusionEquation_1DHeatedRod():
 	spaceDim = 1;
@@ -35,7 +36,8 @@ def DiffusionEquation_1DHeatedRod():
 	
     #Initial field creation
 	print("Building initial data" );
-	myProblem.setInitialFieldConstant(spaceDim,VV_Constant,xinf,xsup,nx,"Neumann","Neumann");
+	#Syntax should be simplified when problem of enum swig is solved
+	myProblem.setInitialFieldConstant(spaceDim,VV_Constant,xinf,xsup,nx,"Neumann","Neumann",0.,0.,0,"","",0.,0.,0,"","",cm.NODES);
 
     # the boundary conditions
 	myProblem.setNeumannBoundaryCondition("Neumann");
