@@ -7,6 +7,7 @@
 
 #include "Node.hxx"
 #include "Cell.hxx"
+#include "Face.hxx"
 #include "Field.hxx"
 #include "MEDFileMesh.hxx"
 #include "MEDLoader.hxx"

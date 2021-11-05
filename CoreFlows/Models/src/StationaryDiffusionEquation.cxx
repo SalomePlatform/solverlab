@@ -713,7 +713,7 @@ void StationaryDiffusionEquation::setLinearSolver(linearSolver kspType, precondi
 		throw CdmathException("!!! Error : only 'GMRES', 'CG' or 'BCGS' algorithm is acceptable !!!");
 	}
 	// set preconditioner
-	if (pcType == NOPC)
+	if (pcType == NONE)
 		_pctype = (char*)&PCNONE;
 	else if (pcType ==LU)
 		_pctype = (char*)&PCLU;
