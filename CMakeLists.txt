@@ -14,6 +14,7 @@ option (SOLVERLAB_WITH_GUI           "Compile a Graphic user Interface for SOLVE
 option (SOLVERLAB_WITH_PACKAGE       "Generate RPM, Debian and tarball packages" OFF)
 option (SOLVERLAB_WITH_COREFLOWS     "Generate COREFLOWS module" ON)
 option (SOLVERLAB_WITH_TESTS         "Generate SOLVERLAB example tests" ON)
+option (SOLVERLAB_WITH_MPI         "Generate a parallel version of SOLVERLAB" OFF)
 
 #Path to installed libraries
 set (PETSC_DIR            OFF CACHE STRING "PETSc library path" )
@@ -23,6 +24,7 @@ set (MEDFILE_ROOT_DIR     OFF CACHE STRING "MED library path" )
 set (MEDCOUPLING_ROOT_DIR OFF CACHE STRING "MEDCoupling library path" )
 set (PYTHON_ROOT_DIR      OFF CACHE STRING "Python library path" )
 set (PARAVIEW_ROOT_DIR    OFF CACHE STRING "PARAVIEW library path" )
+set (MPI4PY_ROOT_DIR      OFF CACHE STRING "MPI4PY library path" )
 
 #url of tarball librairies
 set (DOWNLOAD_PETSC         http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-3.16.0.tar.gz 
@@ -39,8 +41,10 @@ set (DOWNLOAD_MEDCOUPLING   http://files.salome-platform.org/Salome/other/medCou
      CACHE STRING           "MEDCoupling tarball path/url" )
 set (DOWNLOAD_OPENMPI       https://download.open-mpi.org/release/open-mpi/v3.1/openmpi-3.1.6.tar.gz
      CACHE STRING           "OPENMPI tarball path/url" )
-set (DOWNLOAD_HYPRE         https://github.com/hypre-space/hypre/archive/v2.20.0.zip
+set (DOWNLOAD_HYPRE         https://github.com/hypre-space/hypre/archive/v2.23.0.zip
      CACHE STRING           "HYPRE tarball path/url" )
+set (DOWNLOAD_MPI4PY         https://bitbucket.org/mpi4py/mpi4py/downloads/mpi4py-3.1.1.tar.gz
+     CACHE STRING           "MPY4PY tarball path/url" )
 
 set (CMAKE_BUILD_TYPE Release CACHE STRING "Installation mode")
 
@@ -60,6 +64,7 @@ if   ( DEFINED ENV{MPI_ROOT_DIR} OR DEFINED MPI_ROOT_DIR )
   endif( DEFINED  ENV{MPI_ROOT_DIR} )
 endif( DEFINED ENV{MPI_ROOT_DIR} OR DEFINED MPI_ROOT_DIR )
 
+# Definition of SOLVERLAB_WITH_MPI
 if(    DEFINED ENV{MPI_HOME} OR MPI_HOME )
   set(SOLVERLAB_WITH_MPI ON)
   find_package(MPI)
@@ -71,8 +76,22 @@ else(  DEFINED ENV{MPI_HOME} OR MPI_HOME )
   set(SOLVERLAB_WITH_MPI OFF)
 endif( DEFINED ENV{MPI_HOME} OR MPI_HOME )
 
+# Definition of MPI4PY_ROOT_DIR
+if(   ${SOLVERLAB_WITH_PYTHON} AND ${SOLVERLAB_WITH_MPI} AND NOT ${MPI4PY_ROOT_DIR})
+  if(    DEFINED $ENV{MPI4PY_ROOT_DIR})
+    set(MPI4PY_ROOT_DIR $ENV{MPI4PY_ROOT_DIR})
+  else(  DEFINED $ENV{MPI4PY_ROOT_DIR})
+    set(MPI4PY_ROOT_DIR ${PETSC_DIR}/${PETSC_ARCH}/lib/mpi4py)
+  endif( DEFINED $ENV{MPI4PY_ROOT_DIR})
+endif(${SOLVERLAB_WITH_PYTHON} AND ${SOLVERLAB_WITH_MPI} AND NOT ${MPI4PY_ROOT_DIR})
+
+if(    $MPI4PY_ROOT_DIR)
+  message(STATUS "MPI4PY directory is ${MPI4PY_ROOT_DIR}" )
+  SET(CMAKE_SWIG_FLAGS ${CMAKE_SWIG_FLAGS} -DMPI4PY_ROOT_DIR=${MPI4PY_ROOT_DIR})
+endif( $MPI4PY_ROOT_DIR)
+
 ############################
-# Definition of HDF5_HOME  #
+# Definition of HDF5_ROOT  #
 ############################
 if   ( DEFINED ENV{HDF5_ROOT_DIR} OR DEFINED HDF5_ROOT_DIR )
   if   ( DEFINED  ENV{HDF5_ROOT_DIR} )
@@ -267,7 +286,7 @@ endif( DEFINED ENV{HDF5_ROOT_DIR} OR DEFINED HDF5_ROOT_DIR )
       URL               ${DOWNLOAD_PETSC}   
       SOURCE_DIR        ${PETSC_DIR}
       BUILD_IN_SOURCE   TRUE
-      CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${PETSC_INSTALL} --with-debugging=0 --download-f2cblaslapack=${DOWNLOAD_F2CBLASLAPACK} --with-fc=0 --download-slepc=${DOWNLOAD_SLEPC} --download-hdf5=${DOWNLOAD_HDF5} --with-mpi=0 # --download-openmpi=${DOWNLOAD_OPENMPI} --download-hypre=${DOWNLOAD_HYPRE}
+      CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${PETSC_INSTALL} --with-debugging=0 --download-f2cblaslapack=${DOWNLOAD_F2CBLASLAPACK} --with-mpi=0 --with-fc=0 --download-slepc=${DOWNLOAD_SLEPC} --download-hdf5=${DOWNLOAD_HDF5}   --with-petsc4py=yes --download-slepc-configure-arguments="--with-slepc4py=yes" # --download-openmpi=${DOWNLOAD_OPENMPI} --download-hypre=${DOWNLOAD_HYPRE} --download-mpi4py=${DOWNLOAD_MPI4PY}
       BUILD_COMMAND     make all
       TEST_COMMAND      make check
       INSTALL_COMMAND   make install
@@ -328,6 +347,7 @@ endif( DEFINED ENV{HDF5_ROOT_DIR} OR DEFINED HDF5_ROOT_DIR )
       #set(MPI_HOME    ${PETSC_INSTALL} )
       #set(MPI_LIBRARY ${PETSC_INSTALL}/lib/libmpi.so)
       #set(MPIEXEC     ${PETSC_INSTALL}/bin/mpiexec)
+      #set(MPI4PY_ROOT_DIR    ${PETSC_INSTALL}/lib/mpi4py )
 
     endif ( IS_DIRECTORY "/usr/include/petsc/" AND EXISTS "/usr/lib64/libpetsc.so" )
   endif ( DEFINED ENV{PETSC_DIR} OR PETSC_DIR )
@@ -413,7 +433,7 @@ if( MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
   find_package(MEDCoupling CONFIG REQUIRED)   # CONFIG is important !
   message( STATUS "MEDCoupling found. Version is ${MEDCoupling_VERSION}")
 
-else( DEFINED MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
+else( MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
   message(STATUS "MEDCoupling will be downloaded and installed from ${DOWNLOAD_MEDCOUPLING}")
   set(MEDCOUPLING_ROOT_DIR ${CMAKE_INSTALL_PREFIX}/lib/medcoupling) # Location of the final install
   SET(ENV{HDF5_ROOT} ${HDF5_ROOT})#MEDCoupling install process seems to require an environment variable
@@ -560,6 +580,16 @@ ENDIF(${CMAKE_VERSION} VERSION_GREATER "3.12.0")
 
 message(STATUS "Python version found is ${Python_VERSION}")
 
+#Matplotlib root dir
+IF   ( NOT DEFINED MATPLOTLIB_ROOT_DIR )
+    set(MATPLOTLIB_ROOT_DIR $ENV{MATPLOTLIB_ROOT_DIR} )
+ENDIF( NOT DEFINED MATPLOTLIB_ROOT_DIR )
+
+#PyQt5 root dir
+IF   ( NOT DEFINED PYQT5_ROOT_DIR )
+    set(PYQT5_ROOT_DIR $ENV{PYQT5_ROOT_DIR} )
+ENDIF( NOT DEFINED PYQT5_ROOT_DIR )
+
 #Paraview library paths
 set (PV_LIB_DIR    /usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:${MATPLOTLIB_ROOT_DIR}/lib/:${PARAVIEW_LIBRARIES_DIR})
 set (PV_PYTHON_DIR /usr/lib/python${Python_VERSION_MAJOR}/dist-packages/:/usr/lib/python${Python_VERSION_MAJOR}/dist-packages/paraview/:/usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:/usr/lib64/paraview/site-packages/:/usr/lib64/paraview/site-packages/paraview/:/usr/lib64/paraview/site-packages/vtk/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/paraview/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules:/usr/lib/paraview/site-packages/paraview:/usr/lib/paraview/site-packages/paraview/vtk:${PARAVIEW_ROOT_DIR}/lib/:${PARAVIEW_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:${PARAVIEW_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules/:${MATPLOTLIB_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages:${PYQT5_ROOT_DIR}:${PYQT5_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages)
@@ -585,25 +615,6 @@ else( ${python-paraview} STREQUAL "python-paraview-NOTFOUND" )
     set(PRELOAD_NETCDF_ON_UBUNTU20 OFF)
   endif( ${python-paraview} STREQUAL "/usr/lib/python3/dist-packages/paraview/simple.py" )
 endif( ${python-paraview} STREQUAL "python-paraview-NOTFOUND" )
-
-#PyQt5 root dir
-IF   ( NOT DEFINED PYQT5_ROOT_DIR )
-    set(PYQT5_ROOT_DIR $ENV{PYQT5_ROOT_DIR} )
-ENDIF( NOT DEFINED PYQT5_ROOT_DIR )
-
-#Matplotlib root dir
-IF   ( NOT DEFINED MATPLOTLIB_ROOT_DIR )
-    set(MATPLOTLIB_ROOT_DIR $ENV{MATPLOTLIB_ROOT_DIR} )
-ENDIF( NOT DEFINED MATPLOTLIB_ROOT_DIR )
-
-#define HDF5_ROOT_DIR
-IF   ( NOT HDF5_ROOT_DIR )
-  IF  ( ENV{HDF5_ROOT_DIR} )
-    set(HDF5_ROOT_DIR $ENV{HDF5_ROOT_DIR} )
-  ELSE( ENV{HDF5_ROOT_DIR} )
-    set(HDF5_ROOT_DIR ${HDF5_ROOT} )
-  ENDIF( ENV{HDF5_ROOT_DIR} )
-ENDIF( NOT HDF5_ROOT_DIR )
 
 # Find SWIG
 IF   ( DEFINED SWIG_ROOT_DIR OR DEFINED ENV{SWIG_ROOT_DIR})
@@ -645,6 +656,12 @@ if (SOLVERLAB_WITH_TESTS)                                                       
 endif(SOLVERLAB_WITH_TESTS)			
 				    
 # Enter subdirectories
+set(CDMATH_WITH_POSTPRO ${SOLVERLAB_WITH_POSTPRO} )
+set(CDMATH_WITH_PETSC ${SOLVERLAB_WITH_PETSC} )
+set(CDMATH_WITH_DOCUMENTATION ${SOLVERLAB_WITH_DOCUMENTATION} )
+set(CDMATH_WITH_PYTHON ${SOLVERLAB_WITH_PYTHON} )
+set(CDMATH_WITH_PACKAGE ${SOLVERLAB_WITH_PACKAGE} )
+set(CDMATH_WITH_TESTS ${SOLVERLAB_WITH_TESTS} )
 add_subdirectory (CDMATH)
 if(SOLVERLAB_WITH_COREFLOWS)
   set(COREFLOWS_WITH_DOCUMENTATION ${SOLVERLAB_WITH_DOCUMENTATION} )
