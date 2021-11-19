@@ -8,17 +8,19 @@ import solverlab
 # Name        : Finite Elements simulation of the 2D heat equation -\triangle T = f with Neumann boundary condition
 # Author      : Michaël Ndjinga
 # Copyright   : CEA Saclay 2021
-# Description : Test solving the diffusion of the temperature T in a solid (default is Uranium). 
-#		        \rho cp dT/dt-\lambda\Delta T=\Phi(T) + \lambda_{sf} (T_{fluid}-T)
-#		        Heat capacity cp, density \rho, and conductivity \lambda MUST be defined
-#		        The solid may be extra refrigerated by a fluid with transfer coefficient \lambda_{sf} (functions setFluidTemperature and setHeatTransfertCoeff)
-#		        The solid may receive some extra heat power \Phi due to nuclear fissions (function setHeatSource)
 #================================================================================================================================
 
 
 def DiffusionEquation_2DSpherical(FECalculation):
 
-    # Prepare for the mesh
+	""" Description : Test solving the diffusion of the temperature T in a solid (default is Uranium). 
+		Equation : Thermal diffusion equation  \rho cp dT/dt-\lambda\Delta T=\Phi + \lambda_{sf} (T_{fluid}-T)
+		        Heat capacity, density, and conductivity of the solid MUST be defined
+		        The solid may be extra refrigerated by a fluid with transfer coefficient using functions setFluidTemperature and setHeatTransfertCoeff
+		        The solid may receive some extra heat power due to nuclear fissions using function setHeatSource
+	"""
+	
+    # Prepare for the mesh and initial data
 	inputfile="../resources/BoxWithMeshWithTriangularCells";
 	fieldName="Temperature";
 	spaceDim=2
@@ -61,7 +63,7 @@ def DiffusionEquation_2DSpherical(FECalculation):
 
     # set the numerical method
 	myProblem.setTimeScheme( solverlab.Explicit);
-	myProblem.setLinearSolver(solverlab.GMRES,solverlab.ILU,True);
+	myProblem.setLinearSolver(solverlab.GMRES,solverlab.ILU);
 
     # name of result file
 	if( FECalculation):
