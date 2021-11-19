@@ -14,7 +14,6 @@ import solverlab
 from math import sin, pi
 
 def StationaryDiffusionEquation_2DEF_StructuredTriangles_par(split_direction, rank):
-	spaceDim = 2;
 	# Prepare for the mesh
 	print("Processor ", rank, " : Building mesh " );
 	xinf = 0 ;
@@ -33,8 +32,15 @@ def StationaryDiffusionEquation_2DEF_StructuredTriangles_par(split_direction, ra
 	
 	print("Processor ", rank, " : Built a regular triangular 2D mesh from a square mesh with ", nx,"x" ,ny, " cells.")
 	print("Processor ", rank, " : Each square was split in two in direction ",split_direction)
+
 	FEComputation=True
-	myProblem = solverlab.StationaryDiffusionEquation(spaceDim,FEComputation);
+	Lambda=1.#Thermal conductivity
+	spaceDim = 2
+
+	color = rank % 2
+	sub_comm = comm.Split(color)
+
+	myProblem = solverlab.StationaryDiffusionEquation(spaceDim,FEComputation, Lambda, sub_comm);
 	myProblem.setMesh(M);
 
     # set the limit value for each boundary
@@ -58,7 +64,6 @@ def StationaryDiffusionEquation_2DEF_StructuredTriangles_par(split_direction, ra
 		my_RHSfield[i]=2*pi*pi*sin(pi*x)*sin(pi*y)#mettre la fonction definie au second membre de l'edp
 	
 	myProblem.setHeatPowerField(my_RHSfield)
-	myProblem.setLinearSolver(solverlab.GMRES,solverlab.ILU);
 
     # name of result file
 	fileName = "StationnaryDiffusion_2DEF_StructuredTriangles"+str(rank);
