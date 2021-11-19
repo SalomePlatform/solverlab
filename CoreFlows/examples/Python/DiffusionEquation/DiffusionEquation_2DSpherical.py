@@ -26,19 +26,19 @@ def DiffusionEquation_2DSpherical(FECalculation):
 	spaceDim=2
 	
     # Mandatory physical values
-	cp_ur=300# heat capacity
-	rho_ur=10000# density
-	lambda_ur=5# conductivity
+	specific_heat=300# specific heat capacity
+	density=10000# density
+	conductivity=5# conductivity
 
-	myProblem = solverlab.DiffusionEquation(spaceDim,FECalculation,rho_ur,cp_ur,lambda_ur);
+	myProblem = solverlab.DiffusionEquation(spaceDim,FECalculation,density,specific_heat,conductivity);
 
-    #Optional physical values
-	fluidTemp=573.;#fluid mean temperature
+    # Optional physical values (default value is zero)
+	fluidTemperature=573.;#fluid mean temperature
 	heatTransfertCoeff=1000.;#fluid/solid exchange coefficient
-	phi=1e5;#heat power ddensity
-	myProblem.setFluidTemperature(fluidTemp);
+	constant_heat=1e5;#heat power ddensity
+	myProblem.setFluidTemperature(fluidTemperature);
 	myProblem.setHeatTransfertCoeff(heatTransfertCoeff);
-	myProblem.setHeatSource(phi);
+	myProblem.setHeatSource(constant_heat);
 
     #Initial field load
 	time_iteration=0
