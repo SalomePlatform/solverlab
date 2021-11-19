@@ -32,18 +32,18 @@ ProblemCoreFlows::ProblemCoreFlows(MPI_Comm comm)
 			PETSC_COMM_WORLD = comm;
 		PetscInitialize(NULL,NULL,0,0);//Note this is ok if MPI has been been initialised independently from PETSC
 	}
-	MPI_Comm_rank(PETSC_COMM_WORLD,&_rank);
-	MPI_Comm_size(PETSC_COMM_WORLD,&_size);
-	PetscPrintf(PETSC_COMM_WORLD,"Simulation on %d processors\n",_size);//Prints to standard out, only from the first processor in the communicator. Calls from other processes are ignored. 
-	PetscSynchronizedPrintf(PETSC_COMM_WORLD,"Processor [%d] ready for action\n",_rank);//Prints synchronized output from several processors. Output of the first processor is followed by that of the second, etc. 
+	MPI_Comm_rank(PETSC_COMM_WORLD,&_mpi_rank);
+	MPI_Comm_size(PETSC_COMM_WORLD,&_mpi_size);
+	PetscPrintf(PETSC_COMM_WORLD,"Simulation on %d processors\n",_mpi_size);//Prints to standard out, only from the first processor in the communicator. Calls from other processes are ignored. 
+	PetscSynchronizedPrintf(PETSC_COMM_WORLD,"Processor [%d] ready for action\n",_mpi_rank);//Prints synchronized output from several processors. Output of the first processor is followed by that of the second, etc. 
 	PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);
 
-	if(_size>1)
+	if(_mpi_size>1)
 	{
 		PetscPrintf(PETSC_COMM_WORLD,"---- More than one processor detected : running a parallel simulation ----\n");
 		PetscPrintf(PETSC_COMM_WORLD,"---- Limited parallelism : input and output fields remain sequential ----\n");
-		PetscPrintf(PETSC_COMM_WORLD,"---- Only the matrixoperations are done in parallel thanks to PETSc----\n");
-		PetscPrintf(PETSC_COMM_WORLD,"---- Processor %d is in charge of building the mesh, saving the results, filling and then distributing the matrix to other processors.\n\n",_rank);
+		PetscPrintf(PETSC_COMM_WORLD,"---- Only the matrix operations are done in parallel thanks to PETSc----\n");
+		PetscPrintf(PETSC_COMM_WORLD,"---- Processor %d is in charge of building the mesh, saving the results, filling and then distributing the matrix to other processors.\n\n",_mpi_rank);
 	}
 	
 	/* Numerical parameter */
@@ -57,6 +57,7 @@ ProblemCoreFlows::ProblemCoreFlows(MPI_Comm comm)
 	_precision_Newton=_precision;
 	_erreur_rel= 0;
 	_isStationary=false;
+	_stationaryMode=false;
 	_timeScheme=Explicit;
 	_wellBalancedCorrection=false;
     _FECalculation=false;
@@ -76,7 +77,8 @@ ProblemCoreFlows::ProblemCoreFlows(MPI_Comm comm)
 	/* Mesh parameters */
 	_Ndim=0;
 	_minl=0;
-	_neibMaxNb=0;
+	_neibMaxNbCells=0;
+	_neibMaxNbNodes=0;
 
 	/* Memory and restart */
 	_initialDataSet=false;
@@ -89,12 +91,14 @@ ProblemCoreFlows::ProblemCoreFlows(MPI_Comm comm)
 	_maxNewtonIts=50;
 	_PetscIts=0;//the number of iterations of the linear solver
 	_ksptype = (char*)&KSPGMRES;
-	_pctype = (char*)&PCLU;
+	if( _mpi_size>1)
+		_pctype = (char*)&PCNONE;
+	else
+		_pctype = (char*)&PCLU;
 
-	/* Physical parameter */
+	/* Physical parameters */
 	_heatPowerFieldSet=false;
 	_heatTransfertCoeff=0;
-	_rodTemperatureFieldSet=false;
 	_heatSource=0;
 
 	//extracting current directory
@@ -128,7 +132,7 @@ double ProblemCoreFlows::presentTime() const
 void ProblemCoreFlows::setTimeMax(double timeMax){
 	_timeMax = timeMax;
 }
-void ProblemCoreFlows::setPresentTime (double time)
+void ProblemCoreFlows::resetTime (double time)
 {
 	_time=time;
 }
@@ -145,7 +149,6 @@ void ProblemCoreFlows::setPrecision(double precision)
 }
 void ProblemCoreFlows::setInitialField(const Field &VV)
 {
-
 	if(_Ndim != VV.getSpaceDimension()){
 		*_runLogFile<<"ProblemCoreFlows::setInitialField: mesh has incorrect space dimension"<<endl;
 		_runLogFile->close();
@@ -174,6 +177,7 @@ void ProblemCoreFlows::setInitialField(const Field &VV)
 	_VV.setName("SOLVERLAB results");
 	_time=_VV.getTime();
 	_mesh=_VV.getMesh();
+
 	_initialDataSet=true;
 
 	//Mesh data
@@ -189,33 +193,53 @@ void ProblemCoreFlows::setInitialField(const Field &VV)
 	Face Fk;
 
 	if(_verbose)
-		PetscPrintf(PETSC_COMM_WORLD,"Computing cell perimeters and mesh minimal diameter\n");
+		PetscPrintf(PETSC_COMM_SELF,"Processor %d Computing cell perimeters and mesh minimal diameter\n", _mpi_rank);
 
 	//Compute the maximum number of neighbours for nodes or cells
     if(VV.getTypeOfField()==NODES)
         _neibMaxNbNodes=_mesh.getMaxNbNeighbours(NODES);
     else
-        _neibMaxNb=_mesh.getMaxNbNeighbours(CELLS);
+    {
+        _neibMaxNbCells=_mesh.getMaxNbNeighbours(CELLS);
         
-	//Compute Delta x and the cell perimeters
-	for (int i=0; i<_mesh.getNumberOfCells(); i++){
-		Ci = _mesh.getCell(i);
-		if (_Ndim > 1){
-			_perimeters(i)=0;
-			for (int k=0 ; k<Ci.getNumberOfFaces() ; k++){
-				indexFace=Ci.getFacesId()[k];
-				Fk = _mesh.getFace(indexFace);
-				_minl = min(_minl,Ci.getMeasure()/Fk.getMeasure());
-				_perimeters(i)+=Fk.getMeasure();
+		//Compute Delta x and the cell perimeters
+		for (int i=0; i<_mesh.getNumberOfCells(); i++){
+			Ci = _mesh.getCell(i);
+			if (_Ndim > 1){
+				_perimeters(i)=0;
+				for (int k=0 ; k<Ci.getNumberOfFaces() ; k++){
+					indexFace=Ci.getFacesId()[k];
+					Fk = _mesh.getFace(indexFace);
+					_minl = min(_minl,Ci.getMeasure()/Fk.getMeasure());
+					_perimeters(i)+=Fk.getMeasure();
+				}
+			}else{
+				_minl = min(_minl,Ci.getMeasure());
+				_perimeters(i)=Ci.getNumberOfFaces();
 			}
-		}else{
-			_minl = min(_minl,Ci.getMeasure());
-			_perimeters(i)=Ci.getNumberOfFaces();
 		}
+		if(_verbose)
+			cout<<_perimeters<<endl;
 	}
-	if(_verbose)
-		cout<<_perimeters<<endl;
+	
+	/*** MPI distribution of parameters ***/
+	MPI_Allreduce(&_initialDataSet, &_initialDataSet, 1, MPIU_BOOL, MPI_LOR, PETSC_COMM_WORLD);
+	
+	int nbVoisinsMax;//Mettre en attribut ?
+	if(!_FECalculation){
+		MPI_Bcast(&_Nmailles      , 1, MPI_INT, 0, PETSC_COMM_WORLD);
+		MPI_Bcast(&_neibMaxNbCells, 1, MPI_INT, 0, PETSC_COMM_WORLD);
+		nbVoisinsMax = _neibMaxNbCells;
+	}
+	else{
+		MPI_Bcast(&_Nnodes        , 1, MPI_INT, 0, PETSC_COMM_WORLD);
+		MPI_Bcast(&_neibMaxNbNodes, 1, MPI_INT, 0, PETSC_COMM_WORLD);
+		nbVoisinsMax = _neibMaxNbNodes;
+	}
+    _d_nnz = (nbVoisinsMax+1)*_nVar;
+    _o_nnz =  nbVoisinsMax   *_nVar;
 }
+
 //Function needed because swig of enum EntityType fails
 void ProblemCoreFlows::setInitialField(string fileName, string fieldName, int timeStepNumber, int field_support_type)
 {
@@ -537,7 +561,7 @@ bool ProblemCoreFlows::run()
 	bool ok; // Is the time interval successfully solved ?
 	_isStationary=false;//in case of a second run with a different physics or cfl
 
-	PetscPrintf(PETSC_COMM_WORLD,"Running test case %d\n",_fileName);
+	PetscPrintf(PETSC_COMM_WORLD,"Running test case %s\n",_fileName);
 
 	_runLogFile->open((_fileName+".log").c_str(), ios::out | ios::trunc);;//for creation of a log file to save the history of the simulation
 	*_runLogFile<< "Running test case "<< _fileName<<endl;
@@ -696,12 +720,11 @@ bool ProblemCoreFlows::solveTimeStep(){
 
 ProblemCoreFlows::~ProblemCoreFlows()
 {
-	/*
 	PetscBool petscInitialized;
 	PetscInitialized(&petscInitialized);
 	if(petscInitialized)
 		PetscFinalize();
-	 */
+
 	delete _runLogFile;
 }
 
@@ -760,3 +783,13 @@ ProblemCoreFlows::getUnknownField() const
 	}
 	return _VV;
 }
+
+bool 
+ProblemCoreFlows::isMEDCoupling64Bits() const
+{ 
+#ifdef MEDCOUPLING_USE_64BIT_IDS
+	return  true;
+#else
+	return false;
+#endif
+};

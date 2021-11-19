@@ -170,7 +170,7 @@ public :
 	 * \param [in] bool, passage par reférence.
 	 * \param [out] bool
 	 *  */
-	virtual bool iterateTimeStep(bool &converged) = 0; //??
+	virtual bool iterateTimeStep(bool &converged) = 0; 
 
 	/** \fn isStationary
 	 * \brief vérifie la stationnairité du problème .
@@ -188,26 +188,120 @@ public :
 	 *  */
 	virtual double presentTime() const;
 
-	/*
-	//Coupling interface
-	virtual vector<string> getInputFieldsNames()=0 ;//Renvoie les noms des champs dont le problème a besoin (données initiales)
-	virtual  Field& getInputFieldTemplate(const string& name)=0;//Renvoie le format de champs attendu (maillage, composantes etc)
-	virtual void setInputField(const string& name, const Field& afield)=0;//enregistre les valeurs d'une donnée initiale
-	virtual vector<string> getOutputFieldsNames()=0 ;//liste tous les champs que peut fournir le code pour le postraitement
-	virtual Field& getOutputField(const string& nameField )=0;//Renvoie un champs pour le postraitement
-	 */
+	/** \fn setStationaryMode
+	 * \brief Perform the search of a stationary regime
+	 * \details
+	 * \param [in] bool
+	 * \param [out] 
+	 *  */
+	virtual void setStationaryMode(bool stationaryMode){ _stationaryMode=stationaryMode;};
 
-	Field getUnknownField() const;
-	
-	//paramètres du calcul -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+	/** \fn getStationaryMode
+	 * \brief Tells if we are seeking a stationary regime
+	 * \details
+	 * \param [in] 
+	 * \param [out] bool
+	 *  */
+	virtual bool getStationaryMode(){return _stationaryMode;};
 
-	/** \fn setPresentTime
-	 * \brief met à jour _time (le temps courant du calcul)
+	/** \fn resetTime
+	 * \brief sets the current time (typically to start a new calculation)
 	 * \details
 	 * \param [in] double
 	 * \param [out] void
 	 *  */
-	void setPresentTime (double time);
+	void resetTime (double time);
+
+	/*
+	//Coupling interface
+	virtual void getInputMEDDoubleFieldTemplate(const std::string& name, MEDDoubleField& afield) const;//Renvoie le format de champs attendu (maillage, composantes etc)
+	virtual vector<string> getOutputFieldsNames()=0 ;//liste tous les champs que peut fournir le code pour le postraitement
+	virtual void getOutputMEDDoubleField(const std::string& name, MEDDoubleField& afield)//Renvoie un champs pour le postraitement ou le couplage
+	 */
+
+	/** Set input fields to prepare the simulation or coupling **/
+	virtual vector<string> getInputFieldsNames()=0;
+	virtual void setInputField(const string& nameField, Field& inputField )=0;//supply of a required input field
+
+     /*! @brief (Optional) Provide the code with a scalar double data.
+     *
+     * See Problem documentation for more details on the time semantic of a scalar value.
+     *
+     * @param[in] name name of the scalar value that is given to the code.
+     * @param[in] val value passed to the code.
+     * @throws ICoCo::WrongArgument exception if the scalar name ('name' parameter) is invalid.
+     */
+    /* virtual void setInputDoubleValue(const std::string& name, const double& val); */
+
+    /*! @brief (Optional) Retrieve a scalar double value from the code.
+     *
+     * See Problem documentation for more details on the time semantic of a scalar value.
+     *
+     * @param[in] name name of the scalar value to be read from the code.
+     * @return the double value read from the code.
+     * @throws ICoCo::WrongArgument exception if the scalar name ('name' parameter) is invalid.
+     */
+    /* virtual double getOutputDoubleValue(const std::string& name) const; */
+
+    /*! @brief (Optional) Similar to setInputDoubleValue() but for an int value.
+     * @sa setInputDoubleValue()
+     */
+    /* virtual void setInputIntValue(const std::string& name, const int& val); */
+
+    /*! @brief (Optional) Similar to getOutputDoubleValue() but for an int value.
+     * @sa getOutputDoubleValue()
+     */
+    /* virtual int getOutputIntValue(const std::string& name) const; */
+
+    /*! @brief (Optional) Similar to setInputDoubleValue() but for an string value.
+     * @sa setInputDoubleValue()
+     */
+    /* virtual void setInputStringValue(const std::string& name, const std::string& val); */
+
+    /*! @brief (Optional) Similar to getOutputDoubleValue() but for an string value.
+     * @sa getOutputDoubleValue()
+     */
+    /* virtual std::string getOutputStringValue(const std::string& name) const; */
+    
+   /*! @brief Return ICoCo interface major version number.
+     * @return ICoCo interface major version number (2 at present)
+     */
+    static int GetICoCoMajorVersion() { return 2; }
+
+    /*! @brief (Optional) Get MEDCoupling major version, if the code was built with MEDCoupling support.
+     *
+     * This can be used to assess compatibility between codes when coupling them.
+     *
+     * @return the MEDCoupling major version number (typically 7, 8, 9, ...)
+     */
+    virtual int getMEDCouplingMajorVersion() const{ return MEDCOUPLING_VERSION_MAJOR; };
+
+    /*! @brief (Optional) Indicate whether the code was built with a 64-bits version of MEDCoupling.
+     *
+     * Implemented if the code was built with MEDCoupling support.
+     * This can be used to assess compatibility between codes when coupling them.
+     *
+     * @return the MEDCoupling major version number
+     */
+    virtual bool isMEDCoupling64Bits() const;
+
+    /*! @brief (Optional) Get the list of input scalars accepted by the code.
+     *
+     * @return the list of scalar names that represent inputs of the code
+     * @throws ICoCo::WrongContext exception if called before initialize() or after terminate().
+     */
+    /* virtual std::vector<std::string> getInputValuesNames() const; */
+
+    /*! @brief (Optional) Get the list of output scalars that can be provided by the code.
+     *
+     * @return the list of scalar names that can be returned by the code
+     * @throws ICoCo::WrongContext exception if called before initialize() or after terminate().
+     */
+    /* virtual std::vector<std::string> getOutputValuesNames() const; */
+
+	Field getUnknownField() const;
+	
+	//paramètres du calcul -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
 	/** \fn setMaxNbOfTimeStep
 	 * \brief met à jour _maxNbOfTimeStep ( le nombre maximum d'itération du calcul )
@@ -574,6 +668,7 @@ public :
 	void setHeatPowerField(Field heatPower){
 		_heatPowerField=heatPower;
 		_heatPowerFieldSet=true;
+		_isStationary=false;//Source term may be changed after previously reaching a stationary state
 	}
 
 	/** \fn setHeatPowerField
@@ -586,57 +681,28 @@ public :
 	void setHeatPowerField(string fileName, string fieldName){
 		_heatPowerField=Field(fileName, CELLS,fieldName);
 		_heatPowerFieldSet=true;
+		_isStationary=false;//Source term may be changed after previously reaching a stationary state
 	}
 
 	/** \fn setHeatSource
-	 * \brief met à jour la puissance thermique ( _phi )
+	 * \brief sets a constant heat power field
 	 * \details
 	 * \param [in] double
 	 * \param [out] void
 	 *  */
 	void setHeatSource(double phi){
 		_heatSource=phi;
+		_isStationary=false;//Source term may be changed after previously reaching a stationary state
 	}
 
 	/** \fn getHeatPowerField
-	 * \brief renvoie le champs ?? ( _heatPowerField )
+	 * \brief returns the heat power field
 	 * \details
 	 * \param [in] void
 	 * \param [out] Field
 	 *  */
 	Field getHeatPowerField(){
 		return _heatPowerField;
-	}
-
-	/** \fn setRodTemperatureField ??
-	 * \brief
-	 * \details
-	 * \param [in] Field
-	 * \param [out] void
-	 *  */
-	void setRodTemperatureField(Field rodTemperature){
-		_rodTemperatureField=rodTemperature;
-		_rodTemperatureFieldSet=true;
-	}
-
-	/** \fn setRodTemperature ??
-	 * \brief
-	 * \details
-	 * \param [in] double
-	 * \param [out] void
-	 *  */
-	void setRodTemperature(double rodTemp){
-		_rodTemperature=rodTemp;
-	}
-
-	/** \fn getRodTemperatureField
-	 * \brief
-	 * \details
-	 * \param [in] void
-	 * \param [out] Field
-	 *  */
-	virtual Field& getRodTemperatureField(){ // ?? je ne retrouve pas cet attribut dans le file.cxx
-		return _rodTemperatureField;
 	}
 
 	/** \fn setHeatTransfertCoeff
@@ -647,6 +713,7 @@ public :
 	 *  */
 	void setHeatTransfertCoeff(double heatTransfertCoeff){
 		_heatTransfertCoeff=heatTransfertCoeff;
+		_isStationary=false;//Source term may be changed after previously reaching a stationary state
 	}
 
 	/** \fn setVerbose
@@ -697,7 +764,7 @@ protected :
 	int _Nmailles;//number of cells
 	int _Nnodes;//number of nodes
 	int _Nfaces;//number of faces
-	int _neibMaxNb;//maximum number of neighbours around a cell
+	int _neibMaxNbCells;//maximum number of neighbours around a cell
 	int _neibMaxNbNodes;/* maximum number of nodes around a node */
 	Mesh _mesh;
 	Field _perimeters;
@@ -735,6 +802,7 @@ protected :
 	bool _isStationary;
 	bool _initialDataSet;
 	bool _initializedMemory;
+	bool _stationaryMode;//ICoCo V2
 	bool _restartWithNewTimeScheme;
 	bool _restartWithNewFileName;
 	double _timeMax,_time;
@@ -747,10 +815,10 @@ protected :
 	ofstream * _runLogFile;//for creation of a log file to save the history of the simulation
 
 	//Heat transfert variables
-	Field _heatPowerField, _rodTemperatureField;
-	bool _heatPowerFieldSet, _rodTemperatureFieldSet;
+	Field _heatPowerField;
+	bool _heatPowerFieldSet;
 	double _heatTransfertCoeff;
-	double _heatSource, _rodTemperature;
+	double _heatSource;
 	double _hsatv, _hsatl;//all models appart from DiffusionEquation will need this
 
 	//Display variables
@@ -759,11 +827,12 @@ protected :
 	string _path;//path to execution directory used for saving results
 	saveFormat _saveFormat;//file saving format : MED, VTK or CSV
 	
-	//MPI variables
-	PetscMPIInt    _size;        /* size of communicator */
-	PetscMPIInt    _rank;        /* processor rank */
-	
-	
+	//MPI related variables
+	PetscMPIInt    _mpi_size;        /* size of communicator */
+	PetscMPIInt    _mpi_rank;        /* processor rank */
+	VecScatter	   _scat;			/* For the distribution of a local vector */
+	int _globalNbUnknowns, _localNbUnknowns;
+	int _d_nnz, _o_nnz;			/* local and "non local" numbers of non zeros corfficients */
 };
 
 #endif /* PROBLEMCOREFLOWS_HXX_ */

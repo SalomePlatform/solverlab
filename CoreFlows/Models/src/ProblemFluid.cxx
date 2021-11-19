@@ -145,7 +145,7 @@ void ProblemFluid::initialize()
 
 	//creation de la matrice
 	if(_timeScheme == Implicit)
-		MatCreateSeqBAIJ(PETSC_COMM_SELF, _nVar, _nVar*_Nmailles, _nVar*_Nmailles, (1+_neibMaxNb), PETSC_NULL, &_A);
+		MatCreateSeqBAIJ(PETSC_COMM_SELF, _nVar, _nVar*_Nmailles, _nVar*_Nmailles, (1+_neibMaxNbCells), PETSC_NULL, &_A);
 
 	//creation des vecteurs
 	VecCreateSeq(PETSC_COMM_SELF, _nVar, &_Uext);
@@ -412,7 +412,7 @@ double ProblemFluid::computeTimeStep(bool & stop){//dt is not known and will not
 	if(_restartWithNewTimeScheme)//This is a change of time scheme during a simulation
 	{
 		if(_timeScheme == Implicit)
-			MatCreateSeqBAIJ(PETSC_COMM_SELF, _nVar, _nVar*_Nmailles, _nVar*_Nmailles, (1+_neibMaxNb), PETSC_NULL, &_A);			
+			MatCreateSeqBAIJ(PETSC_COMM_SELF, _nVar, _nVar*_Nmailles, _nVar*_Nmailles, (1+_neibMaxNbCells), PETSC_NULL, &_A);			
 		else
 			MatDestroy(&_A);
 		_restartWithNewTimeScheme=false;
@@ -607,7 +607,7 @@ double ProblemFluid::computeTimeStep(bool & stop){//dt is not known and will not
 				}
 				idm = idCells[0];
 				idn = idCells[1];
-				//cout<<"idm= "<<idm<<"idn= "<<idn<<"nbvoismax= "<<_neibMaxNb<<endl;
+				//cout<<"idm= "<<idm<<"idn= "<<idn<<"nbvoismax= "<<_neibMaxNbCells<<endl;
 				MatSetValuesBlocked(_A, size, &idm, size, &idn, _AroeMinusImplicit, ADD_VALUES);
 				MatSetValuesBlocked(_A, size, &idm, size, &idn, _Diffusion, ADD_VALUES);
 
@@ -648,7 +648,7 @@ double ProblemFluid::computeTimeStep(bool & stop){//dt is not known and will not
 		}
 		else if( Fj.getNumberOfCells()>2 && _Ndim==1 ){//inner face with more than two neighbours
 			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
-				cout<<"lattice mesh junction at face "<<j<<" nbvoismax= "<<_neibMaxNb<<endl;
+				cout<<"lattice mesh junction at face "<<j<<" nbvoismax= "<<_neibMaxNbCells<<endl;
 			*_runLogFile<<"Warning: treatment of a junction node"<<endl;
 
 			if(!_sectionFieldSet)
@@ -1042,7 +1042,7 @@ void ProblemFluid::computeNewtonRHS( Vec X, Vec F_X){//dt is known and will cont
 		}
 		else if( Fj.getNumberOfCells()>2 && _Ndim==1 ){//inner face with more than two neighbours
 			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
-				cout<<"lattice mesh junction at face "<<j<<" nbvoismax= "<<_neibMaxNb<<endl;
+				cout<<"lattice mesh junction at face "<<j<<" nbvoismax= "<<_neibMaxNbCells<<endl;
 			*_runLogFile<<"Warning: treatment of a junction node"<<endl;
 
 			if(!_sectionFieldSet)
@@ -1316,7 +1316,7 @@ void ProblemFluid::computeNewtonJacobian( Vec X, Mat A){//dt is known and will c
 				}
 				idm = idCells[0];
 				idn = idCells[1];
-				//cout<<"idm= "<<idm<<"idn= "<<idn<<"nbvoismax= "<<_neibMaxNb<<endl;
+				//cout<<"idm= "<<idm<<"idn= "<<idn<<"nbvoismax= "<<_neibMaxNbCells<<endl;
 				MatSetValuesBlocked(A, size, &idm, size, &idn, _AroeMinusImplicit, ADD_VALUES);
 				MatSetValuesBlocked(A, size, &idm, size, &idn, _Diffusion, ADD_VALUES);
 
@@ -1356,7 +1356,7 @@ void ProblemFluid::computeNewtonJacobian( Vec X, Mat A){//dt is known and will c
 		}
 		else if( Fj.getNumberOfCells()>2 && _Ndim==1 ){//inner face with more than two neighbours
 			if(_verbose && (_nbTimeStep-1)%_freqSave ==0)
-				cout<<"lattice mesh junction at face "<<j<<" nbvoismax= "<<_neibMaxNb<<endl;
+				cout<<"lattice mesh junction at face "<<j<<" nbvoismax= "<<_neibMaxNbCells<<endl;
 			*_runLogFile<<"Warning: treatment of a junction node"<<endl;
 
 			if(!_sectionFieldSet)
@@ -2194,4 +2194,35 @@ void ProblemFluid::terminate(){
 	// Destruction du solveur de Newton de PETSc
 	if(_timeScheme == Implicit && _nonLinearSolver != Newton_SOLVERLAB)
 		SNESDestroy(&_snes);
+}
+
+vector<string> 
+ProblemFluid::getInputFieldsNames()
+{
+	vector<string> result(1);
+	
+	result[0]="HeatPower";
+	result[1]="Porosity";
+	result[2]="PressureLoss";
+	result[3]="Section";
+	
+	return result;
+}
+
+void
+ProblemFluid::setInputField(const string& nameField, Field& inputField )
+{
+	if(nameField=="Porosity" || nameField=="POROSITY" || nameField=="Porosité" || nameField=="POROSITE")
+		return setPorosityField( inputField) ;
+	else if(nameField=="HeatPower" || nameField=="HEATPOWER" || nameField=="PuissanceThermique" || nameField=="PUISSANCETHERMIQUE" )
+		return setHeatPowerField( inputField );
+	else 	if(nameField=="PressureLoss" || nameField=="PRESSURELOSS" || nameField=="PerteDeCharge" || nameField=="PPERTEDECHARGE")
+		return setPressureLossField( inputField) ;
+	else if(nameField=="Section" || nameField=="SECTION" )
+		return setSectionField( inputField );
+	else
+    {
+        cout<<"Error : Field name "<< nameField << " is not an input field name, call getInputFieldsNames first" << endl;
+        throw CdmathException("SinglePhase::setInputField error : Unknown Field name");
+    }
 }

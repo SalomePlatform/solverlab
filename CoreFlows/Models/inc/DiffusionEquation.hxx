@@ -54,7 +54,7 @@ public :
 
 	DiffusionEquation( int dim,bool FECalculation=true,double rho=10000,double cp=300,double lambda=5, MPI_Comm comm = MPI_COMM_WORLD);
 
-	//Gestion du calcul
+	//Gestion du calcul (ICoCo)
 	void initialize();
 	void terminate();//vide la mémoire et enregistre le résultat final
 	bool initTimeStep(double dt);
@@ -97,29 +97,32 @@ public :
 	void setConductivity(double conductivite){
 		_conductivity=conductivite;
 	};
-	void setFluidTemperatureField(Field coupledTemperatureField){
-		_fluidTemperatureField=coupledTemperatureField;
-		_fluidTemperatureFieldSet=true;
-	};
-
 	void setDiffusiontensor(Matrix DiffusionTensor){
 		_DiffusionTensor=DiffusionTensor;
 	};
 
+
+	/** Set input fields to prepare the simulation or coupling **/
+	vector<string> getInputFieldsNames();
+	void setInputField(const string& nameField, Field& inputField );//supply of a required input field
+
+	void setFluidTemperatureField(Field coupledTemperatureField){
+		_fluidTemperatureField=coupledTemperatureField;
+		_fluidTemperatureFieldSet=true;
+	};
 	void setFluidTemperature(double fluidTemperature){
 	_fluidTemperature=fluidTemperature;
-	}
-
-	//get output fields for postprocessing or coupling
-	vector<string> getOutputFieldsNames() ;//liste tous les champs que peut fournir le code pour le postraitement
-	Field&         getOutputField(const string& nameField );//Renvoie un champs pour le postraitement
-
-	Field& getRodTemperatureField(){
-		return _VV;
 	}
 	Field& getFluidTemperatureField(){
 		return _fluidTemperatureField;
 	}
+	
+	/*** get output fields names for postprocessing or coupling ***/
+	vector<string> getOutputFieldsNames() ;//liste tous les champs que peut fournir le code pour le postraitement
+	Field&         getOutputField(const string& nameField );//Renvoie un champs pour le postraitement
+
+	Field& getOutputTemperatureField();//Return the main unknown if present (initialize() should be called first)
+	Field& getRodTemperatureField();//Return the main unknown if present (initialize() should be called first)
 
     /*********** Generic functions for finite element method ***********/
     static Vector gradientNodal(Matrix M, vector< double > v);//gradient of nodal shape functions
@@ -141,7 +144,12 @@ protected :
 	Vector _normale;
 	Matrix _DiffusionTensor;
 	Vec _Tn, _deltaT, _Tk, _Tkm1, _b0;
+	Vec _Tn_seq; // Local sequential copy of the parallel vector _Tn, used for saving result files
+
 	double _dt_diffusion, _dt_src;
+	TimeScheme _timeScheme;
+	map<string, LimitFieldDiffusion> _limitField;
+
     
     /************ Data for FE calculation *************/
 	int _NunknownNodes;/* number of unknown nodes for FE calculation */
@@ -149,9 +157,6 @@ protected :
 	int _NdirichletNodes;/* number of boundary nodes with Dirichlet BC for FE calculation */
     std::vector< int > _boundaryNodeIds;/* List of boundary nodes */
     std::vector< int > _dirichletNodeIds;/* List of boundary nodes with Dirichlet BC */
-
-	TimeScheme _timeScheme;
-	map<string, LimitFieldDiffusion> _limitField;
 
     /********* Possibility to set a boundary field as DirichletNeumann boundary condition *********/
     bool _dirichletValuesSet;
