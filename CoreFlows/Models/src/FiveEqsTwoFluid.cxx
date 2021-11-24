@@ -45,15 +45,18 @@ FiveEqsTwoFluid::FiveEqsTwoFluid(pressureEstimate pEstimate, int dim){
 	}
 	_latentHeat=_hsatv-_hsatl;
 	_intPressCoeff=1.5;
+
+	_fileName = "SolverlabFiveEquationTwoFluid";
+    PetscPrintf(PETSC_COMM_WORLD,"\n Five equation two-fluid problem for two phase flow\n");
 }
 
 void FiveEqsTwoFluid::initialize()
 {
-	cout<<"Initialising the five equation two fluid model"<<endl;
-	*_runLogFile<<"Initialising the five equation two fluid model"<<endl;
+	cout<<"\n Initialising the five equation two fluid model"<<endl;
+	*_runLogFile<<"\n Initialising the five equation two fluid model"<<endl;
 
 	if(static_cast<StiffenedGas*>(_fluides[0])==NULL || static_cast<StiffenedGas*>(_fluides[1])==NULL)
-		throw CdmathException("FiveEqsTwoFluid::initialize: both phase must have stiffened gas EOS");
+		throw CdmathException("!!!!!!!!FiveEqsTwoFluid::initialize: both phase must have stiffened gas EOS");
 
 	_Uroe = new double[_nVar+1];
 
@@ -2230,6 +2233,9 @@ void FiveEqsTwoFluid::testConservation()
 }
 
 void FiveEqsTwoFluid::save(){
+    PetscPrintf(PETSC_COMM_WORLD,"Saving numerical results at time step number %d \n\n", _nbTimeStep);
+    *_runLogFile<< "Saving numerical results at time step number "<< _nbTimeStep << endl<<endl;
+
 	string prim(_path+"/FiveEqsTwoFluidPrim_");
 	string cons(_path+"/FiveEqsTwoFluidCons_");
 	prim+=_fileName;

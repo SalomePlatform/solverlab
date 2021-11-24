@@ -72,7 +72,7 @@ DiffusionEquation::DiffusionEquation(int dim, bool FECalculation,double rho,doub
     /* Control input value are acceptable */
     if(rho<_precision or cp<_precision)
     {
-        PetscPrintf(PETSC_COMM_WORLD,"rho = %.2f, cp = %.2f, precision = %.2f\n",rho,cp,_precision);
+        PetscPrintf(PETSC_COMM_WORLD,"rho = %.2f, cp = %.2f, precision = %.2e\n",rho,cp,_precision);
         throw CdmathException("Error : parameters rho and cp should be strictly positive");
     }
     if(lambda < 0.)
@@ -86,11 +86,11 @@ DiffusionEquation::DiffusionEquation(int dim, bool FECalculation,double rho,doub
         throw CdmathException("Error : parameter dim cannot  be negative");
     }
 
-    PetscPrintf(PETSC_COMM_WORLD,"Diffusion problem with density %.2f, specific heat %.2f, conductivity %.2f", rho,cp,lambda);
+    PetscPrintf(PETSC_COMM_WORLD,"\n Diffusion problem with density %.2e, specific heat %.2e, conductivity %.2e", rho,cp,lambda);
     if(FECalculation)
-        PetscPrintf(PETSC_COMM_WORLD," and finite elements method\n");
+        PetscPrintf(PETSC_COMM_WORLD," and finite elements method\n\n");
     else
-        PetscPrintf(PETSC_COMM_WORLD," and finite volumes method\n");
+        PetscPrintf(PETSC_COMM_WORLD," and finite volumes method\n\n");
     
     _FECalculation=FECalculation;
     
@@ -120,8 +120,6 @@ DiffusionEquation::DiffusionEquation(int dim, bool FECalculation,double rho,doub
 
 	_fileName = "SolverlabDiffusionProblem";
 
-	_runLogFile=new ofstream;
-
     /* Default diffusion tensor is diagonal */
    	_DiffusionTensor=Matrix(_Ndim);
 	for(int idim=0;idim<_Ndim;idim++)
@@ -140,14 +138,14 @@ void DiffusionEquation::initialize()
 			*_runLogFile<< "Problem : dim = "<<_Ndim<< " but mesh dim= "<<_mesh.getMeshDimension()<<", mesh space dim= "<<_mesh.getSpaceDimension()<<endl;
 			*_runLogFile<<"DiffusionEquation::initialize: mesh has incorrect dimension"<<endl;
 			_runLogFile->close();
-			throw CdmathException("DiffusionEquation::initialize: mesh has incorrect  dimension");
+			throw CdmathException("!!!!!!!!DiffusionEquation::initialize: mesh has incorrect  dimension");
 		}
 	
 		if(!_initialDataSet)
-			throw CdmathException("DiffusionEquation::initialize() set initial data first");
+			throw CdmathException("!!!!!!!!DiffusionEquation::initialize() set initial data first");
 		else
 	        {
-	            PetscPrintf(PETSC_COMM_SELF,"Initialising the diffusion of a solid temperature using ");
+	            PetscPrintf(PETSC_COMM_SELF,"\n Initialising the diffusion of a solid temperature using ");
 	            *_runLogFile<<"Initialising the diffusion of a solid temperature using ";
 	            if(!_FECalculation)
 	            {
@@ -314,7 +312,7 @@ double DiffusionEquation::computeDiffusionMatrix(bool & stop)
     else
         result=computeDiffusionMatrixFV(stop);
 
-	PetscPrintf(PETSC_COMM_WORLD,"Maximum diffusivity is %.2f, CFL = %.2f, Delta x = %.2f\n",_maxvp,_cfl,_minl);
+	PetscPrintf(PETSC_COMM_WORLD,"Maximum diffusivity is %.2e, CFL = %.2f, Delta x = %.2e\n",_maxvp,_cfl,_minl);
 
     MatAssemblyBegin(_A, MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(  _A, MAT_FINAL_ASSEMBLY);
@@ -602,7 +600,7 @@ bool DiffusionEquation::initTimeStep(double dt){
     }
     else//dt<=0
     {
-        PetscPrintf(PETSC_COMM_WORLD,"DiffusionEquation::initTimeStep %.2f = \n",dt);
+        PetscPrintf(PETSC_COMM_WORLD,"DiffusionEquation::initTimeStep %.2e = \n",dt);
         throw CdmathException("Error DiffusionEquation::initTimeStep : cannot set time step to zero");        
     }
     //At this stage _b contains _b0 + power + heat exchange
@@ -704,8 +702,8 @@ void DiffusionEquation::validateTimeStep()
 }
 
 void DiffusionEquation::save(){
-    PetscPrintf(PETSC_COMM_WORLD,"Saving numerical results\n\n");
-    *_runLogFile<< "Saving numerical results"<< endl<<endl;
+    PetscPrintf(PETSC_COMM_WORLD,"Saving numerical results at time step number %d \n\n", _nbTimeStep);
+    *_runLogFile<< "Saving numerical results at time step number "<< _nbTimeStep << endl<<endl;
 
 	string resultFile(_path+"/DiffusionEquation");//Results
 
