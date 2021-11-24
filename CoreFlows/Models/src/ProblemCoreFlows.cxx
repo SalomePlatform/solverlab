@@ -34,7 +34,7 @@ ProblemCoreFlows::ProblemCoreFlows(MPI_Comm comm)
 	}
 	MPI_Comm_rank(PETSC_COMM_WORLD,&_mpi_rank);
 	MPI_Comm_size(PETSC_COMM_WORLD,&_mpi_size);
-	PetscPrintf(PETSC_COMM_WORLD,"Simulation on %d processors\n",_mpi_size);//Prints to standard out, only from the first processor in the communicator. Calls from other processes are ignored. 
+	PetscPrintf(PETSC_COMM_WORLD,"\n Simulation on %d processors\n",_mpi_size);//Prints to standard out, only from the first processor in the communicator. Calls from other processes are ignored. 
 	PetscSynchronizedPrintf(PETSC_COMM_WORLD,"Processor [%d] ready for action\n",_mpi_rank);//Prints synchronized output from several processors. Output of the first processor is followed by that of the second, etc. 
 	PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);
 
@@ -561,7 +561,7 @@ bool ProblemCoreFlows::run()
 	bool ok; // Is the time interval successfully solved ?
 	_isStationary=false;//in case of a second run with a different physics or cfl
 
-	PetscPrintf(PETSC_COMM_WORLD,"Running test case %s\n",_fileName);
+	PetscPrintf(PETSC_COMM_WORLD,"Running test case %s\n",_fileName.c_str());
 
 	_runLogFile->open((_fileName+".log").c_str(), ios::out | ios::trunc);;//for creation of a log file to save the history of the simulation
 	*_runLogFile<< "Running test case "<< _fileName<<endl;
@@ -574,7 +574,7 @@ bool ProblemCoreFlows::run()
 		// Guess the next time step length
 		_dt=computeTimeStep(stop);
 		if (stop){
-			PetscPrintf(PETSC_COMM_WORLD,"Failed computing time step %d, time = %.2f, dt= %.2f, stopping calculation",_nbTimeStep,_time,_dt);
+			PetscPrintf(PETSC_COMM_WORLD,"Failed computing time step %d, time = %.2f, dt= %.2e, stopping calculation",_nbTimeStep,_time,_dt);
 			*_runLogFile << "Failed computing time step "<<_nbTimeStep<<", time = " << _time <<", dt= "<<_dt<<", stopping calculation"<< endl;
 			break;
 		}
@@ -584,7 +584,7 @@ bool ProblemCoreFlows::run()
 			stop=!initTimeStep(_dt);
 			// Prepare the next time step
 			if (stop){
-				PetscPrintf(PETSC_COMM_WORLD,"Failed initializing time step %d, time = %.2f, dt= %.2f, stopping calculation",_nbTimeStep,_time,_dt);
+				PetscPrintf(PETSC_COMM_WORLD,"Failed initializing time step %d, time = %.2f, dt= %.2e, stopping calculation",_nbTimeStep,_time,_dt);
 				*_runLogFile << "Failed initializing time step "<<_nbTimeStep<<", time = " << _time <<", dt= "<<_dt<<", stopping calculation"<< endl;
 				break;
 			}
@@ -604,7 +604,7 @@ bool ProblemCoreFlows::run()
 					//_dt=computeTimeStep(stop);
 				}
 				else{*/
-					PetscPrintf(PETSC_COMM_WORLD,"Failed solving time step %d, time = %.2f, dt= %.2f, cfl = %.2f, stopping calculation \n",_nbTimeStep,_time,_dt,_cfl);
+					PetscPrintf(PETSC_COMM_WORLD,"Failed solving time step %d, time = %.2f, dt= %.2e, cfl = %.2f, stopping calculation \n",_nbTimeStep,_time,_dt,_cfl);
 					*_runLogFile << "Failed solving time step "<<_nbTimeStep<<", _time = " << _time<<" _dt= "<<_dt<<", cfl= "<<_cfl <<", stopping calculation"<< endl;
 					stop=true; // Impossible to solve the next time step, the Problem has given up
 					break;
@@ -614,7 +614,7 @@ bool ProblemCoreFlows::run()
 			{
 				validateTimeStep();
 				if ((_nbTimeStep-1)%_freqSave ==0){
-					PetscPrintf(PETSC_COMM_WORLD,"Time step = %d, dt = %.2f, time = %.2f, ||Un+1-Un||= %.2f\n\n",_nbTimeStep,_dt,_time,_erreur_rel);
+					PetscPrintf(PETSC_COMM_WORLD,"Time step = %d, dt = %.2e, time = %.2f, ||Un+1-Un||= %.2e\n\n",_nbTimeStep,_dt,_time,_erreur_rel);
 					*_runLogFile << "Time step = "<< _nbTimeStep << ", dt = "<< _dt <<", time = "<<_time << ", ||Un+1-Un||= "<<_erreur_rel<<endl<<endl;
 				}
 			}
@@ -684,14 +684,14 @@ bool ProblemCoreFlows::solveTimeStep(){
 
 		if(_timeScheme == Implicit && (_nbTimeStep-1)%_freqSave ==0)//To monitor the convergence of the newton scheme
 		{
-			PetscPrintf(PETSC_COMM_WORLD," Newton iteration %d, %s iterations : %d maximum variation ||Uk+1-Uk||: %.2f\n",_NEWTON_its,_ksptype,_PetscIts,_erreur_rel);
+			PetscPrintf(PETSC_COMM_WORLD," Newton iteration %d, %s iterations : %d maximum variation ||Uk+1-Uk||: %.2e\n",_NEWTON_its,_ksptype,_PetscIts,_erreur_rel);
 			*_runLogFile<< " Newton iteration " << _NEWTON_its<< ", "<< _ksptype << " iterations : " << _PetscIts<< " maximum variation ||Uk+1-Uk||: " << _erreur_rel << endl;
 
 			if(_conditionNumber)
 			{
 				PetscReal sv_max, sv_min;
 				KSPComputeExtremeSingularValues(_ksp, &sv_max, &sv_min);
-				PetscPrintf(PETSC_COMM_WORLD," Singular value max = %.2f, singular value min = %.2f, condition number = %.2f\n",sv_max,sv_min,sv_max/sv_min);
+				PetscPrintf(PETSC_COMM_WORLD," Singular value max = %.2e, singular value min = %.2e, condition number = %.2e\n",sv_max,sv_min,sv_max/sv_min);
 				*_runLogFile<<" Singular value max = " << sv_max <<", singular value min = " << sv_min <<", condition number = " << sv_max/sv_min <<endl;
 			}
 		}
