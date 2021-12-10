@@ -106,7 +106,7 @@ public: //----------------------------------------------------------------
 	 * @param nx : Number of cells in x direction
 	 * @param ny : Number of cells in y direction
 	 * @param nz : Number of cells in z direction
-     * @param split_to_tetrahedra_policy : each cuboid will be split into 5 tetrahedra if value is INTERP_KERNEL::PLANAR_FACE_5 or 6 tetrahedra if the value is INTERP_KERNEL::PLANAR_FACE_6
+     * @param split_to_tetrahedra_policy : each cuboid will be split into 5 tetrahedra if value is 0 or 6 tetrahedra if the value is 1
 	 */
 	Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz, int split_to_tetrahedra_policy=-1, std::string meshName="MESH3D_Regular_Cuboid_Grid") ;
 
@@ -256,9 +256,14 @@ public: //----------------------------------------------------------------
 	MEDCoupling::MCAuto<MEDCoupling::MEDCouplingMesh> getMEDCouplingMesh ( void )  const ;
 
 	/**
-	 * \brief computes the skin surrounding the mesh
+	 * \brief return the skin surrounding the mesh
 	 */
 	Mesh getBoundaryMesh ( void )  const ;
+
+	/**
+	 * \brief return a group surrounding the mesh
+	 */
+	Mesh getBoundaryGroupMesh ( std::string groupName, int nth_group_match = 0 )  const ;
 
 	/**
 	 * \brief return the list of face group names
@@ -303,11 +308,11 @@ public: //----------------------------------------------------------------
      /** 
       * @return list of face group Ids
       */
-    std::vector< int > getGroupFaceIds(std::string groupName) const;
+    std::vector< int > getFaceGroupIds(std::string groupName, bool isBoundaryGroup=true) const;
     /**
      * @return list of node group Ids
      * */
-    std::vector< int > getGroupNodeIds(std::string groupName) const;
+    std::vector< int > getNodeGroupIds(std::string groupName, bool isBoundaryGroup=true) const;
  
 	/**
 	 * \brief write mesh in the VTK format
@@ -319,9 +324,11 @@ public: //----------------------------------------------------------------
 	 */
 	void writeMED ( const std::string fileName ) const ;
 
-	void setGroupAtPlan(double value, int direction, double eps, std::string groupName) ;
+	void setGroupAtPlan(double value, int direction, double eps, std::string groupName, bool isBoundaryGroup=true) ;
 
-	void setGroupAtFaceByCoords(double x, double y, double z, double eps, std::string groupName) ;
+	void setGroupAtFaceByCoords(double x, double y, double z, double eps, std::string groupName, bool isBoundaryGroup=true) ;
+
+	void setGroupAtNodeByCoords(double x, double y, double z, double eps, std::string groupName, bool isBoundaryGroup=true) ;
 
 	void setFaceGroupByIds(std::vector< int > faceIds, std::string groupName) ;
 
@@ -349,9 +356,9 @@ public: //----------------------------------------------------------------
 	double getComparisonEpsilon() const {return _epsilon;};
 	void setComparisonEpsilon(double epsilon){ _epsilon=epsilon;};
     // Quick comparison of two meshes to see if they are identical with high probability (three cells are compared)
-    void checkFastEquivalWith( Mesh m) const { return getMEDCouplingMesh()->checkFastEquivalWith(m.getMEDCouplingMesh(),1e-6);};
+    void checkFastEquivalWith( Mesh m) const { return getMEDCouplingMesh()->checkFastEquivalWith(m.getMEDCouplingMesh(),_epsilon);};
     // Deep comparison of two meshes to see if they are identical Except for their names and units
-    bool isEqualWithoutConsideringStr( Mesh m) const { return getMEDCouplingMesh()->isEqualWithoutConsideringStr(m.getMEDCouplingMesh(),1e-6);};
+    bool isEqualWithoutConsideringStr( Mesh m) const { return getMEDCouplingMesh()->isEqualWithoutConsideringStr(m.getMEDCouplingMesh(),_epsilon);};
 
     std::vector< std::string > getElementTypesNames() const ;
 	/**
@@ -364,12 +371,29 @@ public: //----------------------------------------------------------------
 	 */
     int getMaxNbNeighbours(EntityType type) const;
     
+    /** 
+     * \brief Delete the medcoupling mesh to save memory space
+     */
+    void deleteMEDCouplingUMesh();
+    
+    /** 
+     * \brief Returns true iff an unstructured mesh has been loaded
+     */
+     bool meshNotDeleted() const {return _meshNotDeleted;}
+    
 private: //----------------------------------------------------------------
 
 	MEDCoupling::MEDCouplingUMesh*  setMesh( void ) ;
+	void setGroups( const MEDCoupling::MEDFileUMesh* medmesh, MEDCoupling::MEDCouplingUMesh*  mu) ;//Read all face and node group
+	void addNewFaceGroup( const MEDCoupling::MEDCouplingUMesh *m);//adds one face group in the vectors _faceGroups, _faceGroupNames and _faceGroupIds
+	
+	/*
+	 * The MEDCoupling mesh
+	 */
+	MEDCoupling::MCAuto<MEDCoupling::MEDCouplingMesh> _mesh;
 
-	void setGroups( const MEDCoupling::MEDFileUMesh* medmesh, MEDCoupling::MEDCouplingUMesh*  mu) ;
-
+	bool _meshNotDeleted;
+	
     std::string _name;
     
 	/**
@@ -456,11 +480,20 @@ private: //----------------------------------------------------------------
 	 * The list of node groups.
 	 */
 	std::vector<MEDCoupling::DataArrayIdType *> _nodeGroups;
+	
 	/*
-	 * The mesh MEDCoupling
+	 * The list of face id in each face groups.
 	 */
-	MEDCoupling::MCAuto<MEDCoupling::MEDCouplingMesh> _mesh;
-
+	std::vector< std::vector<int> > _faceGroupsIds;
+	
+	/*
+	 * The list of node id in each node groups.
+	 */
+	std::vector< std::vector<int> > _nodeGroupsIds;
+	
+	/*
+	 * Elements types (SEG2, TRI3, QUAD4, HEXA6 ...)
+	 */
 	std::vector< INTERP_KERNEL::NormalizedCellType > _eltsTypes;//List of cell types contained in the mesh
 	std::vector< std::string > _eltsTypesNames;//List of cell types contained in the mesh
     std::vector< INTERP_KERNEL::NormalizedCellType > getElementTypes() const;    
@@ -476,7 +509,7 @@ private: //----------------------------------------------------------------
     /* List of boundary nodes*/
     std::vector< int > _boundaryNodeIds;
     /* Boundary mesh */
-    const MEDCoupling::MEDCouplingUMesh * _boundaryMesh;
+    MEDCoupling::MEDCouplingUMesh * _boundaryMesh;
     
     double _epsilon;
 };
