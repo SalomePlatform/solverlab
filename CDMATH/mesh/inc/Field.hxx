@@ -12,6 +12,7 @@ namespace MEDCoupling
 {
   class MEDCouplingFieldDouble;
   class DataArrayDouble;
+  class MEDFileField1TS;
 }
 
 #include "DoubleTab.hxx"
@@ -72,8 +73,7 @@ class Field
      */
     Field( const std::string filename, EntityType fieldType,
            const std::string & fieldName = "",
-           int iteration = -1, int order = -1, int meshLevel=0,
-           int numberOfComponents=1, double time=0.0);
+           int iteration = -1, int order = -1, int meshLevel=0);
   
     /**
      * constructor with data
@@ -251,6 +251,16 @@ class Field
 
     void setFieldByDataArrayDouble ( const MEDCoupling::DataArrayDouble* array );
 
+    /** 
+	 * \brief Delete the medcoupling mesh to save memory space
+     */
+    void deleteMEDCouplingUMesh();
+    
+    /** 
+     * \brief Returns true iff an unstructured mesh has been loaded
+     */
+     bool meshNotDeleted() const {return _mesh.meshNotDeleted();}
+    
     Vector getNormEuclidean( void ) const ;
 
     double max( int component=0 ) const ;
@@ -357,6 +367,7 @@ class Field
 	int _numberOfComponents;
 	double _time;
 	std::string _fieldName;
+	MEDCoupling::MEDFileField1TS *_ff ;//To save the field when the mesh has been deleted
 	
     private:
 
