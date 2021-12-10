@@ -91,10 +91,7 @@ ProblemCoreFlows::ProblemCoreFlows(MPI_Comm comm)
 	_maxNewtonIts=50;
 	_PetscIts=0;//the number of iterations of the linear solver
 	_ksptype = (char*)&KSPGMRES;
-	if( _mpi_size>1)
-		_pctype = (char*)&PCNONE;
-	else
-		_pctype = (char*)&PCLU;
+	_pctype = (char*)&PCILU;
 
 	/* Physical parameters */
 	_heatPowerFieldSet=false;
@@ -793,3 +790,23 @@ ProblemCoreFlows::isMEDCoupling64Bits() const
 	return false;
 #endif
 };
+
+void 
+ProblemCoreFlows::setHeatPowerField(Field heatPower){
+	if(!_initialDataSet)
+		throw CdmathException("!!!!!!!! ProblemCoreFlows::setHeatPowerField set initial field first");
+
+	heatPower.getMesh().checkFastEquivalWith(_mesh);
+	_heatPowerField=heatPower;
+	_heatPowerFieldSet=true;
+}
+
+void 
+ProblemCoreFlows::setHeatPowerField(string fileName, string fieldName, int iteration, int order, int meshLevel){
+	if(!_initialDataSet)
+		throw CdmathException("!!!!!!!! ProblemCoreFlows::setHeatPowerField set initial field first");
+
+	_heatPowerField=Field(fileName, CELLS,fieldName, iteration, order, meshLevel);
+	_heatPowerField.getMesh().checkFastEquivalWith(_mesh);
+	_heatPowerFieldSet=true;
+}
