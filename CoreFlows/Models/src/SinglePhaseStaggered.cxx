@@ -58,8 +58,8 @@ SinglePhaseStaggered::SinglePhaseStaggered(phaseType fluid, pressureEstimate pEs
 	}
 }
 void SinglePhaseStaggered::initialize(){
-	cout<<"Initialising the Navier-Stokes model"<<endl;
-	*_runLogFile<<"Initialising the Navier-Stokes model"<<endl;
+	cout<<"\n Initialising the Navier-Stokes model\n"<<endl;
+	*_runLogFile<<"\n Initialising the Navier-Stokes model\n"<<endl;
 
 	_Uroe = new double[_nVar];
 	_gravite = vector<double>(_nVar,0);//Not to be confused with _GravityField3d (size _Ndim). _gravite (size _Nvar) is usefull for dealing with source term and implicitation of gravity vector
@@ -1222,6 +1222,9 @@ void SinglePhaseStaggered::getDensityDerivatives( double pressure, double temper
 	}
 }
 void SinglePhaseStaggered::save(){
+    PetscPrintf(PETSC_COMM_WORLD,"Saving numerical results at time step number %d \n\n", _nbTimeStep);
+    *_runLogFile<< "Saving numerical results at time step number "<< _nbTimeStep << endl<<endl;
+
 	string prim(_path+"/SinglePhaseStaggeredPrim_");///Results
 	string cons(_path+"/SinglePhaseStaggeredCons_");
 	prim+=_fileName;
