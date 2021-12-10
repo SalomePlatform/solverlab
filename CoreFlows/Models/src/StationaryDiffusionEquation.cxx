@@ -24,19 +24,19 @@ StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalcula
 	}
 	MPI_Comm_rank(PETSC_COMM_WORLD,&_mpi_rank);
 	MPI_Comm_size(PETSC_COMM_WORLD,&_mpi_size);
-	PetscPrintf(PETSC_COMM_WORLD,"Simulation on %d processors\n",_mpi_size);//Prints to standard out, only from the first processor in the communicator. Calls from other processes are ignored. 
+	PetscPrintf(PETSC_COMM_WORLD,"\n Simulation on %d processors\n",_mpi_size);//Prints to standard out, only from the first processor in the communicator. Calls from other processes are ignored. 
 	PetscSynchronizedPrintf(PETSC_COMM_WORLD,"Processor [%d] ready for action\n",_mpi_rank);//Prints synchronized output from several processors. Output of the first processor is followed by that of the second, etc. 
 	PetscSynchronizedFlush(PETSC_COMM_WORLD,PETSC_STDOUT);
 
     if(lambda < 0.)
     {
         std::cout<<"Conductivity="<<lambda<<endl;
-        throw CdmathException("Error : conductivity parameter lambda cannot  be negative");
+        throw CdmathException("!!!!!!!!Error : conductivity parameter lambda cannot  be negative");
     }
     if(dim<=0)
     {
         std::cout<<"Space dimension="<<dim<<endl;
-        throw CdmathException("Error : parameter dim cannot  be negative");
+        throw CdmathException("!!!!!!!!Error : parameter dim cannot  be negative");
     }
 
     _FECalculation=FECalculation;
@@ -104,6 +104,12 @@ StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalcula
    	_DiffusionTensor=Matrix(_Ndim);
 	for(int idim=0;idim<_Ndim;idim++)
 		_DiffusionTensor(idim,idim)=_conductivity;
+
+    PetscPrintf(PETSC_COMM_WORLD,"\n Stationary diffusion problem with conductivity %.2f", lambda);
+    if(FECalculation)
+        PetscPrintf(PETSC_COMM_WORLD," and finite elements method\n\n");
+    else
+        PetscPrintf(PETSC_COMM_WORLD," and finite volumes method\n\n");
 }
 
 void StationaryDiffusionEquation::initialize()
@@ -113,11 +119,11 @@ void StationaryDiffusionEquation::initialize()
 		_runLogFile->open((_fileName+".log").c_str(), ios::out | ios::trunc);;//for creation of a log file to save the history of the simulation
 	
 		if(!_meshSet)
-			throw CdmathException("StationaryDiffusionEquation::initialize() set mesh first");
+			throw CdmathException("!!!!!!!!StationaryDiffusionEquation::initialize() set mesh first");
 		else
 	    {
-			cout<<"!!!! Initialisation of the computation of the temperature diffusion in a solid using ";
-	        *_runLogFile<<"!!!!! Initialisation of the computation of the temperature diffusion in a solid using ";
+			cout<<"\n Initialisation of the computation of the temperature diffusion in a solid using ";
+	        *_runLogFile<<"\n Initialisation of the computation of the temperature diffusion in a solid using ";
 	        if(!_FECalculation)
 	        {
 	            cout<< "Finite volumes method"<<endl<<endl;
@@ -595,7 +601,7 @@ bool StationaryDiffusionEquation::iterateNewtonStep(bool &converged)
 	if (reason!=2 and reason!=3)
     {
         PetscPrintf(PETSC_COMM_WORLD,"!!!!!!!!!!!!! Erreur système linéaire : pas de convergence de Petsc.");
-        PetscPrintf(PETSC_COMM_WORLD,"!!!!!!!!!!!!! Itérations maximales %d atteintes, résidu = %1.2f, précision demandée= %1.2f",_maxPetscIts,residu,_precision);
+        PetscPrintf(PETSC_COMM_WORLD,"!!!!!!!!!!!!! Itérations maximales %d atteintes, résidu = %1.2e, précision demandée= %1.2e",_maxPetscIts,residu,_precision);
         PetscPrintf(PETSC_COMM_WORLD,"Solver used %s, preconditioner %s, Final number of iteration = %d",_ksptype,_pctype,_PetscIts);
 		*_runLogFile<<"!!!!!!!!!!!!! Erreur système linéaire : pas de convergence de Petsc."<<endl;
         *_runLogFile<<"!!!!!!!!!!!!! Itérations maximales "<<_maxPetscIts<<" atteintes, résidu="<<residu<<", précision demandée= "<<_precision<<endl;
@@ -607,7 +613,7 @@ bool StationaryDiffusionEquation::iterateNewtonStep(bool &converged)
     else{
         if( _MaxIterLinearSolver < _PetscIts)
             _MaxIterLinearSolver = _PetscIts;
-        PetscPrintf(PETSC_COMM_WORLD,"## Système linéaire résolu en %d itérations par le solveur %s et le preconditioneur %s, précision demandée = %1.2f",_PetscIts,_ksptype,_pctype,_precision);
+        PetscPrintf(PETSC_COMM_WORLD,"## Système linéaire résolu en %d itérations par le solveur %s et le preconditioneur %s, précision demandée = %1.2e",_PetscIts,_ksptype,_pctype,_precision);
 		*_runLogFile<<"## Système linéaire résolu en "<<_PetscIts<<" itérations par le solveur "<<  _ksptype<<" et le preconditioneur "<<_pctype<<", précision demandée= "<<_precision<<endl<<endl;
         VecCopy(_Tk, _deltaT);//ici on a deltaT=Tk
         VecAXPY(_deltaT,  -1, _Tkm1);//On obtient deltaT=Tk-Tkm1
@@ -623,7 +629,7 @@ bool StationaryDiffusionEquation::iterateNewtonStep(bool &converged)
 		VecNorm(_deltaT,NORM_INFINITY,&_erreur_rel);
 
 		if(_verbose)
-			PetscPrintf(PETSC_COMM_WORLD,"Fin calcul de la variation relative, erreur maximale : %1.2f", _erreur_rel );
+			PetscPrintf(PETSC_COMM_WORLD,"Fin calcul de la variation relative, erreur maximale : %1.2e", _erreur_rel );
         stop=false;
         converged = (_erreur_rel <= _precision) ;//converged=convergence des iterations de Newton
     }
@@ -1042,6 +1048,9 @@ StationaryDiffusionEquation::getOutputField(const string& nameField )
 void
 StationaryDiffusionEquation::setInputField(const string& nameField, Field& inputField )
 {
+	if(!_meshSet)
+		throw CdmathException("!!!!!!!! StationaryDiffusionEquation::setInputField set the mesh first");
+
 	if(nameField=="FluidTemperature" || nameField=="FLUIDTEMPERATURE" || nameField=="TemperatureFluide" || nameField=="TEMPERATUREFLUIDE")
 		return setFluidTemperatureField( inputField) ;
 	else if(nameField=="HeatPower" || nameField=="HEATPOWER" || nameField=="PuissanceThermique" || nameField=="PUISSANCETHERMIQUE" )
@@ -1051,4 +1060,34 @@ StationaryDiffusionEquation::setInputField(const string& nameField, Field& input
         cout<<"Error : Field name "<< nameField << " is not an input field name, call getInputFieldsNames first" << endl;
         throw CdmathException("StationaryDiffusionEquation::setInputField error : Unknown Field name");
     }
+}
+
+void 
+StationaryDiffusionEquation::setFluidTemperatureField(Field coupledTemperatureField){
+	if(!_meshSet)
+		throw CdmathException("!!!!!!!! StationaryDiffusionEquation::setFluidTemperatureField set initial field first");
+
+	coupledTemperatureField.getMesh().checkFastEquivalWith(_mesh);
+	_fluidTemperatureField=coupledTemperatureField;
+	_fluidTemperatureFieldSet=true;
+};
+
+void 
+StationaryDiffusionEquation::setHeatPowerField(Field heatPower){
+	if(!_meshSet)
+		throw CdmathException("!!!!!!!! StationaryDiffusionEquation::setHeatPowerField set initial field first");
+
+	heatPower.getMesh().checkFastEquivalWith(_mesh);
+	_heatPowerField=heatPower;
+	_heatPowerFieldSet=true;
+}
+
+void 
+StationaryDiffusionEquation::setHeatPowerField(string fileName, string fieldName, int iteration, int order, int meshLevel){
+	if(!_meshSet)
+		throw CdmathException("!!!!!!!! StationaryDiffusionEquation::setHeatPowerField set initial field first");
+
+	_heatPowerField=Field(fileName, CELLS,fieldName, iteration, order, meshLevel);
+	_heatPowerField.getMesh().checkFastEquivalWith(_mesh);
+	_heatPowerFieldSet=true;
 }
