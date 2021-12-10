@@ -6,9 +6,6 @@ import sys
 import medcoupling as MC
 import MEDLoader as ML
 
-#filename = "locrafgrid_1_new.msh"
-#filename = "checkerboard_2x2x2_new.msh"
-
 if len(sys.argv) != 2:
   print( "USAGE: convert_gmsh_to_med.py file.msh")
   sys.exit(-1)
@@ -20,6 +17,7 @@ print( "Converting ", filename)
 # type de maille en fonction du nombre de noeuds.
 # cf INTERP_KERNEL/CellModel.cxx
 d_cell_types = {8: MC.NORM_HEXA8,
+                4: MC.NORM_TETRA4,
                 6: MC.NORM_PENTA6}
 
 mesh_dim = 3
@@ -37,18 +35,18 @@ cell_connectivity = []
 
 mesh = MC.MEDCouplingUMesh.New()
 mesh.setMeshDimension(mesh_dim)
-mesh.setName("mesh_from_gmsh")
+mesh.setName("mesh_from_msh")
 
-with open(filename, 'rb') as f:
+with open(filename, 'r', encoding="iso-8859-1") as f:
   for line in f:
     # remove end of line character
     line = line[:-1]
     infos = line.split()
-    #print infos
+    #print(infos)
     if infos and infos[0] == "Vertices":
       nb_vertices = int(infos[1])
       read_vertices = True
-    elif infos and infos[0] == "Volumes->faces":
+    elif infos and (infos[0] == "Volumes->faces" or infos[0] == "Volumes->Faces"):
       # stop reading node coords
       read_vertices = False
       meshCoords = MC.DataArrayDouble.New()
@@ -136,12 +134,12 @@ for i, coord in enumerate(barycenters):
   elif abs(z-1) < tol:
     ids_front.append(i)
 
-arr_left = MC.DataArrayIdType(ids_left)
-arr_right = MC.DataArrayIdType(ids_right)
-arr_bottom = MC.DataArrayIdType(ids_bottom)
-arr_top = MC.DataArrayIdType(ids_top)
-arr_back = MC.DataArrayIdType(ids_back)
-arr_front = MC.DataArrayIdType(ids_front)
+arr_left = MC.DataArrayInt64(ids_left)
+arr_right = MC.DataArrayInt64(ids_right)
+arr_bottom = MC.DataArrayInt64(ids_bottom)
+arr_top = MC.DataArrayInt64(ids_top)
+arr_back = MC.DataArrayInt64(ids_back)
+arr_front = MC.DataArrayInt64(ids_front)
 
 arr_left.setName("Left")
 arr_right.setName("Right")
