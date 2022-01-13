@@ -5,39 +5,54 @@
 
 using namespace std;
 
-TransportEquation::TransportEquation(phase fluid, pressureMagnitude pEstimate,vector<double> vitesseTransport, MPI_Comm comm):ProblemCoreFlows(comm)
+TransportEquation::TransportEquation(FluidMaterial fluid, pressureEstimate pEstimate,vector<double> vitesseTransport, MPI_Comm comm):ProblemCoreFlows(comm)
 {
-	if(pEstimate==around1bar300KTransport){
+	if(pEstimate==around1bar300K){
 		_Tref=300;
-		if(fluid==GasPhase){//Nitrogen pressure 1 bar and temperature 27°C
-			_href=3.11e5; //nitrogen enthalpy at 1 bar and 300K
-			_cpref=1041;//nitrogen specific heat at constant pressure 1 bar and 300K
-			//saturation data for nitrogen at 1 bar and 77K
-			_hsatv=0.77e5;//nitrogen vapour enthalpy at saturation at 1 bar
-			_hsatl=-1.22e5;//nitrogen liquid enthalpy at saturation at 1 bar
-			_rhosatv=4.556;//nitrogen vapour density at saturation at 1 bar
-			_rhosatl=806.6;//nitrogen liquid density at saturation at 1 bar
-		}
-		else{
-			//Water at pressure 1 bar and temperature 27°C
-			_href=1.127e5; //water enthalpy at 1 bar and 300K
-			_cpref=4181;//water specific heat at 1 bar and 300K
-			//saturation data for water at 1 bar and 373K
-			_hsatv=2.675e6;//Gas enthalpy at saturation at 1 bar
-			_hsatl=4.175e5;//water enthalpy at saturation at 1 bar
-			_rhosatv=0.6;//Gas density at saturation at 1 bar
-			_rhosatl=958;//water density at saturation at 1 bar
+		switch (fluid) 
+		{
+			case Air://Nitrogen pressure 1 bar and temperature 27°C
+				_href=3.11e5; //nitrogen enthalpy at 1 bar and 300K
+				_cpref=1041;//nitrogen specific heat at constant pressure 1 bar and 300K
+				//saturation data for nitrogen at 1 bar and 77K
+				_hsatv=0.77e5;//nitrogen vapour enthalpy at saturation at 1 bar
+				_hsatl=-1.22e5;//nitrogen liquid enthalpy at saturation at 1 bar
+				_rhosatv=4.556;//nitrogen vapour density at saturation at 1 bar
+				_rhosatl=806.6;//nitrogen liquid density at saturation at 1 bar
+				cout<<"Air at around 1 bar and 300 Kelvin"<<endl;
+				break;
+			case Water://Water at pressure 1 bar and temperature 27°C
+				_href=1.127e5; //water enthalpy at 1 bar and 300K
+				_cpref=4181;//water specific heat at 1 bar and 300K
+				//saturation data for water at 1 bar and 373K
+				_hsatv=2.675e6;//Gas enthalpy at saturation at 1 bar
+				_hsatl=4.175e5;//water enthalpy at saturation at 1 bar
+				_rhosatv=0.6;//Gas density at saturation at 1 bar
+				_rhosatl=958;//water density at saturation at 1 bar
+				cout<<"Water at around 1 bar and 300 Kelvin"<<endl;
+				break;
+			default://Solid phase
+				cout<<"Error TransportEquation::TransportEquation : Only Gas and Liquid phases accepted"<<endl;
+				throw CdmathException("TransportEquation::TransportEquation : Wrong material phase requested");
 		}
 	}
 	else{//around155bars600K
 		_Tref=618;//=Tsat
-		if(fluid==GasPhase){
-			_href=2.675e6; //Gas enthalpy at 155 bars and 618K
-			_cpref=14001;//Gas specific heat at 155 bar and 618K
-		}
-		else{//Liquid
-			_href=4.175e5;//water enthalpy at 155 bars and 618K
-			_cpref=8950;//water specific heat at 155 bar and 618K
+		switch (fluid) 
+		{
+			case Air://Nitrogen pressure 155 bars and temperature 327°C
+				_href=2.675e6; //Gas enthalpy at 155 bars and 618K
+				_cpref=14001;//Gas specific heat at 155 bar and 618K
+				cout<<"Air at around 155 bar and 600 Kelvin"<<endl;
+				break;
+			case Water://Water at pressure 155 bars and temperature 327°C
+				_href=4.175e5;//water enthalpy at 155 bars and 618K
+				_cpref=8950;//water specific heat at 155 bar and 618K
+				cout<<"Water at around 155 bar and 600 Kelvin"<<endl;
+				break;
+			default://Solid phase
+				cout<<"Error TransportEquation::TransportEquation : Only Gas and Liquid phases accepted"<<endl;
+				throw CdmathException("TransportEquation::TransportEquation : Wrong material phase requested");
 		}
 		//saturation data for water at 155 bars and 618K
 		_hsatv=2.6e6;//Gas enthalpy at saturation at 155 bars
@@ -124,14 +139,8 @@ void TransportEquation::initialize()
 		VecCreateSeq(PETSC_COMM_SELF,_globalNbUnknowns,&_Hn_seq);//For saving results on proc 0
 	VecScatterCreateToZero(_Hn,&_scat,&_Hn_seq);
 
-	//Linear solver
-	KSPCreate(PETSC_COMM_SELF, &_ksp);
-	KSPSetType(_ksp, _ksptype);
-	// if(_ksptype == KSPGMRES) KSPGMRESSetRestart(_ksp,10000);
-	KSPSetTolerances(_ksp,_precision,_precision,PETSC_DEFAULT,_maxPetscIts);
-	KSPGetPC(_ksp, &_pc);
-	PCSetType(_pc, _pctype);
-
+	createKSP();
+	
 	_initializedMemory=true;
 	save();//save initial data
 }
@@ -648,4 +657,62 @@ TransportEquation::setRodTemperatureField(Field rodTemperature){
 	_rodTemperatureField=rodTemperature;
 	_rodTemperatureFieldSet=true;
 	_isStationary=false;//Source term may be changed after previously reaching a stationary state
+}
+
+void 
+TransportEquation::setDirichletBoundaryCondition(string groupName, string fileName, string fieldName, int timeStepNumber, int order, int meshLevel, int field_support_type){
+	if(_FECalculation && field_support_type != NODES)
+		cout<<"Warning : finite element simulation should have boundary field on nodes!!! Change parameter field_support_type"<<endl;
+	else if(!_FECalculation && field_support_type == NODES)
+		cout<<"Warning : finite volume simulation should not have boundary field on nodes!!! Change parameter field_support_type"<<endl;
+
+	Field VV;
+	
+	switch(field_support_type)
+	{
+	case CELLS:
+		VV = Field(fileName, CELLS, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	case NODES:
+		VV = Field(fileName, NODES, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	case FACES:
+		VV = Field(fileName, FACES, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	default:
+		std::ostringstream message;
+		message << "Error TransportEquation::setDirichletBoundaryCondition \n Accepted field support integers are "<< CELLS <<" (for CELLS), "<<NODES<<" (for NODES), and "<< FACES <<" (for FACES)" ;
+		throw CdmathException(message.str().c_str());
+	}	
+	/* For the moment the boundary value is taken constant equal to zero */
+	_limitField[groupName]=LimitFieldTransport(DirichletTransport,-1, 0,-1);//This line will be deleted when variable BC are properly treated in solverlab 
+}
+
+void 
+TransportEquation::setNeumannBoundaryCondition(string groupName, string fileName, string fieldName, int timeStepNumber, int order, int meshLevel, int field_support_type){
+	if(_FECalculation && field_support_type != NODES)
+		cout<<"Warning : finite element simulation should have boundary field on nodes!!! Change parameter field_support_type"<<endl;
+	else if(!_FECalculation && field_support_type == NODES)
+		cout<<"Warning : finite volume simulation should not have boundary field on nodes!!! Change parameter field_support_type"<<endl;
+
+	Field VV;
+	
+	switch(field_support_type)
+	{
+	case CELLS:
+		VV = Field(fileName, CELLS, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	case NODES:
+		VV = Field(fileName, NODES, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	case FACES:
+		VV = Field(fileName, FACES, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	default:
+		std::ostringstream message;
+		message << "Error TransportEquation::setNeumannBoundaryCondition \n Accepted field support integers are "<< CELLS <<" (for CELLS), "<<NODES<<" (for NODES), and "<< FACES <<" (for FACES)" ;
+		throw CdmathException(message.str().c_str());
+	}	
+	/* For the moment the boundary value is taken constant equal to zero */
+	_limitField[groupName]=LimitFieldTransport(NeumannTransport,-1, 0,-1);//This line will be deleted when variable BC are properly treated in solverlab 
 }
