@@ -266,39 +266,8 @@ void DiffusionEquation::initialize()
 		VecCreateSeq(PETSC_COMM_SELF, _globalNbUnknowns, &_Tn_seq);//For saving results on proc 0
 	VecScatterCreateToZero(_Tn,&_scat,&_Tn_seq);
 
-	//Linear solver
-	KSPCreate(PETSC_COMM_WORLD, &_ksp);
-	KSPSetType(_ksp, _ksptype);
-	KSPGetPC(_ksp, &_pc);
-	if(_mpi_size==1 )
-		PCSetType(_pc, _pctype);
-	else
-	{
-		PCSetType(_pc, PCBJACOBI);//Global preconditioner is block jacobi
-		if(_pctype != (char*)&PCILU)//Default pc type is ilu
-		{
-			PetscOptionsSetValue(NULL,"-sub_pc_type ",_pctype);
-			PetscOptionsSetValue(NULL,"-sub_ksp_type ","preonly");
-			//If the above setvalue does not work, try the following
-			/*
-			KSPSetUp(_ksp);//to set the block Jacobi data structures (including creation of an internal KSP context for each block)
-			KSP * subKSP;
-			PC subpc;
-			int nlocal;//nb local blocs (should equal 1)
-			PCBJacobiGetSubKSP(_pc,&nlocal,NULL,&subKSP);
-			if(nlocal==1)
-			{
-				KSPSetType(subKSP[0], KSPPREONLY);//local block solver is same as global
-				KSPGetPC(subKSP[0],&subpc);
-				PCSetType(subpc,_pctype);
-			}
-			else
-				throw CdmathException("PC Block Jacobi, more than one block in this processor!!");
-			*/ 
-		}
-	}
-	KSPSetTolerances(_ksp,_precision,_precision,PETSC_DEFAULT,_maxPetscIts);
-
+	createKSP();
+	
 	_initializedMemory=true;
 	save();//save initial data
 }
@@ -938,3 +907,61 @@ DiffusionEquation::setFluidTemperatureField(Field coupledTemperatureField){
 	_fluidTemperatureField=coupledTemperatureField;
 	_fluidTemperatureFieldSet=true;
 };
+
+void 
+DiffusionEquation::setDirichletBoundaryCondition(string groupName, string fileName, string fieldName, int timeStepNumber, int order, int meshLevel, int field_support_type){
+	if(_FECalculation && field_support_type != NODES)
+		cout<<"Warning : finite element simulation should have boundary field on nodes!!! Change parameter field_support_type"<<endl;
+	else if(!_FECalculation && field_support_type == NODES)
+		cout<<"Warning : finite volume simulation should not have boundary field on nodes!!! Change parameter field_support_type"<<endl;
+
+	Field VV;
+	
+	switch(field_support_type)
+	{
+	case CELLS:
+		VV = Field(fileName, CELLS, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	case NODES:
+		VV = Field(fileName, NODES, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	case FACES:
+		VV = Field(fileName, FACES, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	default:
+		std::ostringstream message;
+		message << "Error DiffusionEquation::setDirichletBoundaryCondition \n Accepted field support integers are "<< CELLS <<" (for CELLS), "<<NODES<<" (for NODES), and "<< FACES <<" (for FACES)" ;
+		throw CdmathException(message.str().c_str());
+	}	
+	/* For the moment the boundary value is taken constant equal to zero */
+	_limitField[groupName]=LimitFieldDiffusion(DirichletDiffusion,0,-1);//This line will be deleted when variable BC are properly treated in solverlab 
+}
+
+void 
+DiffusionEquation::setNeumannBoundaryCondition(string groupName, string fileName, string fieldName, int timeStepNumber, int order, int meshLevel, int field_support_type){
+	if(_FECalculation && field_support_type != NODES)
+		cout<<"Warning : finite element simulation should have boundary field on nodes!!! Change parameter field_support_type"<<endl;
+	else if(!_FECalculation && field_support_type == NODES)
+		cout<<"Warning : finite volume simulation should not have boundary field on nodes!!! Change parameter field_support_type"<<endl;
+
+	Field VV;
+	
+	switch(field_support_type)
+	{
+	case CELLS:
+		VV = Field(fileName, CELLS, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	case NODES:
+		VV = Field(fileName, NODES, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	case FACES:
+		VV = Field(fileName, FACES, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	default:
+		std::ostringstream message;
+		message << "Error DiffusionEquation::setNeumannBoundaryCondition \n Accepted field support integers are "<< CELLS <<" (for CELLS), "<<NODES<<" (for NODES), and "<< FACES <<" (for FACES)" ;
+		throw CdmathException(message.str().c_str());
+	}	
+	/* For the moment the boundary value is taken constant equal to zero */
+	_limitField[groupName]=LimitFieldDiffusion(NeumannDiffusion,-1,0);//This line will be deleted when variable BC are properly treated in solverlab 
+}

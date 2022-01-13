@@ -78,6 +78,20 @@ public :
 	void setDirichletBoundaryCondition(string groupName,double Temperature=0){
 		_limitField[groupName]=LimitFieldDiffusion(DirichletDiffusion,Temperature,-1);
 	};
+	/** \fn setDirichletBoundaryCondition
+			 * \brief adds a new boundary condition of type Dirichlet
+			 * \details Reads the boundary field in a med file
+			 * \param [in] string : the name of the boundary
+			 * \param [in] string : the file name
+			 * \param [in] string : the field name
+			 * \param [in] int : the time step number
+			 * \param [in] int : int corresponding to the enum CELLS or NODES
+			 * \param [out] void
+			 *  */
+	void setDirichletBoundaryCondition(string groupName, string fileName, string fieldName, int timeStepNumber, int order, int meshLevel, int field_support_type);
+	void setDirichletBoundaryCondition(string groupName, Field bc_field){
+		_limitField[groupName]=LimitFieldDiffusion(DirichletDiffusion,0,-1);//This line will be deleted when variable BC are properly treated in solverlab 
+	}
 	/** \fn setNeumannBoundaryCondition
 			 * \brief adds a new boundary condition of type Neumann
 			 * \details
@@ -87,7 +101,20 @@ public :
 	void setNeumannBoundaryCondition(string groupName, double normalFlux=0){
 		_limitField[groupName]=LimitFieldDiffusion(NeumannDiffusion,-1, normalFlux);
 	};
-
+	/** \fn setNeumannBoundaryCondition
+			 * \brief adds a new boundary condition of type Neumann
+			 * \details Reads the boundary field in a med file
+			 * \param [in] string : the name of the boundary
+			 * \param [in] string : the file name
+			 * \param [in] string : the field name
+			 * \param [in] int : the time step number
+			 * \param [in] int : int corresponding to the enum CELLS or NODES 
+			 * \param [out] void
+			 *  */
+	void setNeumannBoundaryCondition(string groupName, string fileName, string fieldName, int timeStepNumber, int order, int meshLevel, int field_support_type);
+	void setNeumannBoundaryCondition(string groupName, Field BC_Field){
+		_limitField[groupName]=LimitFieldDiffusion(NeumannDiffusion,-1, 0);//This line will be deleted when variable BC are properly treated in solverlab 
+	};
 	void setDirichletValues(map< int, double> dirichletBoundaryValues);
 	void setNeumannValues(map< int, double> neumannBoundaryValues);
 
@@ -155,6 +182,6 @@ protected :
     bool _neumannValuesSet;
     std::map< int, double> _dirichletBoundaryValues;
     std::map< int, double> _neumannBoundaryValues;
-    };
+};
 
 #endif /* DiffusionEquation_HXX_ */
