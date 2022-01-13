@@ -13,6 +13,7 @@
 #include <MEDCouplingCMesh.hxx>
 #include <MEDFileField1TS.hxx>
 #include "MEDFileMesh.hxx"
+#include "MEDLoader.hxx"
 
 using namespace std;
 using namespace MEDCoupling;
@@ -254,12 +255,16 @@ FieldTests::testClassField( void )
 	CPPUNIT_ASSERT_EQUAL( 8, concF2.getNumberOfElements() );
     CPPUNIT_ASSERT(concF2.meshNotDeleted());
     concF2.writeMED("FieldConcF2");//This saves the mesh and the values of iteration 0 at time t=0
-//   	concF2.deleteMEDCouplingUMesh();//medcouplingmesh is no longer needed as the mesh was already saved in the previous line
+    concF2.writeVTK("FieldConcF2");//This saves the mesh and the values of iteration 0 at time t=0
+    concF2.writeCSV("FieldConcF2");//This saves the mesh and the values of iteration 0 at time t=0
+   	concF2.deleteMEDCouplingMesh();//medcouplingmesh is no longer needed as the mesh was already saved in the previous line
     concF2.setTime(0.5,1);//Increase the time to 0.5 and the iteration to 1
     for (int j=0;j<concF2.getNumberOfComponents();j++)
     	for (int i=0;i<concF2.getNumberOfElements();i++)
-    		concF2(i,j)=i*j;
-    concF2.writeMED("FieldConcF2", true);//This saves only the values of iteration 1 at time t=0.5. The previous values are not deleted
+    		concF2(i,j)=i*(j+2);
+    concF2.writeMED("FieldConcF2", false);//This saves only the values of iteration 1 at time t=0.5. The previous values are not deleted
+    concF2.writeVTK("FieldConcF2", false);//This saves only the values of iteration 1 at time t=0.5. The previous values are not deleted
+    concF2.writeCSV("FieldConcF2");//This saves only the values of iteration 1 at time t=0.5. The previous values are not deleted
 	
 	Mesh M3(0.0,1.0,2,0.,1.,2,0.,1.,2);
 	Field concF3("CONCENTRATION",FACES,M3) ;
@@ -285,13 +290,17 @@ FieldTests::testClassField( void )
     		CPPUNIT_ASSERT_EQUAL( double(i+j), concF4(i,j) );
     CPPUNIT_ASSERT(concF4.meshNotDeleted());
     concF4.writeMED("FieldConcF4");//This saves the mesh and the values of iteration 0 at time t=0
-//   	concF4.deleteMEDCouplingUMesh();//medcouplingmesh is no longer needed as the mesh was already saved in the previous line
+    concF4.writeVTK("FieldConcF4");//This saves the mesh and the values of iteration 0 at time t=0
+    concF4.writeCSV("FieldConcF4");//This saves the mesh and the values of iteration 0 at time t=0
+   	concF4.deleteMEDCouplingMesh();//medcouplingmesh is no longer needed as the mesh was already saved in the previous line
     concF4.setTime(0.5,1);//Increase the time to 0.5 and the iteration to 1
     for (int j=0;j<concF4.getNumberOfComponents();j++)
     	for (int i=0;i<concF4.getNumberOfElements();i++)
-    		concF4(i,j)=i*j;
+    		concF4(i,j)=i*(j+2);
     concF4.writeMED("FieldConcF4", false);//This saves only the values of iteration 1 at time t=0.5. The previous values are not deleted
-		
+    concF4.writeVTK("FieldConcF4", false);//This saves only the values of iteration 1 at time t=0.5. The previous values are not deleted
+    concF4.writeCSV("FieldConcF4");//This saves only the values of iteration 1 at time t=0.5. The previous values are not deleted
+			
 	//Create a constant field on the mesh fileNameMEDn
 	Field concF5(fileNameMEDn,NODES,std::vector<double> (3,1),"CONSTANT_Field");
 	CPPUNIT_ASSERT_EQUAL( 3, concF5.getNumberOfComponents() );
@@ -305,103 +314,83 @@ FieldTests::testClassField( void )
     cout<<"Mesh name : " << concF5.getMesh().getName()<<endl;
     cout<<"Field name : " << concF5.getName()<<endl;
     concF5.setTime(0.5,1);//Increase the time to 0.5 and the iteration to 1
-    concF5.writeMED("FieldConcF5",false);//This saves the mesh and the values of iteration 0 at time t=0
-  	//concF5.deleteMEDCouplingUMesh();//medcouplingmesh is no longer needed as the mesh was already saved in the previous line
+    concF5.writeMED("FieldConcF5");//This saves the mesh and the values of iteration 0 at time t=0
+    concF5.writeVTK("FieldConcF5");//This saves the mesh and the values of iteration 0 at time t=0
+    concF5.writeCSV("FieldConcF5");//This saves the mesh and the values of iteration 0 at time t=0
+  	concF5.deleteMEDCouplingMesh();//medcouplingmesh is no longer needed as the mesh was already saved in the previous line
     for (int j=0;j<concF5.getNumberOfComponents();j++)
     	for (int i=0;i<concF5.getNumberOfElements();i++)
     		concF5(i,j)=i*j;
-    //concF5.writeMED("FieldConcF5", false);//This saves only the values of iteration 1 at time t=0.5. The previous values are not deleted
+    concF5.writeMED("FieldConcF5", false);//This saves only the values of iteration 1 at time t=0.5. The previous values are not deleted
+    concF5.writeVTK("FieldConcF5", false);//This saves only the values of iteration 1 at time t=0.5. The previous values are not deleted
+    concF5.writeCSV("FieldConcF5");//This saves only the values of iteration 1 at time t=0.5. The previous values are not deleted
 	
-
-	/* 2D image mesh */
-	//int _spaceDim=2;
-	//double *originPtr = new double[_spaceDim];
-	//double *dxyzPtr = new double[_spaceDim];
-	//mcIdType *nodeStrctPtr = new mcIdType[_spaceDim];
-
-	//originPtr[0]=0;
-	//originPtr[1]=0;
-	//nodeStrctPtr[0]=3;
-	//nodeStrctPtr[1]=3;
-	//dxyzPtr[0]=1;
-	//dxyzPtr[1]=1;
-
-	//MEDCouplingIMesh * _mesh=MEDCouplingIMesh::New("test",
-			//_spaceDim,
-			//nodeStrctPtr,
-			//nodeStrctPtr+_spaceDim,
-			//originPtr,
-			//originPtr+_spaceDim,
-			//dxyzPtr,
-			//dxyzPtr+_spaceDim);
-	//MEDCouplingUMesh * m1 = _mesh->buildUnstructured();
-	//m1->setName("mesh");
-
-	//MEDCouplingFieldDouble * f = MEDCouplingFieldDouble::New(ON_CELLS, ONE_TIME);
-	//f->setMesh(m1);
-	//f->setName("F");
-	//*f=0;
-	//f->setTime(0.0,0,0);
-	
-	//MEDFileField1TS * ff;
-	//ff->setFieldNoProfileSBT(f);	
-
-	/* 1D image mesh */
-	//int _spaceDim=1;
-	//double *originPtr = new double[_spaceDim];
-	//double *dxyzPtr = new double[_spaceDim];
-	//mcIdType *nodeStrctPtr = new mcIdType[_spaceDim];
-
-	//originPtr[0]=0;
-	//nodeStrctPtr[0]=3;
-	//dxyzPtr[0]=1;
-
-	//MEDCouplingIMesh * _mesh=MEDCouplingIMesh::New("test",
-			//_spaceDim,
-			//nodeStrctPtr,
-			//nodeStrctPtr+_spaceDim,
-			//originPtr,
-			//originPtr+_spaceDim,
-			//dxyzPtr,
-			//dxyzPtr+_spaceDim);
-	//MEDCouplingUMesh * m1 = _mesh->buildUnstructured();
-	//m1->setName("mesh");
-
-	//MEDCouplingFieldDouble * f = MEDCouplingFieldDouble::New(ON_CELLS, ONE_TIME);
-	//f->setMesh(m1);
-	//f->setName("F");
-	//*f=0;
-	//f->setTime(0.0,0,0);
-	
-	//MEDFileField1TS * ff;
-	//ff->setFieldNoProfileSBT(f);	
-
-	/* 2D cartesian mesh */
-	//Dataarray
+	/* Delete the mesh then save the field */
+	// Build a 2D cartesian mesh
 	double XCoords[3]={0.,1.,2.};
 	double YCoords[3]={0.,1.,2.};
-	MEDCoupling::DataArrayDouble *arrX=MEDCoupling::DataArrayDouble::New();
+	MCAuto<DataArrayDouble> arrX=DataArrayDouble::New();
 	arrX->alloc(3,1);
 	std::copy(XCoords,XCoords+3,arrX->getPointer());
 	arrX->setInfoOnComponent(0,"X [m]");
-	MEDCoupling::DataArrayDouble *arrY=MEDCoupling::DataArrayDouble::New();
+	MCAuto<DataArrayDouble> arrY=DataArrayDouble::New();
 	arrY->alloc(3,1);
 	std::copy(YCoords,YCoords+3,arrY->getPointer());
 	arrY->setInfoOnComponent(0,"Y [m]");
 	//Mesh
-	MEDCoupling::MEDCouplingCMesh *mesh=MEDCoupling::MEDCouplingCMesh::New("My2D_CMesh");
+	MCAuto<MEDCouplingCMesh> mesh=MEDCouplingCMesh::New("My2D_CMesh");
 	mesh->setCoords(arrX,arrY);
-	arrX->decrRef();
-	arrY->decrRef();
-	MEDCouplingUMesh * m1 = mesh->buildUnstructured();
+	MCAuto<MEDCouplingUMesh> m1 = mesh->buildUnstructured();
 	m1->setName("mesh");
 	//Field
-	MEDCouplingFieldDouble * f = MEDCouplingFieldDouble::New(ON_CELLS, ONE_TIME);
+	MCAuto<MEDCouplingFieldDouble> f = MEDCouplingFieldDouble::New(ON_CELLS, ONE_TIME);
 	f->setMesh(m1);
 	f->setName("F");
-	*f=0;
 	f->setTime(0.0,0,0);
-	//MEDFileField1TS
-	MEDFileField1TS * ff;
-	//ff->setFieldNoProfileSBT(f);	
+	
+	MCAuto<DataArrayDouble> da = DataArrayDouble::New(); da->alloc(4,1);
+	double vals[4]={1.,2., 3., 4.};
+	std::copy(vals,vals+4,da->rwBegin());
+	f->setArray(da);
+		
+	// Sauvegarde Maillage d'abord:
+	auto fName = "./test.med";
+	MEDCoupling::WriteUMesh(fName, m1, true);
+	
+	// Maintenant juste les champs:
+	MCAuto<MEDFileField1TS> ff = MEDFileField1TS::New();
+	ff->setFieldNoProfileSBT(f);
+	ff->write(fName, 0);  // 0 overwrite
+	
+	// Tue le maillage
+	m1 = 0;  // directly garbage collected, this is C++ man !!
+	
+	// Ecrit encore du champ:
+	MCAuto<DataArrayDouble> da2 = da->deepCopy();
+	f->setTime(1.0,1,0);
+	MCAuto<DataArrayDouble> da3 = da2->negate();
+	f->setArray(da3);
+	
+	MCAuto<MEDFileField1TS> ff2 = MEDFileField1TS::New();
+	
+	ff2->setFieldNoProfileSBT(f);  // le maillage n'existe plus, tant pis :-)
+	ff2->write(fName, 0); // 0 oui oui on veut bien 0 ici.
+	
+	/* Create a field on a boundary */
+    Mesh Msquare("./meshSquare.med", "Mesh_1", 0);
+    Mesh Mbottom = Msquare.getBoundaryGroupMesh ( "Bottom" );
+	Mbottom.writeMED("./meshSquare", false);
+    Mbottom.writeVTK("./meshSquare");
+	Field Fbottom_cells("Bottom_BC",CELLS,Mbottom);
+	for(int i=0; i<Fbottom_cells.getNumberOfElements(); i++)
+		Fbottom_cells[i]=300;
+	Fbottom_cells.writeMED("./meshSquare",false);
+	Fbottom_cells.writeVTK("./meshSquare",true);
+	Fbottom_cells.writeCSV("./meshSquare");
+	Field Fbottom_nodes("Bottom_BC",NODES,Mbottom);
+	for(int i=0; i<Fbottom_nodes.getNumberOfElements(); i++)
+		Fbottom_nodes[i]=300;
+	Fbottom_nodes.writeMED("./meshSquare",false);
+	Fbottom_cells.writeVTK("./meshSquare",true);
+	Fbottom_cells.writeCSV("./meshSquare");	
 }

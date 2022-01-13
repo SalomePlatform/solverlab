@@ -84,8 +84,8 @@ MeshTests::testClassMesh( void )
     CPPUNIT_ASSERT(M1.meshNotDeleted());
     CPPUNIT_ASSERT(M1.isStructured());
 
-	double x11=M1.getCells()[1].x();
-	double y11=M1.getCells()[1].y();
+	double x11=M1.getCell(1).x();
+	double y11=M1.getCell(1).y();
 	CPPUNIT_ASSERT_EQUAL( x11, 1.5 );
 	CPPUNIT_ASSERT_EQUAL( y11, 0.0 );
 	M1.setGroupAtFaceByCoords(0.,0.,0.,1.E-14,"LeftEdge") ;
@@ -154,13 +154,13 @@ MeshTests::testClassMesh( void )
 	for(int i=0; i<nbCellsM2; i++)
 		areaM2+=M2.getCell(i).getMeasure();
 	CPPUNIT_ASSERT_DOUBLES_EQUAL( 16., areaM2, eps );
-	double x1=M2.getCells()[4].x();
-	double y1=M2.getCells()[4].y();
+	double x1=M2.getCell(4).x();
+	double y1=M2.getCell(4).y();
 	CPPUNIT_ASSERT_EQUAL( x1, 0.5 );
 	CPPUNIT_ASSERT_EQUAL( y1, 1.5 );
 
-	double x2=M2.getNodes()[24].x();
-	double y2=M2.getNodes()[24].y();
+	double x2=M2.getNode(24).x();
+	double y2=M2.getNode(24).y();
 	CPPUNIT_ASSERT_EQUAL( x2, 4. );
 	CPPUNIT_ASSERT_EQUAL( y2, 4. );
 
@@ -185,8 +185,8 @@ MeshTests::testClassMesh( void )
 	std::map<int,int> indexFaces=M2.getIndexFacePeriodic();
 	for (int i=0;i<nbFaces;i++)
 	{
-		double x=M2.getFaces()[i].x();
-		double y=M2.getFaces()[i].y();
+		double x=M2.getFace(i).x();
+		double y=M2.getFace(i).y();
 		if (y==0. && x==0.5)
 		{
 			int indexFace=M2.getIndexFacePeriodic(i);
@@ -299,9 +299,9 @@ MeshTests::testClassMesh( void )
 	indexFaces=M3.getIndexFacePeriodic();
 	for (int i=0;i<nbFaces;i++)
 	{
-		double x=M3.getFaces()[i].x();
-		double y=M3.getFaces()[i].y();
-		double z=M3.getFaces()[i].z();
+		double x=M3.getFace(i).x();
+		double y=M3.getFace(i).y();
+		double z=M3.getFace(i).z();
 		if (z==0. && x==1./8 && y==1./8)
 		{
 			int indexFace=M3.getIndexFacePeriodic(i);
@@ -369,7 +369,7 @@ MeshTests::testClassMesh( void )
     CPPUNIT_ASSERT_EQUAL( 40, M22.getNumberOfFaces() );
     CPPUNIT_ASSERT_EQUAL( 40, M22.getNumberOfEdges() );
     CPPUNIT_ASSERT(M22.meshNotDeleted());
-    CPPUNIT_ASSERT(!M22.isStructured());
+    CPPUNIT_ASSERT(M22.isStructured());
 
     cout<<"Test mesh M22 normals "<<endl;
     testNormals(M22);
@@ -414,7 +414,7 @@ MeshTests::testClassMesh( void )
     testNormals(M3Tetra);
 
     //Testing a 2D unstructured mesh (triangles)
-    Mesh M23("./meshSquare.med");
+    Mesh M23("./meshSquare.med", "Mesh_1", 0);
     CPPUNIT_ASSERT(M23.getNameOfFaceGroups().size() == 5);//There is a default group named "Boundary" that is created by the mesh class;
     CPPUNIT_ASSERT(M23.getNameOfFaceGroups()[0].compare("Boundary")==0);
     CPPUNIT_ASSERT(M23.getNameOfFaceGroups()[1].compare("Bottom")==0);
@@ -447,7 +447,7 @@ MeshTests::testClassMesh( void )
     CPPUNIT_ASSERT_EQUAL( 40, M6.getNumberOfFaces() );
     CPPUNIT_ASSERT_EQUAL( 40, M6.getNumberOfEdges() );
     CPPUNIT_ASSERT(M6.meshNotDeleted());
-    CPPUNIT_ASSERT(!M6.isStructured());
+    CPPUNIT_ASSERT(M6.isStructured());
 
     /*
     const MEDCouplingMesh* M1MEDMesh = M2.getMEDCouplingMesh();
@@ -513,14 +513,14 @@ MeshTests::testClassMesh( void )
     CPPUNIT_ASSERT_DOUBLES_EQUAL( 1., volM7, eps );
     
     //Testing deletion of MEDCoupling for unstructured meshes (should not deletethe structured meshes)
-    M1.deleteMEDCouplingUMesh();
-    M2.deleteMEDCouplingUMesh();
-    M23.deleteMEDCouplingUMesh();
-    M3.deleteMEDCouplingUMesh();
-    M4.deleteMEDCouplingUMesh();
-    M5.deleteMEDCouplingUMesh();
-    M2Triangle.deleteMEDCouplingUMesh();
-    M3Tetra.deleteMEDCouplingUMesh();
+    M1.deleteMEDCouplingMesh();
+    M2.deleteMEDCouplingMesh();
+    M23.deleteMEDCouplingMesh();
+    M3.deleteMEDCouplingMesh();
+    M4.deleteMEDCouplingMesh();
+    M5.deleteMEDCouplingMesh();
+    M2Triangle.deleteMEDCouplingMesh();
+    M3Tetra.deleteMEDCouplingMesh();
 
     //Testting boundary functions
     Mesh M5Boundary = M5.getBoundaryMesh (  );
