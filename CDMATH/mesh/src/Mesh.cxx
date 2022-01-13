@@ -5,22 +5,26 @@
  *      Authors: CDMATH
  */
 
-#include "Mesh.hxx"
-#include "Node.hxx"
-#include "Cell.hxx"
-#include "Face.hxx"
-
-#include "CdmathException.hxx"
-#include "MEDFileMesh.hxx"
-#include "MEDLoader.hxx"
-
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <iterator>
 #include <algorithm> 
-#include <string.h>
-#include <assert.h>
+#include <cassert> 
+
+#include "Mesh.hxx"
+#include "Node.hxx"
+#include "Cell.hxx"
+#include "Face.hxx"
+
+#include "MEDCouplingIMesh.hxx"
+#include "MEDCouplingUMesh.hxx"
+#include "MEDCouplingFieldDouble.hxx"
+
+#include "MEDFileMesh.hxx"
+#include "MEDLoader.hxx"
+
+#include "CdmathException.hxx"
 
 using namespace MEDCoupling;
 using namespace std;
@@ -41,14 +45,7 @@ Mesh::Mesh( void )
 	_numberOfCells = 0;
 	_numberOfEdges = 0;
     _isStructured=false;
-	_xMin=0.;
-	_xMax=0.;
-	_yMin=0.;
-	_yMax=0.;
-	_zMin=0.;
-	_zMax=0.;
     _nxyz.resize(0);
-    _dxyz.resize(0.);
 	_boundaryMesh=NULL;
     _boundaryFaceIds.resize(0);
     _boundaryNodeIds.resize(0);
@@ -67,10 +64,6 @@ Mesh::Mesh( void )
 Mesh::~Mesh( void )
 //----------------------------------------------------------------------
 {
-	delete [] _cells;
-	delete [] _nodes;
-	delete [] _faces;
-	
 	//for(int i=0; i< _faceGroups.size(); i++)
 	//	_faceGroups[i]->decrRef();
 	//	_nodeGroups[i]->decrRef();
@@ -84,97 +77,34 @@ Mesh::getName( void ) const
     return _name;
 }
 
-Mesh::Mesh( const MEDCoupling::MEDCouplingIMesh* mesh )
+Mesh::Mesh( MEDCoupling::MCAuto<const MEDCoupling::MEDCouplingMesh> mesh )
 {
 	_spaceDim=mesh->getSpaceDimension();
 	_meshDim=mesh->getMeshDimension();
-	_dxyz=mesh->getDXYZ();
-	_nxyz=mesh->getCellGridStructure();
-	double* Box0=new double[2*_spaceDim];
-	mesh->getBoundingBox(Box0);
     _name=mesh->getName();
     _epsilon=1e-6;
     _indexFacePeriodicSet=false;
+	_meshNotDeleted=true;
     
-	_xMin=Box0[0];
-	_xMax=Box0[1];
-	if (_spaceDim>=2)
-	{
-		_yMin=Box0[2];
-		_yMax=Box0[3];
-	}
-	if (_spaceDim>=3)
-	{
-		_zMin=Box0[4];
-		_zMax=Box0[5];
-	}
+	_mesh= mesh->clone(false);//Clone because you will need to buildUnstructured. No deep copy : it is assumed node coordinates and cell connectivity will not change
 
-	double *originPtr = new double[_spaceDim];
-	double *dxyzPtr = new double[_spaceDim];
-	mcIdType *nodeStrctPtr = new mcIdType[_spaceDim];
-
-	for(int i=0;i<_spaceDim;i++)
-	{
-		originPtr[i]=Box0[2*i];
-		nodeStrctPtr[i]=_nxyz[i]+1;
-		dxyzPtr[i]=_dxyz[i];
-	}
-	_mesh=MEDCouplingIMesh::New(_name,
-			_spaceDim,
-			nodeStrctPtr,
-			nodeStrctPtr+_spaceDim,
-			originPtr,
-			originPtr+_spaceDim,
-			dxyzPtr,
-			dxyzPtr+_spaceDim);
-    _meshNotDeleted=true;
-    _isStructured=true;
-
-	delete [] originPtr;
-	delete [] dxyzPtr;
-	delete [] nodeStrctPtr;
-	delete [] Box0 ;
-
-	setMesh();
-}
-
-Mesh::Mesh( const MEDCoupling::MEDCouplingUMesh* mesh )
-{
-	_spaceDim=mesh->getSpaceDimension();
-	_meshDim=mesh->getMeshDimension();
-	double* Box0=new double[2*_spaceDim];
-	mesh->getBoundingBox(Box0);
-    _name=mesh->getName();
-    _epsilon=1e-6;
-    _indexFacePeriodicSet=false;
-    
-	_xMin=Box0[0];
-	_xMax=Box0[1];
-	if (_spaceDim>=2)
-	{
-		_yMin=Box0[2];
-		_yMax=Box0[3];
-	}
-	if (_spaceDim>=3)
-	{
-		_zMin=Box0[4];
-		_zMax=Box0[5];
-	}
-
-	_mesh=mesh->deepCopy();
-	_mesh=mesh->buildUnstructured();
-    _meshNotDeleted=true;
-    _isStructured=false;
-	delete [] Box0 ;
+    MEDCoupling::MEDCouplingStructuredMesh* structuredMesh = dynamic_cast<MEDCoupling::MEDCouplingStructuredMesh*> (_mesh.retn());
+    if(structuredMesh)
+    {
+        _isStructured=true;
+        _nxyz=structuredMesh->getCellGridStructure();
+    }
+    else
+        _isStructured=false;
 
 	setMesh();
 }
 
 //----------------------------------------------------------------------
-Mesh::Mesh( const std::string filename, int meshLevel )
+Mesh::Mesh( const std::string filename, const std::string & meshName, int meshLevel)
 //----------------------------------------------------------------------
 {
-	readMeshMed(filename, meshLevel);
+	readMeshMed(filename, meshName, meshLevel);
 }
 
 //----------------------------------------------------------------------
@@ -185,17 +115,9 @@ Mesh::Mesh( const Mesh& mesh )
 	_meshDim = mesh.getMeshDimension() ;
     _name=mesh.getName();
     _epsilon=mesh.getComparisonEpsilon();
-    _xMax=mesh.getXMax();
-    _yMin=mesh.getYMin();
-    _yMax=mesh.getYMax();
-    _zMin=mesh.getZMin();
-    _zMax=mesh.getZMax();
     _isStructured=mesh.isStructured();
     if(_isStructured)
-    {
         _nxyz = mesh.getCellGridStructure() ;
-        _dxyz=mesh.getDXYZ();
-    }
 	_numberOfNodes = mesh.getNumberOfNodes();
 	_numberOfFaces = mesh.getNumberOfFaces();
 	_numberOfCells = mesh.getNumberOfCells();
@@ -206,23 +128,10 @@ Mesh::Mesh( const Mesh& mesh )
 	_nodeGroupNames = mesh.getNameOfNodeGroups() ;
 	_nodeGroups = mesh.getNodeGroups() ;
 
-	_nodes   = new Node[_numberOfNodes] ;
-	_faces   = new Face[_numberOfFaces] ;
-	_cells   = new Cell[_numberOfCells] ;
+	_nodes   = mesh.getNodes() ;
+	_faces   = mesh.getFaces() ;
+	_cells   = mesh.getCells() ;
     
-    //memcpy(_nodes,mesh.getNodes(),sizeof(*mesh.getNodes())) ;
-    //memcpy(_cells,mesh.getCells(),sizeof(*mesh.getCells())) ;
-    //memcpy(_faces,mesh.getFaces(),sizeof(*mesh.getFaces())) ;
-
-	for (int i=0;i<_numberOfNodes;i++)
-		_nodes[i]=mesh.getNode(i);
-
-	for (int i=0;i<_numberOfFaces;i++)
-		_faces[i]=mesh.getFace(i);
-
-	for (int i=0;i<_numberOfCells;i++)
-		_cells[i]=mesh.getCell(i);
-
     _indexFacePeriodicSet= mesh.isIndexFacePeriodicSet();
     if(_indexFacePeriodicSet)
         _indexFacePeriodicMap=mesh.getIndexFacePeriodic();
@@ -233,17 +142,23 @@ Mesh::Mesh( const Mesh& mesh )
     _eltsTypes=mesh.getElementTypes();
     _eltsTypesNames=mesh.getElementTypesNames();
     
-	MCAuto<MEDCouplingMesh> m1=mesh.getMEDCouplingMesh()->deepCopy();
+	MCAuto<MEDCouplingMesh> m1=mesh.getMEDCouplingMesh()->clone(false);//Clone because you will need to buildUnstructured. No deep copy : it is assumed node coordinates and cell connectivity will not change
+
 	_mesh=m1;
     _meshNotDeleted=mesh.meshNotDeleted();
 }
 
 //----------------------------------------------------------------------
 void
-Mesh::readMeshMed( const std::string filename, const int meshLevel)
+Mesh::readMeshMed( const std::string filename, const std::string & meshName, int meshLevel)
 //----------------------------------------------------------------------
 {
-	MEDFileUMesh *m=MEDFileUMesh::New(filename.c_str());//reads the first mesh encountered in the file, otherwise call New (const char *fileName, const char *mName, int dt=-1, int it=-1)
+	MEDFileMesh *m;
+	if( meshName == "" )
+		m=MEDFileMesh::New(filename.c_str());//reads the first mesh encountered in the file, otherwise call New (const char *fileName, const char *mName, int dt=-1, int it=-1)
+	else
+		m=MEDFileMesh::New(filename.c_str(), meshName.c_str());//seeks the mesh named meshName in the file
+
 	_mesh=m->getMeshAtLevel(meshLevel);
     _mesh->checkConsistencyLight();
 	_mesh->setName(_mesh->getName());
@@ -252,37 +167,22 @@ Mesh::readMeshMed( const std::string filename, const int meshLevel)
     _name=_mesh->getName();
     _epsilon=1e-6;
     _indexFacePeriodicSet=false;
-    MEDCoupling::MEDCouplingIMesh* structuredMesh = dynamic_cast<MEDCoupling::MEDCouplingIMesh*> (_mesh.retn());
+	_meshNotDeleted=true;
+
+    MEDCoupling::MEDCouplingStructuredMesh* structuredMesh = dynamic_cast<MEDCoupling::MEDCouplingStructuredMesh*> (_mesh.retn());
     if(structuredMesh)
     {
         _isStructured=true;
-		_meshNotDeleted=false;
-        _dxyz=structuredMesh->getDXYZ();
         _nxyz=structuredMesh->getCellGridStructure();
-        double* Box0=new double[2*_spaceDim];
-        structuredMesh->getBoundingBox(Box0);
-    
-        _xMin=Box0[0];
-        _xMax=Box0[1];
-        if (_spaceDim>=2)
-        {
-            _yMin=Box0[2];
-            _yMax=Box0[3];
-        }
-        if (_spaceDim>=3)
-        {
-            _zMin=Box0[4];
-            _zMax=Box0[5];
-        }
     }
     else
-    {
         _isStructured=false;
-		_meshNotDeleted=true;
-    }
     
 	MEDCouplingUMesh*  mu = setMesh();
-	setGroups(m, mu);
+	setNodeGroups(m, mu);//Works for both cartesan and unstructured meshes
+	MEDFileUMesh *umedfile=dynamic_cast< MEDFileUMesh * > (m);
+	if(umedfile)
+		setFaceGroups(umedfile, mu);//Works only for unstructured meshes
 
 	cout<<endl<< "Loaded file "<< filename<<endl;
     cout<<"Mesh name = "<<m->getName()<<", mesh dim = "<< _meshDim<< ", space dim = "<< _spaceDim<< ", nb cells= "<<getNumberOfCells()<< ", nb nodes= "<<getNumberOfNodes()<<endl;
@@ -290,523 +190,231 @@ Mesh::readMeshMed( const std::string filename, const int meshLevel)
 	m->decrRef();
 }
 
-void
-Mesh::setGroupAtFaceByCoords(double x, double y, double z, double eps, std::string groupName, bool isBoundaryGroup)
+//----------------------------------------------------------------------
+Mesh::Mesh( std::vector<double> points, std::string meshName )
+//----------------------------------------------------------------------
 {
-	std::vector< int > faceIds(0);
-	double FX, FY, FZ;
-	Face Fi;
-	
-	/* Construction of the face group */
-	if(isBoundaryGroup)        
-        for(int i=0; i<_boundaryFaceIds.size(); i++)
-        {
-			Fi=_faces[_boundaryFaceIds[i]];
-			FX=Fi.x();
-			FY=Fi.y();
-			FZ=Fi.z();
-			if (abs(FX-x)<eps && abs(FY-y)<eps && abs(FZ-z)<eps)
-			{
-				faceIds.insert(faceIds.end(),_boundaryFaceIds[i]);
-				_faces[_boundaryFaceIds[i]].setGroupName(groupName);
-			}
-        }
-	else
-		for (int iface=0;iface<_numberOfFaces;iface++)
-		{
-			Fi=_faces[iface];
-			FX=Fi.x();
-			FY=Fi.y();
-			FZ=Fi.z();
-			if (abs(FX-x)<eps && abs(FY-y)<eps && abs(FZ-z)<eps)
-			{
-				faceIds.insert(faceIds.end(),iface);
-				_faces[iface].setGroupName(groupName);
-			}
-		}
-
-	if (faceIds.size()>0)
+    int nx=points.size();
+    
+	if(nx<2)
+		throw CdmathException("Mesh::Mesh( vector<double> points, string meshName) : nx < 2, vector should contain at least two values");
+    int i=0;
+    while( i<nx-1 && points[i+1]>points[i] )
+        i++;
+	if( i!=nx-1 )
     {
-		std::vector< std::string >::iterator it = std::find(_faceGroupNames.begin(), _faceGroupNames.end(), groupName);
-		if(it == _faceGroupNames.end())//No group named groupName
-		{
-			_faceGroupNames.insert(_faceGroupNames.end(),groupName);
-			_faceGroupsIds.insert(  _faceGroupsIds.end(),faceIds);
-			_faceGroups.insert(    _faceGroups.end(), NULL);//No mesh created. Create one ?
-		}
-		else
-		{
-			std::vector< int > faceGroupIds = _faceGroupsIds[it-_faceGroupNames.begin()];
-			faceGroupIds.insert( faceGroupIds.end(), faceIds.begin(), faceIds.end());
-			/* Detect and erase duplicates face ids */
-			sort( faceGroupIds.begin(), faceGroupIds.end() );
-			faceGroupIds.erase( unique( faceGroupIds.begin(), faceGroupIds.end() ), faceGroupIds.end() );
-			_faceGroupsIds[it-_faceGroupNames.begin()] = faceGroupIds;
-		}
-	}
-}
-
-void
-Mesh::setGroupAtNodeByCoords(double x, double y, double z, double eps, std::string groupName, bool isBoundaryGroup)
-{
-	std::vector< int > nodeIds(0);
-	double NX, NY, NZ;
-	Node Ni;
-	
-	/* Construction of the node group */
-	if(isBoundaryGroup)        
-        for(int i=0; i<_boundaryNodeIds.size(); i++)
-        {
-			Ni=_nodes[_boundaryNodeIds[i]];
-			NX=Ni.x();
-			NY=Ni.y();
-			NZ=Ni.z();
-			if (abs(NX-x)<eps && abs(NY-y)<eps && abs(NZ-z)<eps)
-			{
-				nodeIds.insert(nodeIds.end(),_boundaryNodeIds[i]);
-				_nodes[_boundaryNodeIds[i]].setGroupName(groupName);
-			}
-        }
-	else
-		for (int inode=0;inode<_numberOfNodes;inode++)
-		{
-			NX=_nodes[inode].x();
-			NY=_nodes[inode].y();
-			NZ=_nodes[inode].z();
-			if (abs(NX-x)<eps && abs(NY-y)<eps && abs(NZ-z)<eps)
-			{
-				nodeIds.insert(nodeIds.end(),inode);
-				_nodes[inode].setGroupName(groupName);
-			}
-		}
-
-	if (nodeIds.size()>0)
-    {
-		std::vector< std::string >::iterator it = std::find(_nodeGroupNames.begin(), _nodeGroupNames.end(), groupName);
-		if(it == _nodeGroupNames.end())//No group named groupName
-		{
-			_nodeGroupNames.insert(_nodeGroupNames.end(),groupName);
-			_nodeGroupsIds.insert(  _nodeGroupsIds.end(),nodeIds);
-			_nodeGroups.insert(    _nodeGroups.end(), NULL);//No mesh created. Create one ?
-		}
-		else
-		{
-			std::vector< int > nodeGroupIds = _nodeGroupsIds[it-_nodeGroupNames.begin()];
-			nodeGroupIds.insert( nodeGroupIds.end(), nodeIds.begin(), nodeIds.end());
-			/* Detect and erase duplicates node ids */
-			sort( nodeGroupIds.begin(), nodeGroupIds.end() );
-			nodeGroupIds.erase( unique( nodeGroupIds.begin(), nodeGroupIds.end() ), nodeGroupIds.end() );
-			_nodeGroupsIds[it-_nodeGroupNames.begin()] = nodeGroupIds;
-		}
+        //cout<< points << endl;
+		throw CdmathException("Mesh::Mesh( vector<double> points, string meshName) : vector values should be sorted");
     }
-}
-
-void
-Mesh::setGroupAtPlan(double value, int direction, double eps, std::string groupName, bool isBoundaryGroup)
-{
-	std::vector< int > faceIds(0), nodeIds(0);
-	double cord;
-	
-	/* Construction of the face group */	
-	if(isBoundaryGroup)        
-        for(int i=0; i<_boundaryFaceIds.size(); i++)
-        {
-			cord=_faces[_boundaryFaceIds[i]].getBarryCenter()[direction];
-			if (abs(cord-value)<eps)
-			{
-				faceIds.insert(faceIds.end(),_boundaryFaceIds[i]);
-				_faces[_boundaryFaceIds[i]].setGroupName(groupName);
-			}
-        }
-	else
-		for (int iface=0;iface<_numberOfFaces;iface++)
-		{
-			cord=_faces[iface].getBarryCenter()[direction];
-			if (abs(cord-value)<eps)
-			{
-				faceIds.insert(faceIds.end(),iface);
-				_faces[iface].setGroupName(groupName);
-			}
-		}
-
-	/* Construction of the node group */
-	if(isBoundaryGroup)        
-        for(int i=0; i<_boundaryNodeIds.size(); i++)
-        {
-			cord=_nodes[_boundaryNodeIds[i]].getPoint()[direction];
-			if (abs(cord-value)<eps)
-			{
-				nodeIds.insert(nodeIds.end(),_boundaryNodeIds[i]);
-				_nodes[_boundaryNodeIds[i]].setGroupName(groupName);
-			}
-        }
-	else
-		for (int inode=0;inode<_numberOfNodes;inode++)
-		{
-			cord=_nodes[inode].getPoint()[direction];
-			if (abs(cord-value)<eps)
-			{
-				nodeIds.insert(nodeIds.end(),inode);
-				_nodes[inode].setGroupName(groupName);
-			}
-		}
-
-	if (faceIds.size()>0)
+    
+	_spaceDim = 1 ;
+	_meshDim  = 1 ;
+    _name=meshName;
+    _epsilon=1e-6;
+    _indexFacePeriodicSet=false;
+    
+    MEDCouplingUMesh * mesh1d = MEDCouplingUMesh::New(meshName, 1);
+    mesh1d->allocateCells(nx - 1);
+    double * coords = new double[nx];
+    mcIdType nodal_con[2];
+    coords[0]=points[0];
+    for(int i=0; i<nx- 1 ; i++)
     {
-		std::vector< std::string >::iterator it = std::find(_faceGroupNames.begin(), _faceGroupNames.end(), groupName);
-		if(it == _faceGroupNames.end())//No group named groupName
-		{
-			_faceGroupNames.insert(_faceGroupNames.end(),groupName);
-			_faceGroupsIds.insert(  _faceGroupsIds.end(),faceIds);
-			_faceGroups.insert(    _faceGroups.end(), NULL);//No mesh created. Create one ?
-		}
-		else
-		{
-			std::vector< int > faceGroupIds = _faceGroupsIds[it-_faceGroupNames.begin()];
-			faceGroupIds.insert( faceGroupIds.end(), faceIds.begin(), faceIds.end());
-			/* Detect and erase duplicates face ids */
-			sort( faceGroupIds.begin(), faceGroupIds.end() );
-			faceGroupIds.erase( unique( faceGroupIds.begin(), faceGroupIds.end() ), faceGroupIds.end() );
-			_faceGroupsIds[it-_faceGroupNames.begin()] = faceGroupIds;
-		}
-	}
-	if (nodeIds.size()>0)
-    {
-		std::vector< std::string >::iterator it = std::find(_nodeGroupNames.begin(), _nodeGroupNames.end(), groupName);
-		if(it == _nodeGroupNames.end())//No group named groupName
-		{
-			_nodeGroupNames.insert(_nodeGroupNames.end(),groupName);
-			_nodeGroupsIds.insert(  _nodeGroupsIds.end(),nodeIds);
-			_nodeGroups.insert(    _nodeGroups.end(), NULL);//No mesh created. Create one ?
-		}
-		else
-		{
-			std::vector< int > nodeGroupIds = _nodeGroupsIds[it-_nodeGroupNames.begin()];
-			nodeGroupIds.insert( nodeGroupIds.end(), nodeIds.begin(), nodeIds.end());
-			/* Detect and erase duplicates node ids */
-			sort( nodeGroupIds.begin(), nodeGroupIds.end() );
-			nodeGroupIds.erase( unique( nodeGroupIds.begin(), nodeGroupIds.end() ), nodeGroupIds.end() );
-			_nodeGroupsIds[it-_nodeGroupNames.begin()] = nodeGroupIds;
-		}
+        nodal_con[0]=i;
+        nodal_con[1]=i+1;
+        mesh1d->insertNextCell(INTERP_KERNEL::NORM_SEG2, 2, nodal_con);
+        coords[i+1]=points[i + 1];
     }
+    mesh1d->finishInsertingCells();
+
+    DataArrayDouble * coords_arr = DataArrayDouble::New();
+    coords_arr->alloc(nx,1);
+    std::copy(coords,coords+nx,coords_arr->getPointer());
+    mesh1d->setCoords(coords_arr);
+
+    delete [] coords;
+    coords_arr->decrRef();
+
+    _mesh=mesh1d;//To enable writeMED. Because we declared the mesh as unstructured, we decide to build the unstructured data (not mandatory)
+    _meshNotDeleted=true;
+    _isStructured = false;
+
+	setMesh();
 }
 
-void
-Mesh::setBoundaryNodesFromFaces()
+//----------------------------------------------------------------------
+Mesh::Mesh( double xmin, double xmax, int nx, std::string meshName )
+//----------------------------------------------------------------------
 {
-    for (int iface=0;iface<_boundaryFaceIds.size();iface++)
-    {
-        std::vector< int > nodesID= _faces[_boundaryFaceIds[iface]].getNodesId();
-        int nbNodes = _faces[_boundaryFaceIds[iface]].getNumberOfNodes();
-        for(int inode=0 ; inode<nbNodes ; inode++)
+	if(nx<=0)
+		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx) : nx <= 0");
+	if(xmin>=xmax)
+		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx) : xmin >= xmax");
+
+	double dx = (xmax - xmin)/nx ;
+
+	_spaceDim = 1 ;
+	_meshDim  = 1 ;
+    _name=meshName;
+    _epsilon=1e-6;
+    _indexFacePeriodicSet=false;
+
+	_nxyz.resize(_spaceDim);
+	_nxyz[0]=nx;
+
+	double originPtr[_spaceDim];
+	double dxyzPtr[_spaceDim];
+	mcIdType nodeStrctPtr[_spaceDim];
+
+	originPtr[0]=xmin;
+	nodeStrctPtr[0]=nx+1;
+	dxyzPtr[0]=dx;
+
+	_mesh=MEDCouplingIMesh::New(meshName,
+			_spaceDim,
+			nodeStrctPtr,
+			nodeStrctPtr+_spaceDim,
+			originPtr,
+			originPtr+_spaceDim,
+			dxyzPtr,
+			dxyzPtr+_spaceDim);
+    _meshNotDeleted=true;
+    _isStructured = true;
+
+	setMesh();
+}
+
+//----------------------------------------------------------------------
+Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, int split_to_triangles_policy, std::string meshName)
+//----------------------------------------------------------------------
+{
+	if(nx<=0 || ny<=0)
+		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny) : nx <= 0 or ny <= 0");
+	if(xmin>=xmax)
+		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny) : xmin >= xmax");
+	if(ymin>=ymax)
+		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny) : ymin >= ymax");
+
+	double dx = (xmax - xmin)/nx ;
+	double dy = (ymax - ymin)/ny ;
+
+	_spaceDim = 2 ;
+	_meshDim  = 2 ;
+    _name=meshName;
+    _epsilon=1e-6;
+    _indexFacePeriodicSet=false;
+	_nxyz.resize(_spaceDim);
+	_nxyz[0]=nx;
+	_nxyz[1]=ny;
+
+	double originPtr[_spaceDim];
+	double dxyzPtr[_spaceDim];
+	mcIdType nodeStrctPtr[_spaceDim];
+
+	originPtr[0]=xmin;
+	originPtr[1]=ymin;
+	nodeStrctPtr[0]=nx+1;
+	nodeStrctPtr[1]=ny+1;
+	dxyzPtr[0]=dx;
+	dxyzPtr[1]=dy;
+
+	_mesh=MEDCouplingIMesh::New(meshName,
+			_spaceDim,
+			nodeStrctPtr,
+			nodeStrctPtr+_spaceDim,
+			originPtr,
+			originPtr+_spaceDim,
+			dxyzPtr,
+			dxyzPtr+_spaceDim);
+    _meshNotDeleted=true;
+    _isStructured = true;
+
+    if(split_to_triangles_policy==0 || split_to_triangles_policy==1)
         {
-            std::vector<int>::const_iterator  it = std::find(_boundaryNodeIds.begin(),_boundaryNodeIds.end(),nodesID[inode]);
-            if( it != _boundaryNodeIds.end() )
-                _boundaryNodeIds.push_back(nodesID[inode]);
+            _mesh=_mesh->buildUnstructured();//simplexize is not available for structured meshes
+            _mesh->simplexize(split_to_triangles_policy);
+			_isStructured = false;
         }
-    }
-}
-
-std::map<int,int>
-Mesh::getIndexFacePeriodic( void ) const
-{
-    return _indexFacePeriodicMap;
-}
-
-void
-Mesh::setPeriodicFaces(bool check_groups, bool use_central_inversion)
-{
-    if(_indexFacePeriodicSet)
-        return;
-        
-    for (int indexFace=0;indexFace<_boundaryFaceIds.size() ; indexFace++)
-    {
-        Face my_face=_faces[_boundaryFaceIds[indexFace]];
-        int iface_perio=-1;
-        if(_meshDim==1)
+    else if (split_to_triangles_policy != -1)
         {
-            for (int iface=0;iface<_boundaryFaceIds.size() ; iface++)
-                if(iface!=indexFace)
-                {
-                    iface_perio=_boundaryFaceIds[iface];
-                    break;
-                }
+            cout<< "split_to_triangles_policy = "<< split_to_triangles_policy << endl;
+            throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny) : Unknown splitting policy");
         }
-        else if(_meshDim==2)
+    
+	setMesh();
+}
+
+//----------------------------------------------------------------------
+Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz, int split_to_tetrahedra_policy, std::string meshName)
+//----------------------------------------------------------------------
+{
+	if(nx<=0 || ny<=0 || nz<=0)
+		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz) : nx <= 0 or ny <= 0 or nz <= 0");
+	if(xmin>=xmax)
+		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz) : xmin >= xmax");
+	if(ymin>=ymax)
+		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz) : ymin >= ymax");
+	if(zmin>=zmax)
+		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz) : zmin >= zmax");
+
+	_spaceDim = 3;
+	_meshDim  = 3;
+    _name=meshName;
+    _epsilon=1e-6;
+
+	double dx = (xmax - xmin)/nx ;
+	double dy = (ymax - ymin)/ny ;
+	double dz = (zmax - zmin)/nz ;
+
+	_nxyz.resize(_spaceDim);
+	_nxyz[0]=nx;
+	_nxyz[1]=ny;
+	_nxyz[2]=nz;
+
+	double originPtr[_spaceDim];
+	double dxyzPtr[_spaceDim];
+	mcIdType nodeStrctPtr[_spaceDim];
+
+	originPtr[0]=xmin;
+	originPtr[1]=ymin;
+	originPtr[2]=zmin;
+	nodeStrctPtr[0]=nx+1;
+	nodeStrctPtr[1]=ny+1;
+	nodeStrctPtr[2]=nz+1;
+	dxyzPtr[0]=dx;
+	dxyzPtr[1]=dy;
+	dxyzPtr[2]=dz;
+
+	_mesh=MEDCouplingIMesh::New(meshName,
+			_spaceDim,
+			nodeStrctPtr,
+			nodeStrctPtr+_spaceDim,
+			originPtr,
+			originPtr+_spaceDim,
+			dxyzPtr,
+			dxyzPtr+_spaceDim);
+    _meshNotDeleted=true;
+    _isStructured = true;
+
+    if( split_to_tetrahedra_policy == 0 )
         {
-            double x=my_face.x();
-            double y=my_face.y();
-            
-            for (int iface=0;iface<_boundaryFaceIds.size() ; iface++)
-            {
-                Face face_i=_faces[_boundaryFaceIds[iface]];
-                double xi=face_i.x();
-                double yi=face_i.y();
-                if (   (abs(y-yi)<_epsilon || abs(x-xi)<_epsilon )// Case of a square geometry
-                    && ( !check_groups || my_face.getGroupName()!=face_i.getGroupName()) //In case groups need to be checked
-                    && ( !use_central_inversion || abs(y+yi) + abs(x+xi)<_epsilon ) // Case of a central inversion
-                    && fabs(my_face.getMeasure() - face_i.getMeasure())<_epsilon
-                    && fabs(my_face.getXN()      + face_i.getXN())<_epsilon
-                    && fabs(my_face.getYN()      + face_i.getYN())<_epsilon
-                    && fabs(my_face.getZN()      + face_i.getZN())<_epsilon )
-                {
-                    iface_perio=_boundaryFaceIds[iface];
-                    break;
-                }
-            }
+            _mesh=_mesh->buildUnstructured();//simplexize is not available for structured meshes
+            _mesh->simplexize(INTERP_KERNEL::PLANAR_FACE_5);
+			_isStructured = false;
         }
-        else if(_meshDim==3)
+    else if( split_to_tetrahedra_policy == 1 )
         {
-            double x=my_face.x();
-            double y=my_face.y();
-            double z=my_face.z();
-        
-            for (int iface=0;iface<_boundaryFaceIds.size() ; iface++)
-            {
-                Face face_i=_faces[_boundaryFaceIds[iface]];
-                double xi=face_i.x();
-                double yi=face_i.y();
-                double zi=face_i.z();
-                if ( ((abs(y-yi)<_epsilon && abs(x-xi)<_epsilon) || (abs(x-xi)<_epsilon && abs(z-zi)<_epsilon) || (abs(y-yi)<_epsilon && abs(z-zi)<_epsilon))// Case of a cube geometry
-                    && ( !check_groups || my_face.getGroupName()!=face_i.getGroupName()) //In case groups need to be checked
-                    && ( !use_central_inversion || abs(y+yi) + abs(x+xi) + abs(z+zi)<_epsilon )// Case of a central inversion
-                    && fabs(my_face.getMeasure() - face_i.getMeasure())<_epsilon
-                    && fabs(my_face.getXN()      + face_i.getXN())<_epsilon
-                    && fabs(my_face.getYN()      + face_i.getYN())<_epsilon
-                    && fabs(my_face.getZN()      + face_i.getZN())<_epsilon )
-                {
-                    iface_perio=_boundaryFaceIds[iface];
-                    break;
-                }
-            }  
+            _mesh=_mesh->buildUnstructured();//simplexize is not available for structured meshes
+            _mesh->simplexize(INTERP_KERNEL::PLANAR_FACE_6);
+			_isStructured = false;
         }
-        else
-            throw CdmathException("Mesh::setPeriodicFaces: Mesh dimension should be 1, 2 or 3");
-        
-        if (iface_perio==-1)
-            throw CdmathException("Mesh::setPeriodicFaces: periodic face not found, iface_perio==-1 " );
-        else
-            _indexFacePeriodicMap[_boundaryFaceIds[indexFace]]=iface_perio;
-    }
-    _indexFacePeriodicSet=true;    
-}
-
-int
-Mesh::getIndexFacePeriodic(int indexFace, bool check_groups, bool use_central_inversion)
-{
-	if (!_faces[indexFace].isBorder())
+    else if ( split_to_tetrahedra_policy != -1 )
         {
-            cout<<"Pb with indexFace= "<<indexFace<<endl;
-            throw CdmathException("Mesh::getIndexFacePeriodic: not a border face" );
+            cout<< "split_to_tetrahedra_policy = "<< split_to_tetrahedra_policy << endl;
+            throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz) : splitting policy value should be 0 or 1");
         }
-        
-    if(!_indexFacePeriodicSet)
-        setPeriodicFaces(check_groups, use_central_inversion);
-
-    std::map<int,int>::const_iterator  it = _indexFacePeriodicMap.find(indexFace);
-    if( it != _indexFacePeriodicMap.end() )
-        return it->second;
-    else
-    {
-        cout<<"Pb with indexFace= "<<indexFace<<endl;
-        throw CdmathException("Mesh::getIndexFacePeriodic: not a periodic face" );
-    }
-}
-
-bool
-Mesh::isBorderNode(int nodeid) const
-{
-	return _nodes[nodeid].isBorder();
-}
-
-bool
-Mesh::isBorderFace(int faceid) const
-{
-	return _faces[faceid].isBorder();
-}
-
-std::vector< int > 
-Mesh::getBoundaryFaceIds() const
-{
-    return _boundaryFaceIds;
-}
-
-std::vector< int > 
-Mesh::getBoundaryNodeIds() const
-{
-    return _boundaryNodeIds;
-}
-
-bool
-Mesh::isTriangular() const
-{
-	return _eltsTypes.size()==1 && _eltsTypes[0]==INTERP_KERNEL::NORM_TRI3;
-}
-bool
-Mesh::isTetrahedral() const
-{
-	return _eltsTypes.size()==1 && _eltsTypes[0]==INTERP_KERNEL::NORM_TETRA4;
-}
-bool
-Mesh::isQuadrangular() const
-{
-	return _eltsTypes.size()==1 && _eltsTypes[0]==INTERP_KERNEL::NORM_QUAD4;
-}
-bool
-Mesh::isHexahedral() const
-{
-	return _eltsTypes.size()==1 && _eltsTypes[0]==INTERP_KERNEL::NORM_HEXA8;
-}
-bool
-Mesh::isStructured() const
-{
-	return _isStructured;
-}
-
-std::vector< INTERP_KERNEL::NormalizedCellType > 
-Mesh::getElementTypes() const
-{
-  return _eltsTypes;  
-}
-
-std::vector< string >
-Mesh::getElementTypesNames() const
-{
-    std::vector< string > result(0);    
-    for(int i=0; i< _eltsTypes.size(); i++)
-    {
-        if( _eltsTypes[i]==INTERP_KERNEL::NORM_POINT1)
-            result.push_back("Points");
-        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_SEG2)
-            result.push_back("Segments");
-        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_TRI3)
-            result.push_back("Triangles");
-        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_QUAD4)
-            result.push_back("Quadrangles");
-        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_POLYGON)
-            result.push_back("Polygons");
-        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_TETRA4)
-            result.push_back("Tetrahedra");
-        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_PYRA5)
-            result.push_back("Pyramids");
-        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_PENTA6)
-            result.push_back("Pentahedra");
-        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_HEXA8)
-            result.push_back("Hexahedra");
-        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_POLYHED)
-            result.push_back("Polyhedrons");
-        else
-		{
-			cout<< "Mesh " + _name + " contains an element of type " <<endl;
-			cout<< _eltsTypes[i]<<endl;
-			throw CdmathException("Mesh::getElementTypes : recognised cell med types are NORM_POINT1, NORM_SEG2, NORM_TRI3, NORM_QUAD4, NORM_TETRA4, NORM_PYRA5, NORM_PENTA6, NORM_HEXA8, NORM_POLYGON, NORM_POLYHED");
-        }
-    }
-    return result;
-}
-
-void
-Mesh::setGroups( const MEDFileUMesh* medmesh, MEDCouplingUMesh*  mu)
-{
-	int nbCellsSubMesh, nbNodesSubMesh;
-	bool foundFace, foundNode;
-	
-	/* Searching for face groups */
-	vector<string> faceGroups=medmesh->getGroupsNames() ;
-
-	for (unsigned int i=0;i<faceGroups.size();i++ )
-	{
-		string groupName=faceGroups[i];
-		vector<mcIdType> nonEmptyGrp(medmesh->getGrpNonEmptyLevels(groupName));
-		//We check if the group has a relative dimension equal to -1 
-		//before call to the function getGroup(-1,groupName.c_str())
-		vector<mcIdType>::iterator it = find(nonEmptyGrp.begin(), nonEmptyGrp.end(), -1);
-		if (it != nonEmptyGrp.end())
-		{
-			MEDCouplingUMesh *m=medmesh->getGroup(-1,groupName.c_str());
-            m->unPolyze();
-			m->sortCellsInMEDFileFrmt( );
-			nbCellsSubMesh=m->getNumberOfCells();
-			
-			_faceGroups.insert(_faceGroups.end(),m);//Vector of group meshes
-			_faceGroupNames.insert(_faceGroupNames.end(),groupName);//Vector of group names
-			_faceGroupsIds.insert(_faceGroupsIds.end(),std::vector<int>(nbCellsSubMesh));//Vector of group face Ids. The filling of the face ids takes place below.
-			
-			DataArrayDouble *baryCell = m->computeIsoBarycenterOfNodesPerCell();//computeCellCenterOfMass() ;
-			const double *coorBary=baryCell->getConstPointer();
-			/* Face identification */
-			for (int ic(0), k(0); ic<nbCellsSubMesh; ic++, k+=_spaceDim)
-			{
-				vector<double> coorBaryXyz(3,0);
-				for (int d=0; d<_spaceDim; d++)
-					coorBaryXyz[d] = coorBary[k+d];
-				Point p1(coorBaryXyz[0],coorBaryXyz[1],coorBaryXyz[2]) ;
-
-				foundFace=false;
-				for (int iface=0;iface<_numberOfFaces;iface++ )
-				{
-					Point p2=_faces[iface].getBarryCenter();
-					if(p1.distance(p2)<_epsilon)
-					{
-						_faces[iface].setGroupName(groupName);
-						_faceGroupsIds[_faceGroupsIds.size()-1][ic]=iface;
-						foundFace=true;
-						break;
-					}
-				}
-				if (not foundFace)
-					throw CdmathException("No face found for group " + groupName );
-			}
-			baryCell->decrRef();
-			//m->decrRef();
-		}
-	}
-
-	/* Searching for node groups */
-	vector<string> nodeGroups=medmesh->getGroupsOnSpecifiedLev(1) ;
-
-	for (unsigned int i=0;i<nodeGroups.size();i++ )
-	{
-		string groupName=nodeGroups[i];
-		DataArrayIdType * nodeGroup=medmesh->getNodeGroupArr( groupName );
-		const mcIdType *nodeids=nodeGroup->getConstPointer();
-
-		if(nodeids!=NULL)
-		{
-			_nodeGroups.insert(_nodeGroups.end(),nodeGroup);
-			_nodeGroupNames.insert(_nodeGroupNames.end(),groupName);
-
-			nbNodesSubMesh=nodeGroup->getNumberOfTuples();//nodeGroup->getNbOfElems();
-
-			DataArrayDouble *coo = mu->getCoords() ;
-			const double *cood=coo->getConstPointer();
-
-			_nodeGroupsIds.insert(_nodeGroupsIds.end(),std::vector<int>(nbNodesSubMesh));//Vector of boundary faces
-			/* Node identification */
-			for (int ic(0); ic<nbNodesSubMesh; ic++)
-			{
-				vector<double> coorP(3,0);
-				for (int d=0; d<_spaceDim; d++)
-					coorP[d] = cood[nodeids[ic]*_spaceDim+d];
-				Point p1(coorP[0],coorP[1],coorP[2]) ;
-
-				foundNode=false;
-				for (int inode=0;inode<_numberOfNodes;inode++ )
-				{
-					Point p2=_nodes[inode].getPoint();
-					if(p1.distance(p2)<_epsilon)
-					{
-						_nodes[inode].setGroupName(groupName);
-						_nodeGroupsIds[_nodeGroupsIds.size()-1][ic]=inode;
-						foundNode=true;
-						break;
-					}
-				}
-				if (not foundNode)
-					throw CdmathException("No node found for group " + groupName );
-			}
-		}
-	}
+    
+	setMesh();
 }
 
 //----------------------------------------------------------------------
@@ -888,13 +496,13 @@ Mesh::setMesh( void )
 	const mcIdType *tmpNEI=nodalI->getConstPointer();
 
 	_numberOfCells = mu->getNumberOfCells() ;
-	_cells      = new Cell[_numberOfCells] ;
+	_cells      = std::shared_ptr<Cell>(new Cell[_numberOfCells], std::default_delete<Cell[]>()) ;
 
 	_numberOfNodes = mu->getNumberOfNodes() ;//This number may include isolated nodes that will not be loaded. The number will be updated during nodes constructions
-	_nodes      = new Node[_numberOfNodes] ;//This array may be resized if isolated nodes are found
+	_nodes      = std::shared_ptr<Node>(new Node[_numberOfNodes], std::default_delete<Node[]>())  ;//This array may be resized if isolated nodes are found
 
 	_numberOfFaces = mu2->getNumberOfCells();
-	_faces       = new Face[_numberOfFaces] ;
+	_faces       = std::shared_ptr<Face>(new Face[_numberOfFaces], std::default_delete<Face[]>()) ;
 
     _indexFacePeriodicSet=false;
 
@@ -966,7 +574,7 @@ Mesh::setMesh( void )
 				ci.addFaceId(el,work[el]) ;
 				xn = - xn; yn=-yn; zn=-zn;
 			}
-			_cells[id] = ci ;
+			_cells.get()[id] = ci ;
 		}
 	
 		for( int id(0); id<_numberOfFaces; id++ )
@@ -986,7 +594,7 @@ Mesh::setMesh( void )
 			assert( nbCells>0);//To make sure our face is not located on an isolated node
 		    
 			Face fi( nbNodes, nbCells, 1.0, p, 1., 0., 0. ) ;
-			for(int node_id=0; node_id<nbNodes;node_id++)//This loop could b deleted since nbNodes=1. Trying to merge with setMesh
+			for(int node_id=0; node_id<nbNodes;node_id++)//This loop could be deleted since nbNodes=1. Trying to merge with setMesh
 				fi.addNodeId(node_id,workv[node_id]) ;//global node number
 	
 			fi.addCellId(0,workc[0]) ;
@@ -1001,7 +609,7 @@ Mesh::setMesh( void )
 			}
 			if(nbCells==1)
 				_boundaryFaceIds.push_back(id);
-			_faces[id] = fi ;
+			_faces.get()[id] = fi ;
 		}
 	
 		int correctNbNodes=0;
@@ -1032,14 +640,18 @@ Mesh::setMesh( void )
 		        for( int el=0;el<nbNeighbourNodes;el++ )
 					vi.addNeighbourNodeId(el,workn[el]) ;//global node number
 				for( int el=0;el<nbFaces;el++ )
-					vi.addFaceId(el,workf[el],_faces[workf[el]].isBorder()) ;
+					vi.addFaceId(el,workf[el],_faces.get()[workf[el]].isBorder()) ;
 		 		if(vi.isBorder())
 					_boundaryNodeIds.push_back(id);
-				_nodes[id] = vi ;
+				_nodes.get()[id] = vi ;
 			}
 		}
-		if( _numberOfNodes!=correctNbNodes)
+		if( _numberOfNodes!=correctNbNodes)//To do : reduce the size of pointer _nodes
+		{
 			cout<<"Found isolated nodes : correctNbNodes= "<<correctNbNodes<<", _numberOfNodes= "<<_numberOfNodes<<endl;
+			_numberOfNodes = correctNbNodes;
+			//memcpy(_nodes,mesh.getNodes(),correctNbNodes*sizeof(*mesh.getNodes())) ;
+		}
 	}
 	else if(_meshDim==2  || _meshDim==3)
 	{
@@ -1160,7 +772,7 @@ Mesh::setMesh( void )
 					}
 				}
 			}
-			_cells[id] = ci ;
+			_cells.get()[id] = ci ;
 		}
 
 		if(_spaceDim!=_meshDim)
@@ -1219,7 +831,7 @@ Mesh::setMesh( void )
                     }                
             }
             
-			_faces[id] = fi ;
+			_faces.get()[id] = fi ;
 		}
 
 		/*Building mesh nodes, should be done after building mesh faces in order to detect boundary nodes*/
@@ -1264,15 +876,18 @@ Mesh::setMesh( void )
 					vi.addNeighbourNodeId(el,workn[el]) ;
 				//Detection of border nodes    
 				for( int el=0;el<nbFaces;el++ )
-					vi.addFaceId(el,workf[el],_faces[workf[el]].isBorder()) ;
+					vi.addFaceId(el,workf[el],_faces.get()[workf[el]].isBorder()) ;
 				if(vi.isBorder())
 					_boundaryNodeIds.push_back(id);
-				_nodes[id] = vi ;
+				_nodes.get()[id] = vi ;
 			}
 		}
-		if( _numberOfNodes!=correctNbNodes)
+		if( _numberOfNodes!=correctNbNodes)//To do : reduce the size of pointer _nodes
+		{
 			cout<<"Found isolated nodes : correctNbNodes= "<<correctNbNodes<<", _numberOfNodes= "<<_numberOfNodes<<endl;
-
+			_numberOfNodes = correctNbNodes;
+		}
+		
 		if(_spaceDim==_meshDim)
 			fieldn->decrRef();
 		fieldl->decrRef();
@@ -1281,26 +896,6 @@ Mesh::setMesh( void )
 	else
 		throw CdmathException("Mesh::setMesh space dimension should be 1, 2 or 3");
 
-    //definition of the bounding box for unstructured meshes
-    if(!_isStructured)//Structured case is treated in function readMeshMed
-    {
-        double Box0[2*_spaceDim];
-        coo->getMinMaxPerComponent(Box0);
-
-        _xMin=Box0[0];
-        _xMax=Box0[1];
-        if (_spaceDim>=2)
-        {
-            _yMin=Box0[2];
-            _yMax=Box0[3];
-        }
-        if (_spaceDim>=3)
-        {
-            _zMin=Box0[4];
-            _zMax=Box0[5];
-        }
-    }
-	
     //Set boundary groups
     _faceGroupNames.push_back("Boundary");
     _nodeGroupNames.push_back("Boundary");
@@ -1341,285 +936,528 @@ Mesh::setMesh( void )
     return mu;
 }
 
-//----------------------------------------------------------------------
-Mesh::Mesh( std::vector<double> points, std::string meshName )
-//----------------------------------------------------------------------
+void
+Mesh::setGroupAtFaceByCoords(double x, double y, double z, double eps, std::string groupName, bool isBoundaryGroup)
 {
-    int nx=points.size();
-    
-	if(nx<2)
-		throw CdmathException("Mesh::Mesh( vector<double> points, string meshName) : nx < 2, vector should contain at least two values");
-    int i=0;
-    while( i<nx-1 && points[i+1]>points[i] )
-        i++;
-	if( i!=nx-1 )
-    {
-        //cout<< points << endl;
-		throw CdmathException("Mesh::Mesh( vector<double> points, string meshName) : vector values should be sorted");
-    }
-    
-	_spaceDim = 1 ;
-	_meshDim  = 1 ;
-    _name=meshName;
-    _epsilon=1e-6;
-	_xMin=points[0];
-	_xMax=points[nx-1];
-	_yMin=0.;
-	_yMax=0.;
-	_zMin=0.;
-	_zMax=0.;
-
-    _isStructured = false;
-    _indexFacePeriodicSet=false;
-    
-    MEDCouplingUMesh * mesh1d = MEDCouplingUMesh::New(meshName, 1);
-    mesh1d->allocateCells(nx - 1);
-    double * coords = new double[nx];
-    mcIdType * nodal_con = new mcIdType[2];
-    coords[0]=points[0];
-    for(int i=0; i<nx- 1 ; i++)
-    {
-        nodal_con[0]=i;
-        nodal_con[1]=i+1;
-        mesh1d->insertNextCell(INTERP_KERNEL::NORM_SEG2, 2, nodal_con);
-        coords[i+1]=points[i + 1];
-    }
-    mesh1d->finishInsertingCells();
-
-    DataArrayDouble * coords_arr = DataArrayDouble::New();
-    coords_arr->alloc(nx,1);
-    std::copy(coords,coords+nx,coords_arr->getPointer());
-    mesh1d->setCoords(coords_arr);
-
-    delete [] coords, nodal_con;
-    coords_arr->decrRef();
-
-    _mesh=mesh1d->buildUnstructured();//To enable writeMED. Because we declared the mesh as unstructured, we decide to build the unstructured data (not mandatory)
-    _meshNotDeleted=true;
-
-	setMesh();
-}
-
-//----------------------------------------------------------------------
-Mesh::Mesh( double xmin, double xmax, int nx, std::string meshName )
-//----------------------------------------------------------------------
-{
-	if(nx<=0)
-		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx) : nx <= 0");
-	if(xmin>=xmax)
-		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx) : xmin >= xmax");
-
-	double dx = (xmax - xmin)/nx ;
-
-	_spaceDim = 1 ;
-	_meshDim  = 1 ;
-    _name=meshName;
-    _epsilon=1e-6;
-    _isStructured = true;
-    _indexFacePeriodicSet=false;
-
-	_xMin=xmin;
-	_xMax=xmax;
-	_yMin=0.;
-	_yMax=0.;
-	_zMin=0.;
-	_zMax=0.;
-
-	_dxyz.resize(_spaceDim);
-	_dxyz[0]=dx;
-	_nxyz.resize(_spaceDim);
-	_nxyz[0]=nx;
-
-	double *originPtr = new double[_spaceDim];
-	double *dxyzPtr = new double[_spaceDim];
-	mcIdType *nodeStrctPtr = new mcIdType[_spaceDim];
-
-	originPtr[0]=xmin;
-	nodeStrctPtr[0]=nx+1;
-	dxyzPtr[0]=dx;
-
-	_mesh=MEDCouplingIMesh::New(meshName,
-			_spaceDim,
-			nodeStrctPtr,
-			nodeStrctPtr+_spaceDim,
-			originPtr,
-			originPtr+_spaceDim,
-			dxyzPtr,
-			dxyzPtr+_spaceDim);
-    _meshNotDeleted=true;//Because the mesh is structured cartesian : no data in memory. No nodes and cell coordinates stored
-
-	delete [] originPtr;
-	delete [] dxyzPtr;
-	delete [] nodeStrctPtr;
-
-	setMesh();
-}
-
-//----------------------------------------------------------------------
-Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, int split_to_triangles_policy, std::string meshName)
-//----------------------------------------------------------------------
-{
-	if(nx<=0 || ny<=0)
-		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny) : nx <= 0 or ny <= 0");
-	if(xmin>=xmax)
-		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny) : xmin >= xmax");
-	if(ymin>=ymax)
-		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny) : ymin >= ymax");
-
-	_xMin=xmin;
-	_xMax=xmax;
-	_yMin=ymin;
-	_yMax=ymax;
-	_zMin=0.;
-	_zMax=0.;
-
-
-	double dx = (xmax - xmin)/nx ;
-	double dy = (ymax - ymin)/ny ;
-
-	_spaceDim = 2 ;
-	_meshDim  = 2 ;
-    _name=meshName;
-    _epsilon=1e-6;
-    _indexFacePeriodicSet=false;
-	_nxyz.resize(_spaceDim);
-	_nxyz[0]=nx;
-	_nxyz[1]=ny;
-
-	_dxyz.resize(_spaceDim);
-	_dxyz[0]=dx;
-	_dxyz[1]=dy;
-
-	double *originPtr = new double[_spaceDim];
-	double *dxyzPtr   = new double[_spaceDim];
-	mcIdType *nodeStrctPtr = new mcIdType[_spaceDim];
-
-	originPtr[0]=xmin;
-	originPtr[1]=ymin;
-	nodeStrctPtr[0]=nx+1;
-	nodeStrctPtr[1]=ny+1;
-	dxyzPtr[0]=dx;
-	dxyzPtr[1]=dy;
-
-	_mesh=MEDCouplingIMesh::New(meshName,
-			_spaceDim,
-			nodeStrctPtr,
-			nodeStrctPtr+_spaceDim,
-			originPtr,
-			originPtr+_spaceDim,
-			dxyzPtr,
-			dxyzPtr+_spaceDim);
-    _meshNotDeleted=true;//Because the mesh is structured cartesian : no data in memory. No nodes and cell coordinates stored
-    _isStructured = true;
-
-    if(split_to_triangles_policy==0 || split_to_triangles_policy==1)
+	std::vector< int > faceIds(0);
+	double FX, FY, FZ;
+	Face Fi;
+	
+	/* Construction of the face group */
+	if(isBoundaryGroup)        
+        for(int i=0; i<_boundaryFaceIds.size(); i++)
         {
-            _mesh=_mesh->buildUnstructured();
-            _mesh->simplexize(split_to_triangles_policy);
-            _meshNotDeleted=true;//Now the mesh is unstructured and stored with nodes and cell coordinates
-			_isStructured = false;
+			Fi=_faces.get()[_boundaryFaceIds[i]];
+			FX=Fi.x();
+			FY=Fi.y();
+			FZ=Fi.z();
+			if (abs(FX-x)<eps && abs(FY-y)<eps && abs(FZ-z)<eps)
+			{
+				faceIds.insert(faceIds.end(),_boundaryFaceIds[i]);
+				_faces.get()[_boundaryFaceIds[i]].setGroupName(groupName);
+			}
         }
-    else if (split_to_triangles_policy != -1)
+	else
+		for (int iface=0;iface<_numberOfFaces;iface++)
+		{
+			Fi=_faces.get()[iface];
+			FX=Fi.x();
+			FY=Fi.y();
+			FZ=Fi.z();
+			if (abs(FX-x)<eps && abs(FY-y)<eps && abs(FZ-z)<eps)
+			{
+				faceIds.insert(faceIds.end(),iface);
+				_faces.get()[iface].setGroupName(groupName);
+			}
+		}
+
+	if (faceIds.size()>0)
+    {
+		std::vector< std::string >::iterator it = std::find(_faceGroupNames.begin(), _faceGroupNames.end(), groupName);
+		if(it == _faceGroupNames.end())//No group named groupName
+		{
+			_faceGroupNames.insert(_faceGroupNames.end(),groupName);
+			_faceGroupsIds.insert(  _faceGroupsIds.end(),faceIds);
+			_faceGroups.insert(    _faceGroups.end(), NULL);//No mesh created. Create one ?
+		}
+		else
+		{
+			std::vector< int > faceGroupIds = _faceGroupsIds[it-_faceGroupNames.begin()];
+			faceGroupIds.insert( faceGroupIds.end(), faceIds.begin(), faceIds.end());
+			/* Detect and erase duplicates face ids */
+			sort( faceGroupIds.begin(), faceGroupIds.end() );
+			faceGroupIds.erase( unique( faceGroupIds.begin(), faceGroupIds.end() ), faceGroupIds.end() );
+			_faceGroupsIds[it-_faceGroupNames.begin()] = faceGroupIds;
+		}
+	}
+}
+
+void
+Mesh::setGroupAtNodeByCoords(double x, double y, double z, double eps, std::string groupName, bool isBoundaryGroup)
+{
+	std::vector< int > nodeIds(0);
+	double NX, NY, NZ;
+	Node Ni;
+	
+	/* Construction of the node group */
+	if(isBoundaryGroup)        
+        for(int i=0; i<_boundaryNodeIds.size(); i++)
         {
-            cout<< "split_to_triangles_policy = "<< split_to_triangles_policy << endl;
-            throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny) : Unknown splitting policy");
+			Ni=_nodes.get()[_boundaryNodeIds[i]];
+			NX=Ni.x();
+			NY=Ni.y();
+			NZ=Ni.z();
+			if (abs(NX-x)<eps && abs(NY-y)<eps && abs(NZ-z)<eps)
+			{
+				nodeIds.insert(nodeIds.end(),_boundaryNodeIds[i]);
+				_nodes.get()[_boundaryNodeIds[i]].setGroupName(groupName);
+			}
+        }
+	else
+		for (int inode=0;inode<_numberOfNodes;inode++)
+		{
+			NX=_nodes.get()[inode].x();
+			NY=_nodes.get()[inode].y();
+			NZ=_nodes.get()[inode].z();
+			if (abs(NX-x)<eps && abs(NY-y)<eps && abs(NZ-z)<eps)
+			{
+				nodeIds.insert(nodeIds.end(),inode);
+				_nodes.get()[inode].setGroupName(groupName);
+			}
+		}
+
+	if (nodeIds.size()>0)
+    {
+		std::vector< std::string >::iterator it = std::find(_nodeGroupNames.begin(), _nodeGroupNames.end(), groupName);
+		if(it == _nodeGroupNames.end())//No group named groupName
+		{
+			_nodeGroupNames.insert(_nodeGroupNames.end(),groupName);
+			_nodeGroupsIds.insert(  _nodeGroupsIds.end(),nodeIds);
+			_nodeGroups.insert(    _nodeGroups.end(), NULL);//No mesh created. Create one ?
+		}
+		else
+		{
+			std::vector< int > nodeGroupIds = _nodeGroupsIds[it-_nodeGroupNames.begin()];
+			nodeGroupIds.insert( nodeGroupIds.end(), nodeIds.begin(), nodeIds.end());
+			/* Detect and erase duplicates node ids */
+			sort( nodeGroupIds.begin(), nodeGroupIds.end() );
+			nodeGroupIds.erase( unique( nodeGroupIds.begin(), nodeGroupIds.end() ), nodeGroupIds.end() );
+			_nodeGroupsIds[it-_nodeGroupNames.begin()] = nodeGroupIds;
+		}
+    }
+}
+
+void
+Mesh::setGroupAtPlan(double value, int direction, double eps, std::string groupName, bool isBoundaryGroup)
+{
+	std::vector< int > faceIds(0), nodeIds(0);
+	double cord;
+	
+	/* Construction of the face group */	
+	if(isBoundaryGroup)        
+        for(int i=0; i<_boundaryFaceIds.size(); i++)
+        {
+			cord=_faces.get()[_boundaryFaceIds[i]].getBarryCenter()[direction];
+			if (abs(cord-value)<eps)
+			{
+				faceIds.insert(faceIds.end(),_boundaryFaceIds[i]);
+				_faces.get()[_boundaryFaceIds[i]].setGroupName(groupName);
+			}
+        }
+	else
+		for (int iface=0;iface<_numberOfFaces;iface++)
+		{
+			cord=_faces.get()[iface].getBarryCenter()[direction];
+			if (abs(cord-value)<eps)
+			{
+				faceIds.insert(faceIds.end(),iface);
+				_faces.get()[iface].setGroupName(groupName);
+			}
+		}
+
+	/* Construction of the node group */
+	if(isBoundaryGroup)        
+        for(int i=0; i<_boundaryNodeIds.size(); i++)
+        {
+			cord=_nodes.get()[_boundaryNodeIds[i]].getPoint()[direction];
+			if (abs(cord-value)<eps)
+			{
+				nodeIds.insert(nodeIds.end(),_boundaryNodeIds[i]);
+				_nodes.get()[_boundaryNodeIds[i]].setGroupName(groupName);
+			}
+        }
+	else
+		for (int inode=0;inode<_numberOfNodes;inode++)
+		{
+			cord=_nodes.get()[inode].getPoint()[direction];
+			if (abs(cord-value)<eps)
+			{
+				nodeIds.insert(nodeIds.end(),inode);
+				_nodes.get()[inode].setGroupName(groupName);
+			}
+		}
+
+	if (faceIds.size()>0)
+    {
+		std::vector< std::string >::iterator it = std::find(_faceGroupNames.begin(), _faceGroupNames.end(), groupName);
+		if(it == _faceGroupNames.end())//No group named groupName
+		{
+			_faceGroupNames.insert(_faceGroupNames.end(),groupName);
+			_faceGroupsIds.insert(  _faceGroupsIds.end(),faceIds);
+			_faceGroups.insert(    _faceGroups.end(), NULL);//No mesh created. Create one ?
+		}
+		else
+		{cout<<"_faceGroupNames.size()="<<_faceGroupNames.size()<<", _faceGroupsIds.size()="<<_faceGroupsIds.size()<<endl;
+			std::vector< int > faceGroupIds = _faceGroupsIds[it-_faceGroupNames.begin()];
+			faceGroupIds.insert( faceGroupIds.end(), faceIds.begin(), faceIds.end());
+			/* Detect and erase duplicates face ids */
+			sort( faceGroupIds.begin(), faceGroupIds.end() );
+			faceGroupIds.erase( unique( faceGroupIds.begin(), faceGroupIds.end() ), faceGroupIds.end() );
+			_faceGroupsIds[it-_faceGroupNames.begin()] = faceGroupIds;
+		}
+	}
+	if (nodeIds.size()>0)
+    {
+		std::vector< std::string >::iterator it = std::find(_nodeGroupNames.begin(), _nodeGroupNames.end(), groupName);
+		if(it == _nodeGroupNames.end())//No group named groupName
+		{
+			_nodeGroupNames.insert(_nodeGroupNames.end(),groupName);
+			_nodeGroupsIds.insert(  _nodeGroupsIds.end(),nodeIds);
+			_nodeGroups.insert(    _nodeGroups.end(), NULL);//No mesh created. Create one ?
+		}
+		else
+		{
+			std::vector< int > nodeGroupIds = _nodeGroupsIds[it-_nodeGroupNames.begin()];
+			nodeGroupIds.insert( nodeGroupIds.end(), nodeIds.begin(), nodeIds.end());
+			/* Detect and erase duplicates node ids */
+			sort( nodeGroupIds.begin(), nodeGroupIds.end() );
+			nodeGroupIds.erase( unique( nodeGroupIds.begin(), nodeGroupIds.end() ), nodeGroupIds.end() );
+			_nodeGroupsIds[it-_nodeGroupNames.begin()] = nodeGroupIds;
+		}
+    }
+}
+
+void
+Mesh::setBoundaryNodesFromFaces()
+{
+    for (int iface=0;iface<_boundaryFaceIds.size();iface++)
+    {
+        std::vector< int > nodesID= _faces.get()[_boundaryFaceIds[iface]].getNodesId();
+        int nbNodes = _faces.get()[_boundaryFaceIds[iface]].getNumberOfNodes();
+        for(int inode=0 ; inode<nbNodes ; inode++)
+        {
+            std::vector<int>::const_iterator  it = std::find(_boundaryNodeIds.begin(),_boundaryNodeIds.end(),nodesID[inode]);
+            if( it != _boundaryNodeIds.end() )
+                _boundaryNodeIds.push_back(nodesID[inode]);
+        }
+    }
+}
+
+std::map<int,int>
+Mesh::getIndexFacePeriodic( void ) const
+{
+    return _indexFacePeriodicMap;
+}
+
+void
+Mesh::setPeriodicFaces(bool check_groups, bool use_central_inversion)
+{
+    if(_indexFacePeriodicSet)
+        return;
+        
+    for (int indexFace=0;indexFace<_boundaryFaceIds.size() ; indexFace++)
+    {
+        Face my_face=_faces.get()[_boundaryFaceIds[indexFace]];
+        int iface_perio=-1;
+        if(_meshDim==1)
+        {
+            for (int iface=0;iface<_boundaryFaceIds.size() ; iface++)
+                if(iface!=indexFace)
+                {
+                    iface_perio=_boundaryFaceIds[iface];
+                    break;
+                }
+        }
+        else if(_meshDim==2)
+        {
+            double x=my_face.x();
+            double y=my_face.y();
+            
+            for (int iface=0;iface<_boundaryFaceIds.size() ; iface++)
+            {
+                Face face_i=_faces.get()[_boundaryFaceIds[iface]];
+                double xi=face_i.x();
+                double yi=face_i.y();
+                if (   (abs(y-yi)<_epsilon || abs(x-xi)<_epsilon )// Case of a square geometry
+                    && ( !check_groups || my_face.getGroupName()!=face_i.getGroupName()) //In case groups need to be checked
+                    && ( !use_central_inversion || abs(y+yi) + abs(x+xi)<_epsilon ) // Case of a central inversion
+                    && fabs(my_face.getMeasure() - face_i.getMeasure())<_epsilon
+                    && fabs(my_face.getXN()      + face_i.getXN())<_epsilon
+                    && fabs(my_face.getYN()      + face_i.getYN())<_epsilon
+                    && fabs(my_face.getZN()      + face_i.getZN())<_epsilon )
+                {
+                    iface_perio=_boundaryFaceIds[iface];
+                    break;
+                }
+            }
+        }
+        else if(_meshDim==3)
+        {
+            double x=my_face.x();
+            double y=my_face.y();
+            double z=my_face.z();
+        
+            for (int iface=0;iface<_boundaryFaceIds.size() ; iface++)
+            {
+                Face face_i=_faces.get()[_boundaryFaceIds[iface]];
+                double xi=face_i.x();
+                double yi=face_i.y();
+                double zi=face_i.z();
+                if ( ((abs(y-yi)<_epsilon && abs(x-xi)<_epsilon) || (abs(x-xi)<_epsilon && abs(z-zi)<_epsilon) || (abs(y-yi)<_epsilon && abs(z-zi)<_epsilon))// Case of a cube geometry
+                    && ( !check_groups || my_face.getGroupName()!=face_i.getGroupName()) //In case groups need to be checked
+                    && ( !use_central_inversion || abs(y+yi) + abs(x+xi) + abs(z+zi)<_epsilon )// Case of a central inversion
+                    && fabs(my_face.getMeasure() - face_i.getMeasure())<_epsilon
+                    && fabs(my_face.getXN()      + face_i.getXN())<_epsilon
+                    && fabs(my_face.getYN()      + face_i.getYN())<_epsilon
+                    && fabs(my_face.getZN()      + face_i.getZN())<_epsilon )
+                {
+                    iface_perio=_boundaryFaceIds[iface];
+                    break;
+                }
+            }  
+        }
+        else
+            throw CdmathException("Mesh::setPeriodicFaces: Mesh dimension should be 1, 2 or 3");
+        
+        if (iface_perio==-1)
+            throw CdmathException("Mesh::setPeriodicFaces: periodic face not found, iface_perio==-1 " );
+        else
+            _indexFacePeriodicMap[_boundaryFaceIds[indexFace]]=iface_perio;
+    }
+    _indexFacePeriodicSet=true;    
+}
+
+int
+Mesh::getIndexFacePeriodic(int indexFace, bool check_groups, bool use_central_inversion)
+{
+	if (!_faces.get()[indexFace].isBorder())
+        {
+            cout<<"Pb with indexFace= "<<indexFace<<endl;
+            throw CdmathException("Mesh::getIndexFacePeriodic: not a border face" );
         }
         
-	delete [] originPtr;
-	delete [] dxyzPtr;
-	delete [] nodeStrctPtr;
-    
-	setMesh();
+    if(!_indexFacePeriodicSet)
+        setPeriodicFaces(check_groups, use_central_inversion);
+
+    std::map<int,int>::const_iterator  it = _indexFacePeriodicMap.find(indexFace);
+    if( it != _indexFacePeriodicMap.end() )
+        return it->second;
+    else
+    {
+        cout<<"Pb with indexFace= "<<indexFace<<endl;
+        throw CdmathException("Mesh::getIndexFacePeriodic: not a periodic face" );
+    }
 }
 
-//----------------------------------------------------------------------
-Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz, int split_to_tetrahedra_policy, std::string meshName)
-//----------------------------------------------------------------------
+bool
+Mesh::isBorderNode(int nodeid) const
 {
-	if(nx<=0 || ny<=0 || nz<=0)
-		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz) : nx <= 0 or ny <= 0 or nz <= 0");
-	if(xmin>=xmax)
-		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz) : xmin >= xmax");
-	if(ymin>=ymax)
-		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz) : ymin >= ymax");
-	if(zmin>=zmax)
-		throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz) : zmin >= zmax");
+	return _nodes.get()[nodeid].isBorder();
+}
 
-	_spaceDim = 3;
-	_meshDim  = 3;
-    _name=meshName;
-    _epsilon=1e-6;
-	_xMin=xmin;
-	_xMax=xmax;
-	_yMin=ymin;
-	_yMax=ymax;
-	_zMin=zmin;
-	_zMax=zmax;
+bool
+Mesh::isBorderFace(int faceid) const
+{
+	return _faces.get()[faceid].isBorder();
+}
 
-	double dx = (xmax - xmin)/nx ;
-	double dy = (ymax - ymin)/ny ;
-	double dz = (zmax - zmin)/nz ;
+std::vector< int > 
+Mesh::getBoundaryFaceIds() const
+{
+    return _boundaryFaceIds;
+}
 
-	_dxyz.resize(_spaceDim);
-	_dxyz[0]=dx;
-	_dxyz[1]=dy;
-	_dxyz[2]=dz;
+std::vector< int > 
+Mesh::getBoundaryNodeIds() const
+{
+    return _boundaryNodeIds;
+}
 
-	_nxyz.resize(_spaceDim);
-	_nxyz[0]=nx;
-	_nxyz[1]=ny;
-	_nxyz[2]=nz;
+bool
+Mesh::isTriangular() const
+{
+	return _eltsTypes.size()==1 && _eltsTypes[0]==INTERP_KERNEL::NORM_TRI3;
+}
+bool
+Mesh::isTetrahedral() const
+{
+	return _eltsTypes.size()==1 && _eltsTypes[0]==INTERP_KERNEL::NORM_TETRA4;
+}
+bool
+Mesh::isQuadrangular() const
+{
+	return _eltsTypes.size()==1 && _eltsTypes[0]==INTERP_KERNEL::NORM_QUAD4;
+}
+bool
+Mesh::isHexahedral() const
+{
+	return _eltsTypes.size()==1 && _eltsTypes[0]==INTERP_KERNEL::NORM_HEXA8;
+}
+bool
+Mesh::isStructured() const
+{
+	return _isStructured;
+}
 
-	double *originPtr = new double[_spaceDim];
-	double *dxyzPtr = new double[_spaceDim];
-	mcIdType *nodeStrctPtr = new mcIdType[_spaceDim];
+std::vector< INTERP_KERNEL::NormalizedCellType > 
+Mesh::getElementTypes() const
+{
+  return _eltsTypes;  
+}
 
-	originPtr[0]=xmin;
-	originPtr[1]=ymin;
-	originPtr[2]=zmin;
-	nodeStrctPtr[0]=nx+1;
-	nodeStrctPtr[1]=ny+1;
-	nodeStrctPtr[2]=nz+1;
-	dxyzPtr[0]=dx;
-	dxyzPtr[1]=dy;
-	dxyzPtr[2]=dz;
-
-	_mesh=MEDCouplingIMesh::New(meshName,
-			_spaceDim,
-			nodeStrctPtr,
-			nodeStrctPtr+_spaceDim,
-			originPtr,
-			originPtr+_spaceDim,
-			dxyzPtr,
-			dxyzPtr+_spaceDim);
-    _meshNotDeleted=true;//Because the mesh is structured cartesian : no data in memory. Nno nodes and cell coordinates stored
-    _isStructured = true;
-
-    if( split_to_tetrahedra_policy == 0 )
-        {
-            _mesh=_mesh->buildUnstructured();
-            _mesh->simplexize(INTERP_KERNEL::PLANAR_FACE_5);
-            _meshNotDeleted=true;//Now the mesh is unstructured and stored with nodes and cell coordinates
-			_isStructured = false;
+std::vector< string >
+Mesh::getElementTypesNames() const
+{
+    std::vector< string > result(0);    
+    for(int i=0; i< _eltsTypes.size(); i++)
+    {
+        if( _eltsTypes[i]==INTERP_KERNEL::NORM_POINT1)
+            result.push_back("Points");
+        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_SEG2)
+            result.push_back("Segments");
+        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_TRI3)
+            result.push_back("Triangles");
+        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_QUAD4)
+            result.push_back("Quadrangles");
+        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_POLYGON)
+            result.push_back("Polygons");
+        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_TETRA4)
+            result.push_back("Tetrahedra");
+        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_PYRA5)
+            result.push_back("Pyramids");
+        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_PENTA6)
+            result.push_back("Pentahedra");
+        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_HEXA8)
+            result.push_back("Hexahedra");
+        else if( _eltsTypes[i]==INTERP_KERNEL::NORM_POLYHED)
+            result.push_back("Polyhedrons");
+        else
+		{
+			cout<< "Mesh " + _name + " contains an element of type " <<endl;
+			cout<< _eltsTypes[i]<<endl;
+			throw CdmathException("Mesh::getElementTypes : recognised cell med types are NORM_POINT1, NORM_SEG2, NORM_TRI3, NORM_QUAD4, NORM_TETRA4, NORM_PYRA5, NORM_PENTA6, NORM_HEXA8, NORM_POLYGON, NORM_POLYHED");
         }
-    else if( split_to_tetrahedra_policy == 1 )
-        {
-            _mesh=_mesh->buildUnstructured();
-            _mesh->simplexize(INTERP_KERNEL::PLANAR_FACE_6);
-            _meshNotDeleted=true;//Now the mesh is unstructured and stored with nodes and cell coordinates
-			_isStructured = false;
-        }
-    else if ( split_to_tetrahedra_policy != -1 )
-        {
-            cout<< "split_to_tetrahedra_policy = "<< split_to_tetrahedra_policy << endl;
-            throw CdmathException("Mesh::Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz) : splitting policy value should be 0 or 1");
-        }
+    }
+    return result;
+}
 
-	delete [] originPtr;
-	delete [] dxyzPtr;
-	delete [] nodeStrctPtr;
-    
-	setMesh();
+void
+Mesh::setFaceGroups( const MEDFileUMesh* medmesh, MEDCouplingUMesh*  mu)
+{
+	int nbCellsSubMesh;
+	bool foundFace;
+	
+	/* Searching for face groups */
+	vector<string> faceGroups=medmesh->getGroupsNames() ;
+
+	for (unsigned int i=0;i<faceGroups.size();i++ )
+	{
+		string groupName=faceGroups[i];
+		vector<mcIdType> nonEmptyGrp(medmesh->getGrpNonEmptyLevels(groupName));
+		//We check if the group has a relative dimension equal to -1 
+		//before call to the function getGroup(-1,groupName.c_str())
+		vector<mcIdType>::iterator it = find(nonEmptyGrp.begin(), nonEmptyGrp.end(), -1);
+		if (it != nonEmptyGrp.end())
+		{
+			MEDCouplingUMesh *m=medmesh->getGroup(-1,groupName.c_str());
+            m->unPolyze();
+			nbCellsSubMesh=m->getNumberOfCells();
+			
+			_faceGroups.insert(_faceGroups.end(),m);//Vector of group meshes
+			_faceGroupNames.insert(_faceGroupNames.end(),groupName);//Vector of group names
+			_faceGroupsIds.insert(_faceGroupsIds.end(),std::vector<int>(nbCellsSubMesh));//Vector of group face Ids. The filling of the face ids takes place below.
+			
+			DataArrayDouble *baryCell = m->computeIsoBarycenterOfNodesPerCell();//computeCellCenterOfMass() ;
+			const double *coorBary=baryCell->getConstPointer();
+			// Face identification 
+			for (int ic(0), k(0); ic<nbCellsSubMesh; ic++, k+=_spaceDim)
+			{
+				vector<double> coorBaryXyz(3,0);
+				for (int d=0; d<_spaceDim; d++)
+					coorBaryXyz[d] = coorBary[k+d];
+				Point p1(coorBaryXyz[0],coorBaryXyz[1],coorBaryXyz[2]) ;
+
+				foundFace=false;
+				for (int iface=0;iface<_numberOfFaces;iface++ )
+				{
+					Point p2=_faces.get()[iface].getBarryCenter();
+					if(p1.distance(p2)<_epsilon)
+					{
+						_faces.get()[iface].setGroupName(groupName);
+						_faceGroupsIds[_faceGroupsIds.size()-1][ic]=iface;
+						foundFace=true;
+						break;
+					}
+				}
+				if (not foundFace)
+					throw CdmathException("No face found for group " + groupName );
+			}
+			baryCell->decrRef();
+			//m->decrRef();
+		}
+	}
+}
+void
+Mesh::setNodeGroups( const MEDFileMesh* medmesh, MEDCouplingUMesh*  mu)
+{
+	int  nbNodesSubMesh;
+	bool foundNode;
+	
+	/* Searching for node groups */
+	vector<string> nodeGroups=medmesh->getGroupsOnSpecifiedLev(1) ;
+
+	for (unsigned int i=0;i<nodeGroups.size();i++ )
+	{
+		string groupName=nodeGroups[i];
+		DataArrayIdType * nodeGroup=medmesh->getNodeGroupArr( groupName );
+		const mcIdType *nodeids=nodeGroup->getConstPointer();
+
+		if(nodeids!=NULL)
+		{
+			_nodeGroups.insert(_nodeGroups.end(),nodeGroup);
+			_nodeGroupNames.insert(_nodeGroupNames.end(),groupName);
+
+			nbNodesSubMesh=nodeGroup->getNumberOfTuples();//nodeGroup->getNbOfElems();
+
+			DataArrayDouble *coo = mu->getCoords() ;
+			const double *cood=coo->getConstPointer();
+
+			_nodeGroupsIds.insert(_nodeGroupsIds.end(),std::vector<int>(nbNodesSubMesh));//Vector of boundary faces
+			/* Node identification */
+			for (int ic(0); ic<nbNodesSubMesh; ic++)
+			{
+				vector<double> coorP(3,0);
+				for (int d=0; d<_spaceDim; d++)
+					coorP[d] = cood[nodeids[ic]*_spaceDim+d];
+				Point p1(coorP[0],coorP[1],coorP[2]) ;
+
+				foundNode=false;
+				for (int inode=0;inode<_numberOfNodes;inode++ )
+				{
+					Point p2=_nodes.get()[inode].getPoint();
+					if(p1.distance(p2)<_epsilon)
+					{
+						_nodes.get()[inode].setGroupName(groupName);
+						_nodeGroupsIds[_nodeGroupsIds.size()-1][ic]=inode;
+						foundNode=true;
+						break;
+					}
+				}
+				if (not foundNode)
+					throw CdmathException("No node found for group " + groupName );
+			}
+		}
+	}
 }
 
 //----------------------------------------------------------------------
@@ -1636,15 +1474,6 @@ Mesh::getMeshDimension( void )  const
 //----------------------------------------------------------------------
 {
 	return _meshDim ;
-}
-
-std::vector<double>
-Mesh::getDXYZ() const
-{
-    if(!_isStructured)
-		throw CdmathException("std::vector<double> Mesh::getDXYZ() : dx,dy and dz are defined only for structured meshes !");
-
-	return _dxyz;
 }
 
 std::vector<mcIdType>
@@ -1674,8 +1503,8 @@ Mesh::getNy( void )  const
 {
     if(!_isStructured)
 		throw CdmathException("int Mesh::getNy( void ) : Ny is defined only for structured meshes !");
-	if(_spaceDim < 2)
-		throw CdmathException("int double& Field::operator[ielem] : Ny is not defined in dimension < 2!");
+	if(_meshDim < 2)
+		throw CdmathException("int Mesh::getNy( void ) : Ny is not defined for mesh dimension < 2!");
 
 	return _nxyz[1];
 }
@@ -1687,8 +1516,8 @@ Mesh::getNz( void )  const
 {
     if(!_isStructured)
 		throw CdmathException("int Mesh::getNz( void ) : Nz is defined only for structured meshes !");
-	if(_spaceDim < 3)
-		throw CdmathException("int Mesh::getNz( void ) : Nz is not defined in dimension < 3!");
+	if(_meshDim < 3)
+		throw CdmathException("int Mesh::getNz( void ) : Nz is not defined for mesh dimension < 3!");
 
 	return _nxyz[2];
 }
@@ -1697,8 +1526,11 @@ Mesh::getNz( void )  const
 double
 Mesh::getXMin( void )  const
 //----------------------------------------------------------------------
-{        
-	return _xMin ;
+{
+	double Box0[2*_meshDim];
+    _mesh->getBoundingBox(Box0);
+
+	return Box0[0] ;
 }
 
 //----------------------------------------------------------------------
@@ -1706,7 +1538,10 @@ double
 Mesh::getXMax( void )  const
 //----------------------------------------------------------------------
 {
-	return _xMax ;
+	double Box0[2*_meshDim];
+    _mesh->getBoundingBox(Box0);
+
+	return Box0[1] ;
 }
 
 //----------------------------------------------------------------------
@@ -1714,7 +1549,13 @@ double
 Mesh::getYMin( void )  const
 //----------------------------------------------------------------------
 {
-	return _yMin ;
+	if(_meshDim<2)
+		throw CdmathException("Mesh::getYMin : dimension should be >=2");
+		
+	double Box0[2*_meshDim];
+    _mesh->getBoundingBox(Box0);
+
+	return Box0[2] ;
 }
 
 //----------------------------------------------------------------------
@@ -1722,7 +1563,13 @@ double
 Mesh::getYMax( void )  const
 //----------------------------------------------------------------------
 {
-	return _yMax ;
+	if(_meshDim<2)
+		throw CdmathException("Mesh::getYMax : dimension should be >=2");
+		
+	double Box0[2*_meshDim];
+    _mesh->getBoundingBox(Box0);
+
+	return Box0[3] ;
 }
 
 //----------------------------------------------------------------------
@@ -1730,7 +1577,13 @@ double
 Mesh::getZMin( void )  const
 //----------------------------------------------------------------------
 {
-	return _zMin ;
+	if(_meshDim<3)
+		throw CdmathException("Mesh::getZMin : dimension should be 3");
+		
+	double Box0[2*_meshDim];
+    _mesh->getBoundingBox(Box0);
+
+	return Box0[4] ;
 }
 
 //----------------------------------------------------------------------
@@ -1738,7 +1591,13 @@ double
 Mesh::getZMax( void )  const
 //----------------------------------------------------------------------
 {
-	return _zMax ;
+	if(_meshDim<3)
+		throw CdmathException("Mesh::getZMax : dimension should be 3");
+
+	double Box0[2*_meshDim];
+    _mesh->getBoundingBox(Box0);
+
+	return Box0[5] ;
 }
 
 //----------------------------------------------------------------------
@@ -1782,7 +1641,7 @@ Mesh::getNumberOfEdges ( void ) const
 }
 
 //----------------------------------------------------------------------
-Face*
+std::shared_ptr<Face>
 Mesh::getFaces ( void )  const
 //----------------------------------------------------------------------
 {
@@ -1790,7 +1649,7 @@ Mesh::getFaces ( void )  const
 }
 
 //----------------------------------------------------------------------
-Cell*
+std::shared_ptr<Cell>
 Mesh::getCells ( void ) const
 //----------------------------------------------------------------------
 {
@@ -1802,7 +1661,7 @@ Cell&
 Mesh::getCell ( int i ) const
 //----------------------------------------------------------------------
 {
-	return _cells[i] ;
+	return _cells.get()[i] ;
 }
 
 //----------------------------------------------------------------------
@@ -1810,7 +1669,7 @@ Face&
 Mesh::getFace ( int i ) const
 //----------------------------------------------------------------------
 {
-	return _faces[i] ;
+	return _faces.get()[i] ;
 }
 
 //----------------------------------------------------------------------
@@ -1818,11 +1677,11 @@ Node&
 Mesh::getNode ( int i ) const
 //----------------------------------------------------------------------
 {
-	return _nodes[i] ;
+	return _nodes.get()[i] ;
 }
 
 //----------------------------------------------------------------------
-Node*
+std::shared_ptr<Node>
 Mesh::getNodes ( void )  const
 //----------------------------------------------------------------------
 {
@@ -1871,49 +1730,16 @@ Mesh::operator= ( const Mesh& mesh )
     _meshNotDeleted = mesh.meshNotDeleted();
     
     if(_isStructured)
-    {
         _nxyz = mesh.getCellGridStructure() ;
-        _dxyz=mesh.getDXYZ();
-        _xMin=mesh.getXMin();
-        _xMax=mesh.getXMax();
-        _yMin=mesh.getYMin();
-        _yMax=mesh.getYMax();
-        _zMin=mesh.getZMin();
-        _zMax=mesh.getZMax();
-    }
+
 	_faceGroupNames = mesh.getNameOfFaceGroups() ;
 	_faceGroups = mesh.getFaceGroups() ;
 	_nodeGroupNames = mesh.getNameOfNodeGroups() ;
 	_nodeGroups = mesh.getNodeGroups() ;
 
-	if (_nodes)
-	{
-		delete [] _nodes ;
-		_nodes=NULL;
-	}
-	if (_faces)
-	{
-		delete [] _faces ;
-		_faces=NULL;
-	}
-	if (_cells)
-	{
-		delete [] _cells ;
-		_cells=NULL;
-	}
-
-	_nodes   = new Node[_numberOfNodes] ;
-	_faces   = new Face[_numberOfFaces] ;
-	_cells   = new Cell[_numberOfCells] ;
-
-	for (int i=0;i<_numberOfNodes;i++)
-		_nodes[i]=mesh.getNode(i);
-
-	for (int i=0;i<_numberOfFaces;i++)
-		_faces[i]=mesh.getFace(i);
-
-	for (int i=0;i<_numberOfCells;i++)
-		_cells[i]=mesh.getCell(i);
+	_nodes   = mesh.getNodes() ;
+	_faces   = mesh.getFaces() ;
+	_cells   = mesh.getCells() ;
 
     _indexFacePeriodicSet= mesh.isIndexFacePeriodicSet();
     if(_indexFacePeriodicSet)
@@ -1925,8 +1751,8 @@ Mesh::operator= ( const Mesh& mesh )
     _eltsTypes=mesh.getElementTypes();
     _eltsTypesNames=mesh.getElementTypesNames();
 
-	MCAuto<MEDCouplingMesh> m1=mesh.getMEDCouplingMesh()->deepCopy();
-	_mesh=m1;
+	_mesh=mesh.getMEDCouplingMesh()->clone(false);//Clone because you will need to buildUnstructured. No deep copy : it is assumed node coordinates and cell connectivity will not change
+
 	return *this;
 }
 
@@ -2008,11 +1834,11 @@ Mesh::getMaxNbNeighbours(EntityType type) const
 		int nbNeib;//local number of neighbours
         for(int i=0; i<_numberOfCells; i++)
         {
-            Cell Ci = _cells[i];
+            Cell Ci = _cells.get()[i];
             //Careful with mesh with junctions : do not just take Ci.getNumberOfFaces()
             nbNeib=0;
             for(int j=0; j<Ci.getNumberOfFaces(); j++)
-                nbNeib+=_faces[Ci.getFacesId()[j]].getNumberOfCells()-1;//Without junction this would be +=1
+                nbNeib+=_faces.get()[Ci.getFacesId()[j]].getNumberOfCells()-1;//Without junction this would be +=1
             
             if(result < nbNeib)
                 result=nbNeib;
@@ -2021,8 +1847,8 @@ Mesh::getMaxNbNeighbours(EntityType type) const
     else if(type==NODES)
 	{
         for(int i=0; i<_numberOfNodes; i++)
-            if(result < _nodes[i].getNumberOfEdges())
-                result=_nodes[i].getNumberOfEdges();
+            if(result < _nodes.get()[i].getNumberOfEdges())
+                result=_nodes.get()[i].getNumberOfEdges();
 	}
     else
 		throw CdmathException("Mesh::getMaxNbNeighbours : entity type is not accepted. Should be CELLS or NODES");
@@ -2034,8 +1860,8 @@ void
 Mesh::writeVTK ( const std::string fileName ) const
 //----------------------------------------------------------------------
 {
-	if( !_isStructured && !_meshNotDeleted )
-		throw CdmathException("Mesh::writeVTK : Cannot save mesh : no MEDCouplingUMesh loaded");
+	if( !_meshNotDeleted )
+		throw CdmathException("Mesh::writeVTK : Cannot save mesh : no MEDCouplingMesh loaded (may be deleted)");
 		
 	string fname=fileName+".vtu";
 	_mesh->writeVTK(fname.c_str()) ;
@@ -2043,15 +1869,23 @@ Mesh::writeVTK ( const std::string fileName ) const
 
 //----------------------------------------------------------------------
 void
-Mesh::writeMED ( const std::string fileName ) const
+Mesh::writeMED ( const std::string fileName, bool fromScratch ) const
 //----------------------------------------------------------------------
 {
 	if( !_meshNotDeleted )
-		throw CdmathException("Mesh::writeMED : Cannot save mesh : no MEDCouplingUMesh loaded");
-		
+		throw CdmathException("Mesh::writeMED : Cannot save mesh : no MEDCouplingMesh loaded (may be deleted)");
+
 	string fname=fileName+".med";
-	MEDCouplingUMesh* mu=_mesh->buildUnstructured();
-	MEDCoupling::WriteUMesh(fname.c_str(),mu,true);
+	if(_isStructured)//Check if we have a medcouplingimesh that can't be written directly
+	{
+		const MEDCoupling::MEDCouplingIMesh* iMesh = dynamic_cast< const MEDCoupling::MEDCouplingIMesh* > ((const MEDCoupling::MEDCouplingMesh*) _mesh);
+		if(iMesh)//medcouplingimesh : Use convertToCartesian in order to write mesh
+			MEDCoupling::WriteMesh(fname.c_str(),iMesh->convertToCartesian(), fromScratch);
+		else//medcouplingcmesh : save directly
+			MEDCoupling::WriteMesh(fname.c_str(),_mesh, fromScratch);
+	}
+	else
+		MEDCoupling::WriteMesh(fname.c_str(),_mesh, fromScratch);
 
 	/* Try to save mesh groups */
 	//MEDFileUMesh meshMEDFile;
@@ -2110,7 +1944,7 @@ Mesh::setNodeGroupByIds(std::vector< int > nodeIds, std::string groupName)
         getNode(nodeIds[i]).setGroupName(groupName);
 }
 
-void Mesh::deleteMEDCouplingUMesh()
+void Mesh::deleteMEDCouplingMesh()
 { 
 	if(_meshNotDeleted) 
 	{

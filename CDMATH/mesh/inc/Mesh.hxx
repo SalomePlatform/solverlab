@@ -8,9 +8,12 @@
 #ifndef MESH_HXX_
 #define MESH_HXX_
 
+#include <memory>
+
+#include <MCAuto.hxx>
+#include "NormalizedGeometricTypes"
+
 #include "MEDCouplingUMesh.hxx"
-#include "MEDCouplingIMesh.hxx"
-#include "MEDCouplingFieldDouble.hxx"
 
 /**
  * Mesh class is defined by
@@ -25,19 +28,15 @@
 
 namespace MEDCoupling
 {
+class MEDFileMesh;
 class MEDFileUMesh;
 class MEDCouplingMesh;
-class MEDCouplingIMesh;
-class MEDCouplingUMesh;
 class DataArrayIdType;
 }
 namespace ParaMEDMEM
 {
 class DataArrayIdType;
 }
-#include <MCAuto.hxx>
-#include "NormalizedGeometricTypes"
-
 class Node;
 class Cell;
 class Face;
@@ -63,11 +62,17 @@ public: //----------------------------------------------------------------
 	Mesh ( void ) ;
 
 	/**
+	 * \brief constructor with data from a medcoupling mesh
+	 * @param medcoupling mesh 
+	 */
+	Mesh( MEDCoupling::MCAuto<const MEDCoupling::MEDCouplingMesh> mesh ) ;
+
+	/**
 	 * \brief constructor with data to load a general unstructured mesh
 	 * @param filename name of mesh file
 	 * @param meshLevel : relative mesh dimension : 0->cells, 1->Faces etc
 	 */
-	Mesh ( const std::string filename, int meshLevel=0 ) ;
+	Mesh ( const std::string filename, const std::string & meshName="" , int meshLevel=0) ;
 
 	/**
 	 * \brief constructor with data for a regular 1D grid 
@@ -110,15 +115,12 @@ public: //----------------------------------------------------------------
 	 */
 	Mesh( double xmin, double xmax, int nx, double ymin, double ymax, int ny, double zmin, double zmax, int nz, int split_to_tetrahedra_policy=-1, std::string meshName="MESH3D_Regular_Cuboid_Grid") ;
 
-	Mesh( const MEDCoupling::MEDCouplingIMesh* mesh ) ;
-	Mesh( const MEDCoupling::MEDCouplingUMesh* mesh ) ;
-
 	/**
 	 * \brief constructor with data
 	 * @param filename : file name of mesh med file
 	 * @param meshLevel : relative mesh dimension : 0->cells, 1->Faces etc
 	 */
-	void readMeshMed( const std::string filename, int meshLevel=0 ) ;
+	void readMeshMed( const std::string filename, const std::string & meshName="" , int meshLevel=0) ;
 
 	/**
 	 * \brief constructor by copy
@@ -144,28 +146,10 @@ public: //----------------------------------------------------------------
 	int getSpaceDimension( void ) const ;
 
 	/**
-	 * \brief Mesh dimension
+	 * \brief return Mesh dimension
 	 * @return _meshDim
 	 */
 	int getMeshDimension( void ) const ;
-
-	/**
-	 * \brief return The nodes in this mesh
-	 * @return _nodes
-	 */
-	Node* getNodes ( void ) const ;
-
-	/**
-	 * \brief return The cells in this mesh
-	 * @return _vertices
-	 */
-	Cell* getCells ( void ) const ;
-
-	/**
-	 * \brief return the faces in this mesh
-	 * @return _vertices
-	 */
-	Face* getFaces ( void ) const ;
 
 	/**
 	 * \brief return the number of nodes in this mesh
@@ -239,12 +223,10 @@ public: //----------------------------------------------------------------
 
 	double getZMax( void )  const ;
 
-	std::vector<double> getDXYZ() const ;// for structured meshes
-
 	std::vector<mcIdType> getCellGridStructure() const;// for structured meshes
 
 	/**
-	 * \brief surcharge operator =
+	 * \brief overload operator =
 	 * @param mesh : The Mesh object to be copied
 	 */
 	const Mesh& operator= ( const Mesh& mesh ) ;
@@ -267,13 +249,13 @@ public: //----------------------------------------------------------------
 
 	/**
 	 * \brief return the list of face group names
-	 * return _faceGroupNames
+	 * @return _faceGroupNames
 	 */
 	std::vector<std::string> getNameOfFaceGroups( void )  const ;
 
 	/**
 	 * \brief return the list of node group names
-	 * return _nodeGroupNames
+	 * @return _nodeGroupNames
 	 */
 	std::vector<std::string> getNameOfNodeGroups( void )  const ;
 
@@ -289,8 +271,8 @@ public: //----------------------------------------------------------------
 	 */
 	std::vector<MEDCoupling::DataArrayIdType *> getNodeGroups( void )  const ;
 
-    /*
-     * Functions to extract boundary nodes and faces Ids
+    /**
+     * \brief Functions to extract boundary nodes and faces Ids
      */
      /**
       *  \brief return the list of boundary faces Ids
@@ -302,8 +284,8 @@ public: //----------------------------------------------------------------
      * @return _boundaryNodeIds
      */
     std::vector< int > getBoundaryNodeIds() const;
-    /*
-     * Functions to extract group nodes and faces ids
+    /**
+     * \brief Functions to extract group nodes and faces ids
      */
      /** 
       * @return list of face group Ids
@@ -322,7 +304,7 @@ public: //----------------------------------------------------------------
 	/**
 	 * \brief write mesh in the MED format
 	 */
-	void writeMED ( const std::string fileName ) const ;
+	void writeMED ( const std::string fileName, bool fromScratch = true ) const;
 
 	void setGroupAtPlan(double value, int direction, double eps, std::string groupName, bool isBoundaryGroup=true) ;
 
@@ -362,7 +344,7 @@ public: //----------------------------------------------------------------
 
     std::vector< std::string > getElementTypesNames() const ;
 	/**
-	 * \brief Compute the minimum value over all cells of the ratio cell perimeter/cell vaolume
+	 * \brief Compute the minimum value over all cells of the ratio cell perimeter/cell volume
 	 */
     double minRatioVolSurf() const;
     
@@ -374,7 +356,7 @@ public: //----------------------------------------------------------------
     /** 
      * \brief Delete the medcoupling mesh to save memory space
      */
-    void deleteMEDCouplingUMesh();
+    void deleteMEDCouplingMesh();
     
     /** 
      * \brief Returns true iff an unstructured mesh has been loaded
@@ -384,13 +366,14 @@ public: //----------------------------------------------------------------
 private: //----------------------------------------------------------------
 
 	MEDCoupling::MEDCouplingUMesh*  setMesh( void ) ;
-	void setGroups( const MEDCoupling::MEDFileUMesh* medmesh, MEDCoupling::MEDCouplingUMesh*  mu) ;//Read all face and node group
+	void setFaceGroups( const MEDCoupling::MEDFileUMesh* medmesh, MEDCoupling::MEDCouplingUMesh*  mu) ;//Read all face groups
+	void setNodeGroups( const MEDCoupling::MEDFileMesh*  medmesh, MEDCoupling::MEDCouplingUMesh*  mu) ;//Read all node groups
 	void addNewFaceGroup( const MEDCoupling::MEDCouplingUMesh *m);//adds one face group in the vectors _faceGroups, _faceGroupNames and _faceGroupIds
 	
-	/*
-	 * The MEDCoupling mesh
+	/**
+	 * \brief The MEDCoupling mesh
 	 */
-	MEDCoupling::MCAuto<MEDCoupling::MEDCouplingMesh> _mesh;
+	MEDCoupling::MCAuto<MEDCoupling::MEDCouplingMesh> _mesh;// This is either a MEDCouplingUMesh or a MEDCouplingStructuredMesh
 
 	bool _meshNotDeleted;
 	
@@ -406,100 +389,106 @@ private: //----------------------------------------------------------------
 	 */
 	int _meshDim ;
     
-    /*
-     * Structured mesh parameters
+    /**
+     * \brief Signal a structured mesh
      */
-
-    bool _isStructured;
-    
-	double _xMin;
-
-	double _xMax;
-
-	double _yMin;
-
-	double _yMax;
-
-	double _zMin;
-
-	double _zMax;
-
+	bool _isStructured;
+    /**
+     * \brief Number of cells in each direction (Structured meshes)
+     */
 	std::vector<mcIdType> _nxyz;
 
-	std::vector<double> _dxyz;
-	/*
-	 * The nodes in this mesh.
+	/**
+	 * \brief The nodes in this mesh.
 	 */
-	Node *_nodes;
+	std::shared_ptr<Node> _nodes;
 
-	/*
-	 * The number of nodes in this mesh.
+	/**
+	 * \brief The number of nodes in this mesh.
 	 */
 	int _numberOfNodes;
 
-	/*
-	 * The faces in this mesh.
+	/**
+	 * \brief The faces in this mesh.
 	 */
-	Face *_faces;
+	std::shared_ptr<Face> _faces;
 
-	/*
-	 * The numbers of faces in this mesh.
+	/**
+	 * \brief The numbers of faces in this mesh.
 	 */
 	int _numberOfFaces;
 
-	/*
-	 * The cells in this mesh.
+	/**
+	 * \brief The cells in this mesh.
 	 */
-	Cell *_cells;
+	std::shared_ptr<Cell> _cells;
 
-	/*
-	 * The number of cells in this mesh.
+	/**
+	 * \brief The number of cells in this mesh.
 	 */
 	int _numberOfCells;
 
-	/*
-	 * The number of edges in this mesh.
+	/**
+	 * \brief return The nodes in this mesh
+	 * @return _nodes
 	 */
-	int _numberOfEdges;//Useful to deduce the number of non zero coefficients in the finite element matrix 
+	std::shared_ptr<Node> getNodes ( void ) const ;
 
-	/*
-	 * The names of face groups.
+	/**
+	 * \brief return The cells in this mesh
+	 * @return _vertices
+	 */
+	std::shared_ptr<Cell> getCells ( void ) const ;
+
+	/**
+	 * \brief return the faces in this mesh
+	 * @return _vertices
+	 */
+	std::shared_ptr<Face> getFaces ( void ) const ;
+
+	/**
+	 * \brief The number of edges in this mesh.
+	 */
+	int _numberOfEdges;//Useful to deduce the number of non zero coefficients in a finite element matrix 
+
+	/**
+	 * \brief The names of face groups.
 	 */
 	std::vector<std::string> _faceGroupNames;
 
-	/*
-	 * The names of node groups.
+	/**
+	 * \brief The names of node groups.
 	 */
 	std::vector<std::string> _nodeGroupNames;
 
-	/*
-	 * The list of face groups.
+	/**
+	 * \brief The list of face groups.
 	 */
 	std::vector<MEDCoupling::MEDCouplingUMesh *> _faceGroups;
-	/*
-	 * The list of node groups.
+	/**
+	 * \brief The list of node groups.
 	 */
 	std::vector<MEDCoupling::DataArrayIdType *> _nodeGroups;
 	
-	/*
-	 * The list of face id in each face groups.
+	/**
+	 * \brief The list of face id in each face groups.
 	 */
 	std::vector< std::vector<int> > _faceGroupsIds;
 	
-	/*
-	 * The list of node id in each node groups.
+	/**
+	 * \brief The list of node id in each node groups.
 	 */
 	std::vector< std::vector<int> > _nodeGroupsIds;
 	
-	/*
-	 * Elements types (SEG2, TRI3, QUAD4, HEXA6 ...)
+	/**
+	 * \brief Elements types (SEG2, TRI3, QUAD4, HEXA6 ...)
 	 */
 	std::vector< INTERP_KERNEL::NormalizedCellType > _eltsTypes;//List of cell types contained in the mesh
 	std::vector< std::string > _eltsTypesNames;//List of cell types contained in the mesh
     std::vector< INTERP_KERNEL::NormalizedCellType > getElementTypes() const;    
     
-    /*
-     * Tools to manage periodic boundary conditions in square/cube geometries
+    /**
+     * \brief Tools to manage periodic boundary conditions in square/cube geometries
      */
      bool _indexFacePeriodicSet;
      std::map<int,int> _indexFacePeriodicMap;
