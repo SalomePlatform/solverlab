@@ -71,10 +71,7 @@ StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalcula
 	_NEWTON_its=0;
 	int _PetscIts=0;//the number of iterations of the linear solver
 	_ksptype = (char*)&KSPGMRES;
-	if( _mpi_size>1)
-		_pctype = (char*)&PCNONE;
-	else
-		_pctype = (char*)&PCLU;
+	_pctype = (char*)&PCILU;
 
 	_conditionNumber=false;
 	_erreur_rel= 0;
@@ -224,13 +221,39 @@ void StationaryDiffusionEquation::initialize()
 		_Tk_seq=_Tk;
 	VecScatterCreateToZero(_Tk,&_scat,&_Tk_seq);
 
-	//Linear solver
+	//PETSc Linear solver
 	KSPCreate(PETSC_COMM_WORLD, &_ksp);
 	KSPSetType(_ksp, _ksptype);
-	// if(_ksptype == KSPGMRES) KSPGMRESSetRestart(_ksp,10000);
 	KSPSetTolerances(_ksp,_precision,_precision,PETSC_DEFAULT,_maxPetscIts);
 	KSPGetPC(_ksp, &_pc);
-	PCSetType(_pc, _pctype);
+	//PETSc preconditioner
+	if(_mpi_size==1 )
+		PCSetType(_pc, _pctype);
+	else
+	{
+		PCSetType(_pc, PCBJACOBI);//Global preconditioner is block jacobi
+		if(_pctype != (char*)&PCILU)//Default pc type is ilu
+		{
+			PetscOptionsSetValue(NULL,"-sub_pc_type ",_pctype);
+			PetscOptionsSetValue(NULL,"-sub_ksp_type ","preonly");
+			//If the above setvalue does not work, try the following
+			/*
+			KSPSetUp(_ksp);//to set the block Jacobi data structures (including creation of an internal KSP context for each block)
+			KSP * subKSP;
+			PC subpc;
+			int nlocal;//nb local blocs (should equal 1)
+			PCBJacobiGetSubKSP(_pc,&nlocal,NULL,&subKSP);
+			if(nlocal==1)
+			{
+				KSPSetType(subKSP[0], KSPPREONLY);//local block solver is same as global
+				KSPGetPC(subKSP[0],&subpc);
+				PCSetType(subpc,_pctype);
+			}
+			else
+				throw CdmathException("PC Block Jacobi, more than one block in this processor!!");
+			*/ 
+		}
+	}
 
     //Checking whether all boundary conditions are Neumann boundary condition
     //if(_FECalculation) _onlyNeumannBC = _NdirichletNodes==0;
@@ -290,7 +313,7 @@ double StationaryDiffusionEquation::computeDiffusionMatrix(bool & stop)
         result=computeDiffusionMatrixFV(stop);
 
     MatAssemblyBegin(_A, MAT_FINAL_ASSEMBLY);
-	MatAssemblyEnd(  _A, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(  _A, MAT_FINAL_ASSEMBLY);
 
     //Contribution from the solid/fluid heat exchange with assumption of constant heat transfer coefficient
     //update value here if variable  heat transfer coefficient
@@ -405,6 +428,8 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFE(bool & stop){
 	if(_onlyNeumannBC)	//Check that the matrix is symmetric
 	{
 		PetscBool isSymetric;
+        MatAssemblyBegin(_A, MAT_FINAL_ASSEMBLY);
+	    MatAssemblyEnd(  _A, MAT_FINAL_ASSEMBLY);
 		MatIsSymmetric(_A,_precision,&isSymetric);
 		if(!isSymetric)
 		{
@@ -528,6 +553,8 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFV(bool & stop){
 	if(_onlyNeumannBC)	//Check that the matrix is symmetric
 	{
 		PetscBool isSymetric;
+        MatAssemblyBegin(_A, MAT_FINAL_ASSEMBLY);
+	    MatAssemblyEnd(  _A, MAT_FINAL_ASSEMBLY);
 		MatIsSymmetric(_A,_precision,&isSymetric);
 		if(!isSymetric)
 		{
@@ -743,7 +770,7 @@ void StationaryDiffusionEquation::setLinearSolver(linearSolver kspType, precondi
 		throw CdmathException("!!! Error : only 'GMRES', 'CG' or 'BCGS' algorithm is acceptable !!!");
 	}
 	// set preconditioner
-	if (pcType == NONE)
+	if (pcType == NOPC)
 		_pctype = (char*)&PCNONE;
 	else if (pcType ==LU)
 		_pctype = (char*)&PCLU;
@@ -1090,4 +1117,62 @@ StationaryDiffusionEquation::setHeatPowerField(string fileName, string fieldName
 	_heatPowerField=Field(fileName, CELLS,fieldName, iteration, order, meshLevel);
 	_heatPowerField.getMesh().checkFastEquivalWith(_mesh);
 	_heatPowerFieldSet=true;
+}
+
+void 
+StationaryDiffusionEquation::setDirichletBoundaryCondition(string groupName, string fileName, string fieldName, int timeStepNumber, int order, int meshLevel, int field_support_type){
+	if(_FECalculation && field_support_type != NODES)
+		cout<<"Warning : finite element simulation should have boundary field on nodes!!! Change parameter field_support_type"<<endl;
+	else if(!_FECalculation && field_support_type == NODES)
+		cout<<"Warning : finite volume simulation should not have boundary field on nodes!!! Change parameter field_support_type"<<endl;
+
+	Field VV;
+	
+	switch(field_support_type)
+	{
+	case CELLS:
+		VV = Field(fileName, CELLS, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	case NODES:
+		VV = Field(fileName, NODES, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	case FACES:
+		VV = Field(fileName, FACES, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	default:
+		std::ostringstream message;
+		message << "Error StationaryDiffusionEquation::setDirichletBoundaryCondition \n Accepted field support integers are "<< CELLS <<" (for CELLS), "<<NODES<<" (for NODES), and "<< FACES <<" (for FACES)" ;
+		throw CdmathException(message.str().c_str());
+	}	
+	/* For the moment the boundary value is taken constant equal to zero */
+	_limitField[groupName]=LimitFieldStationaryDiffusion(DirichletStationaryDiffusion,0,-1);//This line will be deleted when variable BC are properly treated in solverlab 
+}
+
+void 
+StationaryDiffusionEquation::setNeumannBoundaryCondition(string groupName, string fileName, string fieldName, int timeStepNumber, int order, int meshLevel, int field_support_type){
+	if(_FECalculation && field_support_type != NODES)
+		cout<<"Warning : finite element simulation should have boundary field on nodes!!! Change parameter field_support_type"<<endl;
+	else if(!_FECalculation && field_support_type == NODES)
+		cout<<"Warning : finite volume simulation should not have boundary field on nodes!!! Change parameter field_support_type"<<endl;
+
+	Field VV;
+	
+	switch(field_support_type)
+	{
+	case CELLS:
+		VV = Field(fileName, CELLS, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	case NODES:
+		VV = Field(fileName, NODES, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	case FACES:
+		VV = Field(fileName, FACES, fieldName, timeStepNumber, order, meshLevel);
+		break;
+	default:
+		std::ostringstream message;
+		message << "Error StationaryDiffusionEquation::setNeumannBoundaryCondition \n Accepted field support integers are "<< CELLS <<" (for CELLS), "<<NODES<<" (for NODES), and "<< FACES <<" (for FACES)" ;
+		throw CdmathException(message.str().c_str());
+	}	
+	/* For the moment the boundary value is taken constant equal to zero */
+	_limitField[groupName]=LimitFieldStationaryDiffusion(NeumannStationaryDiffusion,0,-1);//This line will be deleted when variable BC are properly treated in solverlab 
 }

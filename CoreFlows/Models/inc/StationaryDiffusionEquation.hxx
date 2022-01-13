@@ -87,6 +87,20 @@ public :
 	void setDirichletBoundaryCondition(string groupName,double Temperature){
 		_limitField[groupName]=LimitFieldStationaryDiffusion(DirichletStationaryDiffusion,Temperature,-1);
 	};
+	/** \fn setDirichletBoundaryCondition
+			 * \brief adds a new boundary condition of type Dirichlet
+			 * \details Reads the boundary field in a med file
+			 * \param [in] string : the name of the boundary
+			 * \param [in] string : the file name
+			 * \param [in] string : the field name
+			 * \param [in] int : the time step number
+			 * \param [in] int : int corresponding to the enum CELLS or NODES
+			 * \param [out] void
+			 *  */
+	void setDirichletBoundaryCondition(string groupName, string fileName, string fieldName, int timeStepNumber, int order, int meshLevel, int field_support_type);
+	void setDirichletBoundaryCondition(string groupName, Field bc_field){
+		_limitField[groupName]=LimitFieldStationaryDiffusion(DirichletStationaryDiffusion, 0, -1);
+	};
 
 	/** \fn setNeumannBoundaryCondition
 			 * \brief adds a new boundary condition of type Neumann
@@ -97,6 +111,20 @@ public :
 			 *  */
 	void setNeumannBoundaryCondition(string groupName, double normalFlux=0){
 		_limitField[groupName]=LimitFieldStationaryDiffusion(NeumannStationaryDiffusion,-1, normalFlux);
+	};
+	/** \fn setNeumannBoundaryCondition
+			 * \brief adds a new boundary condition of type Neumann
+			 * \details Reads the boundary field in a med file
+			 * \param [in] string : the name of the boundary
+			 * \param [in] string : the file name
+			 * \param [in] string : the field name
+			 * \param [in] int : the time step number
+			 * \param [in] int : int corresponding to the enum CELLS or NODES 
+			 * \param [out] void
+			 *  */
+	void setNeumannBoundaryCondition(string groupName, string fileName, string fieldName, int timeStepNumber, int order, int meshLevel, int field_support_type);
+	void setNeumannBoundaryCondition(string groupName, Field bc_field){
+		_limitField[groupName]=LimitFieldStationaryDiffusion(NeumannStationaryDiffusion,-1, 0);
 	};
 
 	void setDirichletValues(map< int, double> dirichletBoundaryValues);

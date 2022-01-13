@@ -86,6 +86,14 @@ enum TimeScheme
 	Implicit/**< Implicit numerical scheme */
 };
 
+//! enumeration pressureEstimate
+/*! the pressure estimate needed to fit physical parameters  */
+enum pressureEstimate
+{
+	around1bar300K,/**< pressure is around 1 bar and temperature around 300K (for TransportEquation, SinglePhase and IsothermalTwoFluid) or 373 K (saturation for DriftModel and FiveEqsTwoFluid) */
+	around155bars600K/**< pressure is around 155 bars  and temperature around 618 K (saturation) */
+};
+
 class ProblemCoreFlows
 {
 public :
@@ -789,6 +797,10 @@ protected :
 	Vec _b;//Linear system right hand side
 	double _MaxIterLinearSolver;//nombre maximum d'iteration gmres obtenu au cours par les resolution de systemes lineaires au cours d'un pas de tmeps
 	bool _conditionNumber;//computes an estimate of the condition number
+	/** \fn createKSP
+	 * \brief Create PETSc solver and preconditioner structures
+	 *  */
+	void createKSP();
 
 	//simulation monitoring variables
 	bool _isStationary;
