@@ -646,6 +646,10 @@ if (SOLVERLAB_WITH_DOCUMENTATION)                                               
   if   (NOT DOXYGEN_FOUND)
     message (FATAL_ERROR "Doxygen is needed to build the documentation. Please install it correctly.")
   endif(NOT DOXYGEN_FOUND)
+  
+  configure_file (Doxyfile.in ${PROJECT_BINARY_DIR}/Doxyfile  @ONLY IMMEDIATE)
+  add_custom_target (doc COMMAND ${DOXYGEN_EXECUTABLE} ${PROJECT_BINARY_DIR}/Doxyfile  SOURCES ${PROJECT_BINARY_DIR}/Doxyfile)			                                            #
+  install (DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc/html DESTINATION share/doc/solverlab-dev-doc OPTIONAL)                  #
 endif(SOLVERLAB_WITH_DOCUMENTATION)			
 
 if (SOLVERLAB_WITH_TESTS)                                                                                  #
@@ -658,6 +662,9 @@ if (SOLVERLAB_WITH_TESTS)                                                       
    ENDIF( DEFINED CPPUNIT_ROOT_DIR)
  ENDIF( DEFINED CPPUNIT_ROOT_DIR OR DEFINED ENV{CPPUNIT_ROOT_DIR})
   find_package (CPPUNIT REQUIRED)
+  
+  add_custom_target (cpp COMMAND ctest -R .exe)# may be replace ctest -R with ctest -L
+  add_custom_target (mpi COMMAND ctest -R Proc)# may be replace ctest -R with ctest -L
 endif(SOLVERLAB_WITH_TESTS)			
 				    
 # Enter subdirectories
