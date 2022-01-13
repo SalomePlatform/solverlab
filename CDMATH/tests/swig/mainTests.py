@@ -504,15 +504,15 @@ class TestsCDMATHSwig(unittest.TestCase):
         self.assertEqual(25, M2.getNumberOfNodes())
         self.assertEqual(16, M2.getNumberOfCells())
         self.assertEqual(40, M2.getNumberOfFaces())
-#        x1=M2.getCells()[4].x();
-#        y1=M2.getCells()[4].y();
-#        self.assertTrue( x1==0.5 );
-#        self.assertTrue( y1==1.5 );
+        x1=M2.getCell(4).x();
+        y1=M2.getCell(4).y();
+        self.assertTrue( x1==0.5 );
+        self.assertTrue( y1==1.5 );
 
-#        x2=M2.getNodes()[24].x();
-#        y2=M2.getNodes()[24].y();
-#        self.assertTrue( x2==4. );
-#        self.assertTrue( y2==4. );
+        x2=M2.getNode(24).x();
+        y2=M2.getNode(24).y();
+        self.assertTrue( x2==4. );
+        self.assertTrue( y2==4. );
         eps = 1.E-10
         M2.setGroupAtPlan(xsup, 0, eps, "RightEdge")
         M2.setGroupAtPlan(xinf, 0, eps, "LeftEdge")
@@ -528,8 +528,6 @@ class TestsCDMATHSwig(unittest.TestCase):
         M2.setPeriodicFaces()
         indexFaces = M2.getIndexFacePeriodic()
         for i in range(nbFaces):
-            #            x=M2.getFaces()[i].x();
-            #            y=M2.getFaces()[i].y();
             x = M2.getFace(i).x()
             y = M2.getFace(i).y()
             if (abs(y) < 1.E-10 and abs(x - 0.5) < 1.E-10):
@@ -550,7 +548,7 @@ class TestsCDMATHSwig(unittest.TestCase):
         self.assertTrue(16 == M22.getNumberOfCells())
         self.assertTrue(40 == M22.getNumberOfFaces())
 
-        M23 = Mesh("meshSquare.med")
+        M23 = Mesh("meshSquare.med", "Mesh_1")
         self.assertTrue(len(M23.getNameOfFaceGroups()) == 5)
         print( M23.getNameOfFaceGroups() )
         self.assertTrue(M23.getNameOfFaceGroups()[1] == "Bottom")
