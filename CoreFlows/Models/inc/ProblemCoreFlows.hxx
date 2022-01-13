@@ -731,10 +731,10 @@ public :
 
     //Spectral analysis
     double getConditionNumber(bool isSingular=false, double tol=1e-6) const;
-    std::vector< double > getEigenvalues (int nev, EPSWhich which=EPS_SMALLEST_MAGNITUDE, double tol=1e-6) const;
+    std::vector< double > getEigenvalues (int nev, EPSWhich which=EPS_SMALLEST_MAGNITUDE, double tol=1e-6, EPSType type = EPSKRYLOVSCHUR, bool viewEigenvaluesInXWindows=false, double pause_lenght=0) const;
     std::vector< Vector > getEigenvectors(int nev, EPSWhich which=EPS_SMALLEST_MAGNITUDE, double tol=1e-6) const;
     Field getEigenvectorsField(int nev, EPSWhich which=EPS_SMALLEST_MAGNITUDE, double tol=1e-6) const;
-    std::vector< double > getSingularValues( int nsv, SVDWhich which=SVD_SMALLEST, double tol=1e-6) const;
+    std::vector< double > getSingularValues( int nsv, SVDWhich which=SVD_SMALLEST, double tol=1e-6, SVDType type = SVDCYCLIC, bool viewSingularValuesInXWindows=false, double pause_lenght=0) const;
     std::vector< Vector > getSingularVectors(int nsv, SVDWhich which=SVD_SMALLEST, double tol=1e-6) const;
 
 	//  some supplementary functions
@@ -746,7 +746,7 @@ public :
 	 * @param name, string, name or description of the matrix
 	 * @return displays the matrix on the terminal
 	 *  */
-	static void displayMatrix(double *matrix, int size, string name="Vector coefficients :");
+	static void displayMatrix(double *matrix, int size, string name="Matrix coefficients :");
 
 	/** \fn displayMatrix
 	 * \brief displays a vector of size "size" for profiling
@@ -755,10 +755,11 @@ public :
 	 * @param name, string, name or description of the vector
 	 * @return displays the vector on the terminal
 	 *  */
-	static void displayVector(double *vector, int size, string name="Matrix coefficients :");
+	static void displayVector(double *vector, int size, string name="Vector coefficients :");
 
 protected :
 
+	// Mesh info
 	int _Ndim;//space dimension
 	int _nVar;//Number of equations to sole
 	int _Nmailles;//number of cells
@@ -802,7 +803,7 @@ protected :
 	 *  */
 	void createKSP();
 
-	//simulation monitoring variables
+	// Simulation monitoring variables
 	bool _isStationary;
 	bool _initialDataSet;
 	bool _initializedMemory;
