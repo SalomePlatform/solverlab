@@ -3090,6 +3090,10 @@ void SinglePhase::save(){
 		}
 	}
 
+	if (_nbTimeStep ==0 || _restartWithNewFileName){	// delete mesh in memory	
+		_VV.deleteMEDCouplingMesh();
+		_UU.deleteMEDCouplingMesh();
+	}
 	if (_restartWithNewFileName)
 		_restartWithNewFileName=false;
 }
