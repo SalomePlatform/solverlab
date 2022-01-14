@@ -770,7 +770,7 @@ void StationaryDiffusionEquation::setLinearSolver(linearSolver kspType, precondi
 		throw CdmathException("!!! Error : only 'GMRES', 'CG' or 'BCGS' algorithm is acceptable !!!");
 	}
 	// set preconditioner
-	if (pcType == NOPC)
+	if (pcType == NONE)
 		_pctype = (char*)&PCNONE;
 	else if (pcType ==LU)
 		_pctype = (char*)&PCLU;
@@ -781,10 +781,10 @@ void StationaryDiffusionEquation::setLinearSolver(linearSolver kspType, precondi
 	else if (pcType == ICC)
 		_pctype = (char*)&PCICC;
 	else {
-		cout << "!!! Error : only 'NOPC', 'LU', 'ILU', 'CHOLESKY' or 'ICC' preconditioners are acceptable !!!" << endl;
-		*_runLogFile << "!!! Error : only 'NOPC' or 'LU' or 'ILU' preconditioners are acceptable !!!" << endl;
+		cout << "!!! Error : only 'NONE', 'LU', 'ILU', 'CHOLESKY' or 'ICC' preconditioners are acceptable !!!" << endl;
+		*_runLogFile << "!!! Error : only 'NONE' or 'LU' or 'ILU' preconditioners are acceptable !!!" << endl;
 		_runLogFile->close();
-		throw CdmathException("!!! Error : only 'NOPC' or 'LU' or 'ILU' preconditioners are acceptable !!!" );
+		throw CdmathException("!!! Error : only 'NONE' or 'LU' or 'ILU' preconditioners are acceptable !!!" );
 	}
 }
 
