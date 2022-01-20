@@ -60,9 +60,13 @@ list (APPEND CMAKE_MODULE_PATH "${SOLVERLAB_SOURCE_DIR}/cmake_files")
 #############################
 # Detection of MPI + MPI4PY #
 #############################
-if   ( DEFINED MPI_ROOT_DIR )
-  set(MPI_HOME    ${MPI_ROOT_DIR})
-endif( DEFINED MPI_ROOT_DIR )
+if   ( DEFINED ENV{MPI_ROOT_DIR} OR DEFINED MPI_ROOT_DIR )
+  if   ( DEFINED  ENV{MPI_ROOT_DIR} )
+    set(MPI_HOME $ENV{MPI_ROOT_DIR})
+  else ( DEFINED  ENV{MPI_ROOT_DIR} )
+    set(MPI_HOME    ${MPI_ROOT_DIR})
+  endif( DEFINED  ENV{MPI_ROOT_DIR} )
+endif( DEFINED ENV{MPI_ROOT_DIR} OR DEFINED MPI_ROOT_DIR )
 
 # Definition of SOLVERLAB_WITH_MPI
 if(    DEFINED ENV{MPI_HOME} OR MPI_HOME )
