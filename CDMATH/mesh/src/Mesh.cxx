@@ -67,10 +67,10 @@ Mesh::~Mesh( void )
 	//for(int i=0; i< _faceGroups.size(); i++)
 	//	_faceGroups[i]->decrRef();
 	//	_nodeGroups[i]->decrRef();
-	//if( _boundaryMesh && _meshNotDeleted)
-	//    _boundaryMesh->decrRef();
 	if( _meshNotDeleted)
 		(_mesh.retn())->decrRef();
+	//if( _boundaryMesh)
+	//    _boundaryMesh->decrRef();
 }
 
 std::string 
@@ -144,18 +144,13 @@ Mesh::Mesh( const Mesh& mesh )
     _boundaryFaceIds=mesh.getBoundaryFaceIds();
     _boundaryNodeIds=mesh.getBoundaryNodeIds();
 	
-	if( mesh.getBoundaryMEDCouplingMesh() )
-        _boundaryMesh=mesh.getBoundaryMEDCouplingMesh()->clone(false);//Clone because every other constructor allocates a new mesh and therefore needs to be deleted
+    _boundaryMesh=mesh.getBoundaryMEDCouplingMesh();
 		
     _eltsTypes=mesh.getElementTypes();
     _eltsTypesNames=mesh.getElementTypesNames();
     
-    MCAuto<MEDCouplingMesh> m1;
-    if(mesh.meshNotDeleted())
-    	m1=mesh.getMEDCouplingMesh()->clone(false);//Clone because you will need to buildUnstructured. No deep copy : it is assumed node coordinates and cell connectivity will not change
-    else
-        m1=NULL;
-        
+	MCAuto<MEDCouplingMesh> m1=mesh.getMEDCouplingMesh()->clone(false);//Clone because you will need to buildUnstructured. No deep copy : it is assumed node coordinates and cell connectivity will not change
+
 	_mesh=m1;
     _meshNotDeleted=mesh.meshNotDeleted();
 }
