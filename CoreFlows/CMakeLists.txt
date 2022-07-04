@@ -78,9 +78,9 @@ endif(COREFLOWS_WITH_DOCUMENTATION)                                             
      													    #
 if   (COREFLOWS_WITH_GUI) 
   if   ( NOT PACKAGESPY_ROOT_DIR AND NOT SOLVERLAB_WITH_PACKAGESPY)													    #
-    set (CoreFlows_GUI_DIR ${CoreFlows_SOURCE_DIR}/gui_old)                                                        #
+    set (CoreFlows_GUI_DIR ${CoreFlows_SOURCE_DIR}/gui)                                                        #
   else ( NOT PACKAGESPY_ROOT_DIR AND NOT SOLVERLAB_WITH_PACKAGESPY)													    #
-    set (CoreFlows_GUI_DIR ${CoreFlows_SOURCE_DIR}/gui)      
+    set (CoreFlows_GUI_DIR ${CoreFlows_SOURCE_DIR}/gui_new)      
     if   ( NOT PACKAGESPY_ROOT_DIR )                                                  #
       FILE(DOWNLOAD ${DOWNLOAD_PACKAGESPY} packagespy.zip )
       FILE(ARCHIVE_EXTRACT INPUT packagespy.zip DESTINATION ${CoreFlows_GUI_DIR} )
