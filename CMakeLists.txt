@@ -534,7 +534,7 @@ if  ( DEFINED PARAVIEW_VERSION OR DEFINED ENV{PARAVIEW_VERSION} )
   endif( NOT DEFINED PARAVIEW_VERSION )
   message(STATUS "ParaView version is ${PARAVIEW_VERSION}" )
 else( DEFINED PARAVIEW_VERSION OR DEFINED ENV{PARAVIEW_VERSION} )
-  set( PARAVIEW_SUFFIXES paraview-5.0 paraview-5.1 paraview-5.2 paraview-5.3 paraview-5.4 paraview-5.5 paraview-5.6 paraview-5.7 paraview-5.8 paraview-5.9  paraview-5.11)
+  set( PARAVIEW_SUFFIXES paraview-5.0 paraview-5.1 paraview-5.2 paraview-5.3 paraview-5.4 paraview-5.5 paraview-5.6 paraview-5.7 paraview-5.8 paraview-5.9 paraview-5.10 paraview-5.11 paraview-5.12 paraview-5.13 paraview-5.14 paraview-5.15)
   find_file( vtkConfig_file vtkPVConfig.h HINTS ${PARAVIEW_INCLUDE_DIR} PATH_SUFFIXES ${PARAVIEW_SUFFIXES})
 
   #extraction of the paraview version"
