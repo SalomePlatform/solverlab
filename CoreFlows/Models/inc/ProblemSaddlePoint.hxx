@@ -1,21 +1,20 @@
 //============================================================================
-// Name        : ProblemFluid
+// Name        : ProblemSaddlePoint
 // Author      : M. Ndjinga
 // Version     :
-// Copyright   : CEA Saclay 2014
-// Description : Generic class for thermal hydraulics problems
+// Copyright   : CEA Saclay 2022
+// Description : Generic class for saddle point problems
 //============================================================================
 
-/*! \class ProblemFluid ProblemFluid.hxx "ProblemFluid.hxx"
- *  \brief Factorises the methods that are common to the non scalar models (fluid models)
- *  \details Common functions to fluid models
+/*! \class ProblemSaddlePoint ProblemSaddlePoint.hxx "ProblemSaddlePoint.hxx"
+ *  \brief Navier-Stokes solververs inspired by incompressible Navier-Stokes
+ *  \details Since the fluid might be incompresible, the main variable is the primitive vecctor, the scheme is implicit. We test preconditioners for te resulting saddle point problem
  */
-#ifndef PROBLEMFLUID_HXX_
-#define PROBLEMFLUID_HXX_
+#ifndef ProblemSaddlePoint_HXX_
+#define ProblemSaddlePoint_HXX_
 
-#include "StiffenedGas.hxx"
+#include "Fluide.h"
 #include "ProblemCoreFlows.hxx"
-#include "utilitaire_algebre.h"
 
 using namespace std;
 
@@ -25,19 +24,8 @@ enum SpaceScheme
 {
 	upwind,/**<  classical full upwinding scheme (first order in space) */
 	centered,/**<  centered scheme (second order in space) */
-	pressureCorrection,/**<  include a pressure correction in the upwind scheme to increase precision at low Mach numbers */
-	lowMach,/**<  include an upwinding proportional to the Mach numer scheme to increase precision at low Mach numbers */
-	staggered,/**<  scheme inspired by staggered discretisations */
-};
-
-//! enumeration NonLinearFormulation
-/*! the formulation used to compute the non viscous fluxes */
-enum NonLinearFormulation
-{
-	Roe,/**< Ph. Roe non linear formulation is used */
-	VFRoe,/**< Masella, Faille and Gallouet non linear formulation is used */
-	VFFC,/**< Ghidaglia, Kumbaro and Le Coq non linear formulation is used */
-	reducedRoe,/**< compacted formulation of Roe scheme without computation of the fluxes */
+	pstaggered,/**<  scheme inspired by staggered discretisations */
+	staggered,/**<  staggered discretisation */
 };
 
 //! enumeration phaseType
@@ -69,14 +57,14 @@ struct LimitField{
 	double conc;//For inlet (DriftModel)
 };
 
-class ProblemFluid: public ProblemCoreFlows
+class ProblemSaddlePoint: public ProblemCoreFlows
 {
 
 public :
 	/**\fn
-	 * \brief constructeur de la classe ProblemFluid
+	 * \brief constructeur de la classe ProblemSaddlePoint
 	 */
-	ProblemFluid(MPI_Comm comm = MPI_COMM_WORLD);
+	ProblemSaddlePoint(MPI_Comm comm = MPI_COMM_WORLD);
 
 	//Gestion du calcul (interface ICoCo)
 
@@ -113,7 +101,7 @@ public :
 	void abortTimeStep();
 
 	/** \fn iterateTimeStep
-	 * \brief calls computeNewtonVariation to perform one Newton iteration and tests the convergence of the Newton scheme
+	 * \brief calls computeNewtonVariation to perform one Newton iteration and tests the convergence
 	 * @param
 	 * @return boolean ok is true is the newton iteration gave a physically acceptable result
 	 * */
@@ -154,6 +142,17 @@ public :
 	};
 
 	/** \fn setOutletBoundaryCondition
+	 * \brief Adds a new boundary condition of type Outlet
+	 * \details
+	 * \param [in] string : the name of the boundary
+	 * \param [in] double : the value of the pressure at the boundary
+	 * \param [out] void
+	 *  */
+	void setOutletBoundaryCondition(string groupName,double Pressure){
+		_limitField[groupName]=LimitField(Outlet,Pressure,vector<double>(_nbPhases,0),vector<double>(_nbPhases,0),vector<double>(_nbPhases,0),-1,-1,-1,-1);
+	};
+
+	/** \fn setOutletBoundaryCondition
 	 * \brief Adds a new boundary condition of type Outlet taking into account the hydrostatic pressure variations
 	 * \details The pressure is not constant on the boundary but varies linearly with a slope given by the gravity vector
 	 * \param [in] string : the name of the boundary
@@ -161,7 +160,7 @@ public :
 	 * \param [in] vector<double> : reference_point position on the boundary where the value Pressure will be imposed
 	 * \param [out] void
 	 *  */
-	void setOutletBoundaryCondition(string groupName,double referencePressure, vector<double> reference_point=vector<double>(3,0)){
+	void setOutletBoundaryCondition(string groupName,double referencePressure, vector<double> reference_point){
 		/* On the boundary we have P-Pref=rho g\cdot(x-xref) */
 		_gravityReferencePoint=reference_point;
 		_limitField[groupName]=LimitField(Outlet,referencePressure,vector<double>(_nbPhases,0),vector<double>(_nbPhases,0),vector<double>(_nbPhases,0),-1,-1,-1,-1);
@@ -184,64 +183,21 @@ public :
 	 * 	 * */
 	void setViscosity(vector<double> viscosite){
 		if(_nbPhases!= viscosite.size())
-			throw CdmathException("ProblemFluid::setViscosity: incorrect vector size vs number of phases");
+			throw CdmathException("ProblemSaddlePoint::setViscosity: incorrect vector size vs number of phases");
 		for(int i=0;i<_nbPhases;i++)
 			_fluides[i]->setViscosity(viscosite[i]);
 	};
 
 	/** \fn setConductivity
-	 * \brief sets the conductivity coefficients of each fluid
+	 * \brief sets the vector of conductivity coefficients
 	 * @param conductivite is a vector of size equal to the number of phases and containing the conductivity of each phase
 	 * @return throws an exception if the input vector size is not equal to the number of phases
 	 * */
 	void setConductivity(vector<double> conductivite){
 		if(_nbPhases!= conductivite.size())
-			throw CdmathException("ProblemFluid::setConductivity: incorrect vector size vs number of phases");
+			throw CdmathException("ProblemSaddlePoint::setConductivity: incorrect vector size vs number of phases");
 		for(int i=0;i<_nbPhases;i++)
 			_fluides[i]->setConductivity(conductivite[i]);
-	};
-
-	/** \fn getStiffenedGasEOS
-	 * \brief return the stiffened gas law associated to fluid i
-	 * @param int i : the index of the fluid
-	 * @return throws an exception if the fluid with index i does not follow a stiffened gas law.
-	 * */
-	StiffenedGas getStiffenedGasEOS(int i)
-	{
-		StiffenedGas * result = dynamic_cast<StiffenedGas*>(_fluides[i]); 
-		if(result)
-			 return *result;
-		else
-			throw CdmathException("ProblemFluid::getStiffenedGasEOS() : fluid EOS is not a stiffened gas law");
-	}
-
-	/** \fn getIncompressibleEOS
-	 * \brief return the incompressible law associated to fluid i
-	 * @param int i : the index of the fluid
-	 * @return throws an exception if the fluid with index i does not follow an incompressible law.
-	 * */
-	IncompressibleFluid getIncompressibleEOS(int i)
-	{
-		IncompressibleFluid * result = dynamic_cast<IncompressibleFluid*>(_fluides[i]); 
-		if(result)
-			 return *result;
-		else
-			throw CdmathException("ProblemFluid::getIncompressibleEOS() : fluid EOS is not an incompressible law");
-	}
-
-	/** \fn setDragCoeffs
-	 * \brief Sets the drag coefficients
-	 * @param dragCoeffs is a  vector of size equal to the number of phases and containing the value of the friction coefficient of each phase
-	 * @return throws an exception if the input vector size is not equal to the numer of phases
-	 * */
-	void setDragCoeffs(vector<double> dragCoeffs){
-		if(_nbPhases!= dragCoeffs.size())
-			throw CdmathException("ProblemFluid::setDragCoeffs: incorrect vector size vs number of phases");
-		for(int i=0;i<_nbPhases;i++)
-		{
-			_fluides[i]->setDragCoeff(dragCoeffs[i]);
-			_dragCoeffs[i]=dragCoeffs[i];
-		}
 	};
 
 	/** \fn setGravity
@@ -250,6 +206,21 @@ public :
 	 * 				 * */
 	void setGravity(vector<double> gravite){
 		_GravityField3d = gravite;
+	};
+
+	/** \fn setDragCoeffs
+	 * \brief Sets the drag coefficients
+	 * @param dragCoeffs is a  vector of size equal to the number of phases and containing the value of the friction coefficient of each phase
+	 * @return throws an exception if the input vector size is not equal to the numer of phases
+	 * */
+	void setDragCoeffs(vector<double> dragCoeffs){
+		if(_nbPhases!= dragCoeffs.size())
+			throw CdmathException("ProblemSaddlePoint::setDragCoeffs: incorrect vector size vs number of phases");
+		for(int i=0;i<_nbPhases;i++)
+		{
+			_fluides[i]->setDragCoeffs(dragCoeffs[i]);
+			_dragCoeffs[i]=dragCoeffs[i];
+		}
 	};
 
 	/** \fn getNumberOfPhases
@@ -288,27 +259,6 @@ public :
 	 * */
 	void setEntropicCorrection(bool entropyCorr){
 		_entropicCorrection=entropyCorr;
-	}
-
-	/** \fn setPressureCorrectionOrder
-	 * \brief In case a pressure correction scheme is set by a call to setNumericalScheme(pressureCorrection) this function allows the setting of the type of pressure correction to be used
-	 * @param int the order of the pressure correction
-	* \details The following treatment is applied depending on the value of the input parameter order
-	* \details 1 -> no pressure correction (pressure correction is applied nowhere in the domain), standard upwind scheme instead is used
-	* \details 2 -> standard pressure correction is applied everywhere in the domain, even at the boundary faces
-	* \details 3 -> standard pressure correction is applied only inside the domain (not at the boundary faces)
-	* \details 4 -> no pressure correction (pressure correction is applied nowhere in the domain), no Riemann problem at wall boundaries (boundary pressure = inner pressure)
-	* \details 5 -> standard pressure correction is applied everywhere in the domain, no Riemann problem at the boundary (boundary pressure = inner pressure)
-	* \details 6 -> standard pressure correction is applied inside the domain and a special pressure correction involving gravity is applied at the boundary, no Riemann problem at wall boundaries (boundary pressure = inner pressure+ source term)
-	* */
-	void setPressureCorrectionOrder(int order){
-		if( order >6 || order <1)
-			throw CdmathException("ProblemFluid::setPressureCorrectionOrder Pressure correction order must be an integer between 1 and 4");
-		else
-			_pressureCorrectionOrder=order;
-
-		if(order==1)
-			_spaceScheme=upwind;
 	}
 
 	// Petsc resolution
@@ -420,36 +370,6 @@ public :
 	 *  */
 	void setSectionField(string fileName, string fieldName);
 
-	/** \fn setNonLinearFormulation
-	 * \brief sets the formulation used for the computation of non viscous fluxes
-	 * \details Roe, VFRoe, VFFC
-	 * \param [in] enum NonLinearFormulation
-	 * \param [out] void
-	 *  */
-	void setNonLinearFormulation(NonLinearFormulation nonLinearFormulation){
-		//if(nonLinearFormulation != Roe && nonLinearFormulation != VFRoe && nonLinearFormulation != VFFC && nonLinearFormulation!=reducedRoe)
-		//	throw CdmathException("nonLinearFormulation should be either Roe, VFRoe or VFFC");//extra security for swig binding
-		_nonLinearFormulation=nonLinearFormulation;
-	}
-
-	/** \fn getNonLinearFormulation
-	 * \brief returns the formulation used for the computation of non viscous fluxes
-	 * \details Roe, VFRoe, VFFC
-	 * \param [in] void
-	 * \param [out] enum NonLinearFormulation
-	 *  */
-	NonLinearFormulation getNonLinearFormulation() const{
-		return _nonLinearFormulation;
-	}
-
-	/** \fn usePrimitiveVarsInNewton
-	 * \brief use Primitive Vars instead of conservative vars In Newton scheme for implicit schemes
-	 * \param [in] bool
-	 *  */
-	void usePrimitiveVarsInNewton(bool usePrimitiveVarsInNewton){
-		_usePrimitiveVarsInNewton=usePrimitiveVarsInNewton;
-	}
-
 	/** \fn getSpaceScheme
 	 * \brief returns the  space scheme name
 	 * \param [in] void
@@ -484,12 +404,8 @@ protected :
 	int _nbPhases;
 	/** Field of conservative variables (the primitive variables are defined in the mother class ProblemCoreFlows **/
 	Field  _UU;
-	/** Field of interfacial states of the VFRoe scheme **/
-	Field _UUstar, _VVstar;
 
 	SpaceScheme _spaceScheme;
-	/** the formulation used to compute the non viscous fluxes **/
-	NonLinearFormulation _nonLinearFormulation;
 
 	/** PETSc nonlinear solver and line search **/
 	SNES _snes;
@@ -498,15 +414,12 @@ protected :
 
 	map<string, LimitField> _limitField;
 
-	/** boolean used to specify that an entropic correction should be used **/
-	bool _entropicCorrection;
-	/** Vector containing the eigenvalue jumps for the entropic correction **/
-	vector<double> _entropicShift;
-	/** In case a pressure correction scheme is used some more option regarding the type of pressure correction **/
-	int _pressureCorrectionOrder;
-
 	/** Fluid equation of state **/
-	vector<	Fluide* > _fluides;//ToDo replace this by a vector of Fluide once the classes needing compressible fluids have been modified adequately
+	vector<	Fluide* > _fluides;
+	//!Viscosity coefficients 
+	vector<double> _viscosite;
+	//!Conductivity coefficients 
+	vector<double> _conductivite;
 
 	/** Source terms **/
 	vector<double> _gravite, _GravityField3d, _gravityReferencePoint, _dragCoeffs;//_GravityField3d has size _Ndim whereas _gravite has size _Nvar and is usefull for dealing with source term and implicitation of gravity vector
@@ -523,7 +436,7 @@ protected :
 	bool _usePrimitiveVarsInNewton;
 
 	// Variables du schema numerique 
-	Vec _conservativeVars, _newtonVariation, _bScaling,_old, _primitiveVars, _Uext,_Uextdiff ,_vecScaling,_invVecScaling;
+	Vec _conservativeVars, _newtonVariation, _bScaling,_old, _primitiveVars, _Uext,_Uextdiff ,_vecScaling,_invVecScaling, _Vext;
 	//courant state vector, vector computed at next time step, second member of the equation
 	PetscScalar *_AroePlus, *_AroeMinus,*_Jcb,*_JcbDiff, *_a, *_blockDiag,  *_invBlockDiag,*_Diffusion, *_GravityImplicitationMatrix;
 	PetscScalar *_Aroe, *_absAroe, *_signAroe, *_invAroe;
@@ -542,10 +455,10 @@ protected :
 	bool solveNewtonPETSc();//Use PETSc Newton methods to solve time step
 
 	/** \fn computeNewtonVariation
-	 * \brief Builds and solves the linear system to obtain the variation Ukp1-Uk (or Vkp1-Vk for primitive variables) in the Newton scheme
+	 * \brief Builds and solves the linear system to obtain the variation Ukp1-Uk in a Newton scheme
 	 * @param void
 	 * */
-	void computeNewtonVariation();
+	virtual void computeNewtonVariation();
 
 	/** \fn computeNewtonRHS
 	 * \brief Builds the right hand side F_X(X) of the linear system in the Newton method to obtain the variation Ukp1-Uk
@@ -603,7 +516,7 @@ protected :
 	 * @param boolean isBoundary is true for a boundary face (i,j) and false otherwise
 	 * @param double mesureFace the lenght or area of the face
 	 * */
-	virtual void addSourceTermToSecondMember(const int i, int nbNeighboursi,const int j, int nbNeighboursj,bool isBoundary, int ij, double mesureFace);
+	void addSourceTermToSecondMember(const int i, int nbNeighboursi,const int j, int nbNeighboursj,bool isBoundary, int ij, double mesureFace);
 
 	/** \fn sourceVector
 	 * \brief Computes the source term (at the exclusion of pressure loss terms)
@@ -728,7 +641,7 @@ protected :
 	 * \Details pure virtual, implemented by each model
 	 * @pram V : primitive vector state
 	 * 	 */
-	virtual void primToConsJacobianMatrix(double *V)=0;
+	//void primToConsJacobianMatrix(double *V)=0;
 
 	/** \fn getRacines
 	 * \brief Computes the roots of a polynomial
@@ -786,4 +699,4 @@ protected :
 
 };
 
-#endif /* PROBLEMFLUID_HXX_ */
+#endif /* ProblemSaddlePoint_HXX_ */

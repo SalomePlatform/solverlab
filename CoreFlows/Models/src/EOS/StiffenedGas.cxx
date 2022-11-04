@@ -1,23 +1,23 @@
 #include "StiffenedGas.hxx"
-#include <iostream>
 
-//Perfect gas EOS Loi d'etat gaz parfait
-StiffenedGas::StiffenedGas( double gamma, double cv, double T_ref, double e_ref): Fluide()
+//Perfect gas EOS with given gamma
+StiffenedGas::StiffenedGas( double gamma, double cv, double T_ref, double e_ref): CompressibleFluid()
 {
 	if(gamma -1<=0)
-		throw CdmathException("StiffenedGas::StiffenedGas: gamma<1");
+		throw EosException("StiffenedGas::StiffenedGas: gamma<1");
+	assert(cv>0);
 	_gamma=gamma;
 	_Cv=cv;
 	_Cp=_gamma*_Cv;
-	_p0=0;
 	_Tref=T_ref;
 	_e_ref=e_ref;
+	_p0=0;
 	_q=0;
 	cout<<"Perfect gas EOS P=(gamma - 1) * rho e with parameter"<< " gamma= " << _gamma<<endl;
-	cout<<"Linearised internal energy law e(T)=  e_ref+ cv_ref (T-Tref), around temperature Tref= "<< _Tref<<" K, internal energy e_ref= "<<_e_ref<<" J/Kg, with specific heat cv_ref= "<< _Cv<<" J/Kg/K"<<endl;
+	cout<<"Linearised internal energy law e(T)=  e_ref+ cv_ref (T-Tref), around temperature Tref= "<< _Tref<<" K, internal energy e_ref= "<<_e_ref<<" J/Kg, and specific heat cv_ref= "<< _Cv<<" J/Kg/K"<<endl;
 }
-//Stiffened gas fitted using sound speed
-StiffenedGas::StiffenedGas(double rho_ref, double p_ref, double T_ref, double e_ref, double c_ref, double cv_ref): Fluide()
+//Stiffened gas fitted using sound speed (gamma computed from reference sound speed, pressure and internal energy
+StiffenedGas::StiffenedGas(double rho_ref, double p_ref, double T_ref, double e_ref, double c_ref, double cv_ref): CompressibleFluid()
 {
 	//Old formula
 	//_gamma=(1+sqrt(1+4*c_ref*c_ref/(cv_ref*T_ref)))/2;
@@ -25,7 +25,8 @@ StiffenedGas::StiffenedGas(double rho_ref, double p_ref, double T_ref, double e_
 	_e_ref=e_ref;
 	_gamma=1+c_ref*c_ref/(_e_ref+p_ref/rho_ref);
 	if(_gamma -1<=0)
-		throw CdmathException("StiffenedGas::setEOS: gamma<1");
+		throw EosException("StiffenedGas error gamma<1");
+	assert(cv_ref>0);
 	_Tref=T_ref;
 	_Cv=cv_ref;
 	_Cp=_gamma*_Cv;
@@ -39,8 +40,9 @@ StiffenedGas::StiffenedGas(double rho_ref, double p_ref, double T_ref, double e_
 StiffenedGasDellacherie::StiffenedGasDellacherie( double gamma, double p0, double q, double cv_ref)
 {
 	if(gamma -1<=0)
-		throw CdmathException("StiffenedGas::StiffenedGas: gamma<1");
+		throw EosException("StiffenedGas::StiffenedGas: gamma<1");
 	_gamma=gamma;
+	assert(cv_ref>0);
 	_Cv=cv_ref;
 	_Cp=_gamma*_Cv;
 	_p0=p0;
@@ -58,11 +60,13 @@ double StiffenedGas::getInternalEnergy(double T, double rho)
 }
 double StiffenedGasDellacherie::getInternalEnergy(double T, double rho)
 {
+	assert(rho>0);
 	double h= getEnthalpy(T);//h=e+p/rho=e+(gamma-1)(e-q)-gamma p0/rho=gamma(e- p0/rho)-(gamma-1)q
 	return (h+(_gamma-1)*_q)/_gamma+_p0/rho;
 }
 double StiffenedGas::getEnthalpy(double T, double rho)
 {
+	assert(rho>0);
 	double e=getInternalEnergy( T, rho);
 	return _gamma*(e-_p0/rho)-(_gamma-1)*_q;
 }
@@ -72,12 +76,14 @@ double StiffenedGasDellacherie::getEnthalpy(double T, double rho)
 }
 double StiffenedGas::getTemperatureFromPressure(const double  p, const double rho)
 {
+	assert(rho>0);
 	//p=(gamma-1)rho(e-q)-gamma p0
 	double e=_q +(p+_gamma*_p0)/((_gamma-1)*rho);
 	return (e-_e_ref)/_Cv + _Tref;
 }
 double StiffenedGasDellacherie::getTemperatureFromPressure(const double  p, const double rho)
 {
+	assert(rho>0);
 	//P=(gamma - 1)/gamma * rho (h(T)-q) - p0
 	double h=_q +_gamma*(p+_p0)/((_gamma-1)*rho);
 	return (h-_h_ref)/_Cp + _Tref;
@@ -85,6 +91,7 @@ double StiffenedGasDellacherie::getTemperatureFromPressure(const double  p, cons
 
 double StiffenedGas::getTemperatureFromEnthalpy(const double  h, const double rho)
 {
+	assert(rho>0);
 	//h=e+p/rho et p=(gamma-1)rho(e-q)-gamma p0
 	double e=(h+(_gamma-1)*_q)/_gamma + _p0/rho;
 	return (e-_e_ref)/_Cv + _Tref;
@@ -120,11 +127,13 @@ double StiffenedGas::getJumpInternalEnergyTemperature(){
 // function to compute partial rho/ partial p (e constant), partial rho/partial e (p constant)
 // use to compute the Jacobian matrix
 double StiffenedGas::getDiffDensPress(const double e){
+	assert(e>0);
 	double inv_a_2;
     inv_a_2 = 1/((_gamma-1)*e);
 	return inv_a_2;
 }
 double StiffenedGas::getDiffDensInternalEnergy(const double p,const double e){
+	assert(e>0);
 	double b, p_inf;
 	p_inf = - _gamma*_p0;
 	b = (p_inf-p)/((_gamma-1)*e*e);
@@ -136,9 +145,11 @@ double StiffenedGas::getDiffInternalEnergyTemperature(){
 // function to compute partial rho / partial h (p constant), partial rho/ partial p (h constant)
 // use to compute p_x stationary
 double StiffenedGas::getDiffDensEnthalpyPressconstant(const double p, const double h){
+	assert(h>0);
 	double  p_inf = - _gamma*_p0;
 	return (p_inf - _gamma*p)/((_gamma-1)*h*h);
 }
 double StiffenedGas::getDiffDensPressEnthalpyconstant(const double h){
+	assert(h>0);
 	return _gamma/((_gamma-1)*h);
 }

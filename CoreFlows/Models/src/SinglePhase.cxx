@@ -14,7 +14,6 @@ SinglePhase::SinglePhase(phaseType fluid, pressureEstimate pEstimate, int dim, b
 	_nVar=_Ndim+2;
 	_nbPhases  = 1;
 	_dragCoeffs=vector<double>(1,0);
-	_fluides.resize(1);
 	_useDellacherieEOS=useDellacherieEOS;
 	_saveAllFields=false;
 
@@ -24,12 +23,12 @@ SinglePhase::SinglePhase(phaseType fluid, pressureEstimate pEstimate, int dim, b
 		if(fluid==Gas){
 			cout<<"Fluid is air around 1 bar and 300 K (27°C)"<<endl;
 			*_runLogFile<<"Fluid is air around 1 bar and 300 K (27°C)"<<endl;
-			_fluides[0] = new StiffenedGas(1.4,743,_Tref,2.22e5);  //ideal gas law for nitrogen at pressure 1 bar and temperature 27°C, e=2.22e5, c_v=743
+			_compressibleFluid = new StiffenedGas(1.4,743,_Tref,2.22e5);  //ideal gas law for nitrogen at pressure 1 bar and temperature 27°C, e=2.22e5, c_v=743
 		}
 		else{
 			cout<<"Fluid is water around 1 bar and 300 K (27°C)"<<endl;
 			*_runLogFile<<"Fluid is water around 1 bar and 300 K (27°C)"<<endl;
-			_fluides[0] = new StiffenedGas(996,_Pref,_Tref,1.12e5,1501,4130);  //stiffened gas law for water at pressure 1 bar and temperature 27°C, e=1.12e5, c_v=4130
+			_compressibleFluid = new StiffenedGas(996,_Pref,_Tref,1.12e5,1501,4130);  //stiffened gas law for water at pressure 1 bar and temperature 27°C, e=1.12e5, c_v=4130
 		}
 	}
 	else{//EOS at 155 bars and 618K 
@@ -38,31 +37,37 @@ SinglePhase::SinglePhase(phaseType fluid, pressureEstimate pEstimate, int dim, b
 		if(fluid==Gas){
 			cout<<"Fluid is Gas around saturation point 155 bars and 618 K (345°C)"<<endl;
 			*_runLogFile<<"Fluid is Gas around saturation point 155 bars and 618 K (345°C)"<<endl;
-			_fluides[0] = new StiffenedGas(102,_Pref,_Tref,2.44e6, 433,3633);  //stiffened gas law for Gas at pressure 155 bar and temperature 345°C
+			_compressibleFluid = new StiffenedGas(102,_Pref,_Tref,2.44e6, 433,3633);  //stiffened gas law for Gas at pressure 155 bar and temperature 345°C
 		}
-		else{//To do : change to normal regime: 155 bars and 573K
-			cout<<"Fluid is water around saturation point 155 bars and 618 K (345°C)"<<endl;
-			*_runLogFile<<"Fluid is water around saturation point 155 bars and 618 K (345°C)"<<endl;
+		else{
+			cout<<"Fluid is water around saturation point 155 bars and 573 K (300°C)"<<endl;
+			*_runLogFile<<"Fluid is water around saturation point 155 bars and 573 K (300°C)"<<endl;
 			if(_useDellacherieEOS)
-				_fluides[0]= new StiffenedGasDellacherie(2.35,1e9,-1.167e6,1816); //stiffened gas law for water from S. Dellacherie
+				_compressibleFluid= new StiffenedGasDellacherie(2.35,1e9,-1.167e6,1816); //stiffened gas law for water from S. Dellacherie
 			else
-				_fluides[0]= new StiffenedGas(594.,_Pref,_Tref,1.6e6, 621.,3100.);  //stiffened gas law for water at pressure 155 bar, and temperature 345°C
+				_compressibleFluid= new StiffenedGas(726.82,_Pref,_Tref,1.3e6, 971.,5454.);  //stiffened gas law for water at pressure 155 bar, and temperature 345°C
 		}
 	}
+
+	//Save into the fluid list
+	_fluides.resize(1,_compressibleFluid);
 
 	_fileName = "SolverlabSinglePhase";
     PetscPrintf(PETSC_COMM_WORLD,"\n Navier-Stokes equations for single phase flow\n");
 }
+
 void SinglePhase::initialize(){
 	cout<<"\n Initialising the Navier-Stokes model\n"<<endl;
 	*_runLogFile<<"\n Initialising the Navier-Stokes model\n"<<endl;
 
-	_Uroe = new double[_nVar];
+	_Uroe = new double[_nVar];//Deleted in ProblemFluid::terminate()
+
 	_gravite = vector<double>(_nVar,0);//Not to be confused with _GravityField3d (size _Ndim). _gravite (size _Nvar) is usefull for dealing with source term and implicitation of gravity vector
 	for(int i=0; i<_Ndim; i++)
 		_gravite[i+1]=_GravityField3d[i];
 
-	_GravityImplicitationMatrix = new PetscScalar[_nVar*_nVar];
+	_GravityImplicitationMatrix = new PetscScalar[_nVar*_nVar];//Deleted in ProblemFluid::terminate()
+
 	if(_saveVelocity || _saveAllFields)
 		_Vitesse=Field("Velocity",CELLS,_mesh,3);//Forcement en dimension 3 pour le posttraitement des lignes de courant
 
@@ -88,231 +93,6 @@ void SinglePhase::initialize(){
 	ProblemFluid::initialize();
 }
 
-bool SinglePhase::iterateTimeStep(bool &converged)
-{
-	if(_timeScheme == Explicit || !_usePrimitiveVarsInNewton)
-		return ProblemFluid::iterateTimeStep(converged);
-	else
-	{
-		bool stop=false;
-
-		if(_NEWTON_its>0){//Pas besoin de computeTimeStep à la première iteration de Newton
-			_maxvp=0;
-			computeTimeStep(stop);
-		}
-		if(stop){//Le compute time step ne s'est pas bien passé
-			cout<<"ComputeTimeStep failed"<<endl;
-			converged=false;
-			return false;
-		}
-
-		computeNewtonVariation();
-
-		//converged=convergence des iterations
-		if(_timeScheme == Explicit)
-			converged=true;
-		else{//Implicit scheme
-
-			KSPGetIterationNumber(_ksp, &_PetscIts);
-			if( _MaxIterLinearSolver < _PetscIts)//save the maximum number of iterations needed during the newton scheme
-				_MaxIterLinearSolver = _PetscIts;
-			if(_PetscIts>=_maxPetscIts)//solving the linear system failed
-			{
-				cout<<"Systeme lineaire : pas de convergence de Petsc. Itérations maximales "<<_maxPetscIts<<" atteintes"<<endl;
-				*_runLogFile<<"Systeme lineaire : pas de convergence de Petsc. Itérations maximales "<<_maxPetscIts<<" atteintes"<<endl;
-				converged=false;
-				return false;
-			}
-			else{//solving the linear system succeeded
-				//Calcul de la variation relative Uk+1-Uk
-				_erreur_rel = 0.;
-				double x, dx;
-				int I;
-				for(int j=1; j<=_Nmailles; j++)
-				{
-					for(int k=0; k<_nVar; k++)
-					{
-						I = (j-1)*_nVar + k;
-						VecGetValues(_newtonVariation, 1, &I, &dx);
-						VecGetValues(_primitiveVars, 1, &I, &x);
-						if (fabs(x)*fabs(x)< _precision)
-						{
-							if(_erreur_rel < fabs(dx))
-								_erreur_rel = fabs(dx);
-						}
-						else if(_erreur_rel < fabs(dx/x))
-							_erreur_rel = fabs(dx/x);
-					}
-				}
-			}
-			converged = _erreur_rel <= _precision_Newton;
-		}
-
-		double relaxation=1;//Vk+1=Vk+relaxation*deltaV
-
-		VecAXPY(_primitiveVars,  relaxation, _newtonVariation);
-
-		//mise a jour du champ primitif
-		updateConservatives();
-
-		if(_nbPhases==2 && fabs(_err_press_max) > _precision)//la pression n'a pu être calculée en diphasique à partir des variables conservatives
-		{
-			cout<<"Warning consToPrim: nbiter max atteint, erreur relative pression= "<<_err_press_max<<" precision= " <<_precision<<endl;
-			*_runLogFile<<"Warning consToPrim: nbiter max atteint, erreur relative pression= "<<_err_press_max<<" precision= " <<_precision<<endl;
-			converged=false;
-			return false;
-		}
-		if(_system)
-		{
-			cout<<"Vecteur Vkp1-Vk "<<endl;
-			VecView(_newtonVariation,  PETSC_VIEWER_STDOUT_SELF);
-			cout << "Nouvel etat courant Vk de l'iteration Newton: " << endl;
-			VecView(_primitiveVars,  PETSC_VIEWER_STDOUT_SELF);
-		}
-
-		if(_nbPhases==2 && _nbTimeStep%_freqSave ==0){
-			if(_minm1<-_precision || _minm2<-_precision)
-			{
-				cout<<"!!!!!!!!! WARNING masse partielle negative sur " << _nbMaillesNeg << " faces, min m1= "<< _minm1 << " , minm2= "<< _minm2<< " precision "<<_precision<<endl;
-				*_runLogFile<<"!!!!!!!!! WARNING masse partielle negative sur " << _nbMaillesNeg << " faces, min m1= "<< _minm1 << " , minm2= "<< _minm2<< " precision "<<_precision<<endl;
-			}
-
-			if (_nbVpCplx>0){
-				cout << "!!!!!!!!!!!!!!!!!!!!!!!! Complex eigenvalues on " << _nbVpCplx << " cells, max imag= " << _part_imag_max << endl;
-				*_runLogFile << "!!!!!!!!!!!!!!!!!!!!!!!! Complex eigenvalues on " << _nbVpCplx << " cells, max imag= " << _part_imag_max << endl;
-			}
-		}
-		_minm1=1e30;
-		_minm2=1e30;
-		_nbMaillesNeg=0;
-		_nbVpCplx =0;
-		_part_imag_max=0;
-
-		return true;
-	}
-}
-void SinglePhase::computeNewtonVariation()
-{
-	if(!_usePrimitiveVarsInNewton)
-		ProblemFluid::computeNewtonVariation();
-	else
-	{
-		if(_verbose)
-		{
-			cout<<"Vecteur courant Vk "<<endl;
-			VecView(_primitiveVars,PETSC_VIEWER_STDOUT_SELF);
-			cout << endl;
-			cout << "Matrice du système linéaire avant contribution delta t" << endl;
-			MatView(_A,PETSC_VIEWER_STDOUT_SELF);
-			cout << endl;
-			cout << "Second membre du système linéaire avant contribution delta t" << endl;
-			VecView(_b, PETSC_VIEWER_STDOUT_SELF);
-			cout << endl;
-		}
-		if(_timeScheme == Explicit)
-		{
-			VecCopy(_b,_newtonVariation);
-			VecScale(_newtonVariation, _dt);
-			if(_verbose && _nbTimeStep%_freqSave ==0)
-			{
-				cout<<"Vecteur _newtonVariation =_b*dt"<<endl;
-				VecView(_newtonVariation,PETSC_VIEWER_STDOUT_SELF);
-				cout << endl;
-			}
-		}
-		else
-		{
-			MatAssemblyBegin(_A, MAT_FINAL_ASSEMBLY);
-
-			VecAXPY(_b, 1/_dt, _old);
-			VecAXPY(_b, -1/_dt, _conservativeVars);
-
-			for(int imaille = 0; imaille<_Nmailles; imaille++){
-				_idm[0] = _nVar*imaille;
-				for(int k=1; k<_nVar; k++)
-					_idm[k] = _idm[k-1] + 1;
-				VecGetValues(_primitiveVars, _nVar, _idm, _Vi);
-				primToConsJacobianMatrix(_Vi);
-				for(int k=0; k<_nVar*_nVar; k++)
-					_primToConsJacoMat[k]*=1/_dt;
-				MatSetValuesBlocked(_A, 1, &imaille, 1, &imaille, _primToConsJacoMat, ADD_VALUES);
-			}
-			MatAssemblyEnd(_A, MAT_FINAL_ASSEMBLY);
-
-#if PETSC_VERSION_GREATER_3_5
-			KSPSetOperators(_ksp, _A, _A);
-#else
-			KSPSetOperators(_ksp, _A, _A,SAME_NONZERO_PATTERN);
-#endif
-
-			if(_verbose)
-			{
-				cout << "Matrice du système linéaire" << endl;
-				MatView(_A,PETSC_VIEWER_STDOUT_SELF);
-				cout << endl;
-				cout << "Second membre du système linéaire" << endl;
-				VecView(_b, PETSC_VIEWER_STDOUT_SELF);
-				cout << endl;
-			}
-
-			if(_conditionNumber)
-				KSPSetComputeEigenvalues(_ksp,PETSC_TRUE);
-			if(!_isScaling)
-			{
-				KSPSolve(_ksp, _b, _newtonVariation);
-			}
-			else
-			{
-				computeScaling(_maxvp);
-				int indice;
-				VecAssemblyBegin(_vecScaling);
-				VecAssemblyBegin(_invVecScaling);
-				for(int imaille = 0; imaille<_Nmailles; imaille++)
-				{
-					indice = imaille;
-					VecSetValuesBlocked(_vecScaling,1 , &indice, _blockDiag, INSERT_VALUES);
-					VecSetValuesBlocked(_invVecScaling,1,&indice,_invBlockDiag, INSERT_VALUES);
-				}
-				VecAssemblyEnd(_vecScaling);
-				VecAssemblyEnd(_invVecScaling);
-
-				if(_system)
-				{
-					cout << "Matrice avant le preconditionneur des vecteurs propres " << endl;
-					MatView(_A,PETSC_VIEWER_STDOUT_SELF);
-					cout << endl;
-					cout << "Second membre avant le preconditionneur des vecteurs propres " << endl;
-					VecView(_b, PETSC_VIEWER_STDOUT_SELF);
-					cout << endl;
-				}
-				MatDiagonalScale(_A,_vecScaling,_invVecScaling);
-				if(_system)
-				{
-					cout << "Matrice apres le preconditionneur des vecteurs propres " << endl;
-					MatView(_A,PETSC_VIEWER_STDOUT_SELF);
-					cout << endl;
-				}
-				VecCopy(_b,_bScaling);
-				VecPointwiseMult(_b,_vecScaling,_bScaling);
-				if(_system)
-				{
-					cout << "Produit du second membre par le preconditionneur bloc diagonal  a gauche" << endl;
-					VecView(_b, PETSC_VIEWER_STDOUT_SELF);
-					cout << endl;
-				}
-
-				KSPSolve(_ksp,_b, _bScaling);
-				VecPointwiseMult(_newtonVariation,_invVecScaling,_bScaling);
-			}
-			if(_system)
-			{
-				cout << "solution du systeme lineaire local:" << endl;
-				VecView(_newtonVariation, PETSC_VIEWER_STDOUT_SELF);
-				cout << endl;
-			}
-		}
-	}
-}
 void SinglePhase::convectionState( const long &i, const long &j, const bool &IsBord){
 	//First conservative state then further down we will compute interface (Roe) state and then compute primitive state
 	_idm[0] = _nVar*i; 
@@ -371,7 +151,7 @@ void SinglePhase::convectionState( const long &i, const long &j, const bool &IsB
 		for(int k=1;k<=_Ndim;k++)
 			q_2 += _Uj[k]*_Uj[k];
 		q_2 /= _Uj[0];	//phi rho u²
-		pj =  _fluides[0]->getPressure((_Uj[(_Ndim+2)-1]-q_2/2)/_porosityj,_Uj[0]/_porosityj);
+		pj =  _compressibleFluid->getPressure((_Uj[(_Ndim+2)-1]-q_2/2)/_porosityj,_Uj[0]/_porosityj);
 	}
 	else
 	{
@@ -479,9 +259,9 @@ void SinglePhase::diffusionStateAndMatrices(const long &i,const long &j, const b
 		double q_2=0;
 		for (int i = 0; i<_Ndim;i++)
 			q_2+=_Udiff[i+1]*_Udiff[i+1];
-		double mu = _fluides[0]->getViscosity(_Udiff[_nVar-1]);
-		double lambda = _fluides[0]->getConductivity(_Udiff[_nVar-1]);
-		double Cv= _fluides[0]->constante("Cv");
+		double mu = _compressibleFluid->getViscosity(_Udiff[_nVar-1]);
+		double lambda = _compressibleFluid->getConductivity(_Udiff[_nVar-1]);
+		double Cv= _compressibleFluid->constante("Cv");
 		for(int i=0; i<_nVar*_nVar;i++)
 			_Diffusion[i] = 0;
 		for(int i=1;i<(_nVar-1);i++)
@@ -539,7 +319,7 @@ void SinglePhase::setBoundaryState(string nameOfGroup, const int &j,double *norm
 		VecGetValues(_primitiveVars, _nVar, _idm, _externalStates);//L'état fantome contient à présent les variables primitives internes
 		double pression=_externalStates[0];
 		double T=_limitField[nameOfGroup].T;
-		double rho=_fluides[0]->getDensity(pression,T);
+		double rho=_compressibleFluid->getDensity(pression,T);
 
 		_externalStates[0]=porosityj*rho;
 		_externalStates[1]=_externalStates[0]*_limitField[nameOfGroup].v_x[0];
@@ -555,7 +335,7 @@ void SinglePhase::setBoundaryState(string nameOfGroup, const int &j,double *norm
 				v2 +=_limitField[nameOfGroup].v_z[0]*_limitField[nameOfGroup].v_z[0];
 			}
 		}
-		_externalStates[_nVar-1] = _externalStates[0]*(_fluides[0]->getInternalEnergy(_limitField[nameOfGroup].T,rho) + v2/2);
+		_externalStates[_nVar-1] = _externalStates[0]*(_compressibleFluid->getInternalEnergy(_limitField[nameOfGroup].T,rho) + v2/2);
 		_idm[0] = 0;
 		for(int k=1; k<_nVar; k++)
 			_idm[k] = _idm[k-1] + 1;
@@ -596,7 +376,7 @@ void SinglePhase::setBoundaryState(string nameOfGroup, const int &j,double *norm
 			VecGetValues(_primitiveVars, _nVar, _idm, _externalStates);//On met à jour l'état fantome avec les variables primitives internes
 			double pression=_externalStates[0];
 			double T=_limitField[nameOfGroup].T;
-			double rho=_fluides[0]->getDensity(pression,T);
+			double rho=_compressibleFluid->getDensity(pression,T);
 
 			_externalStates[0]=porosityj*rho;//Composante fantome de masse
 			_externalStates[1]=_externalStates[0]*(_limitField[nameOfGroup].v_x[0]);//Composante fantome de qdm x
@@ -612,7 +392,7 @@ void SinglePhase::setBoundaryState(string nameOfGroup, const int &j,double *norm
 					v2 +=_limitField[nameOfGroup].v_z[0]*_limitField[nameOfGroup].v_z[0];
 				}
 			}
-			_externalStates[_nVar-1] = _externalStates[0]*(_fluides[0]->getInternalEnergy(_limitField[nameOfGroup].T,rho) + v2/2);//Composante fantome de l'nrj
+			_externalStates[_nVar-1] = _externalStates[0]*(_compressibleFluid->getInternalEnergy(_limitField[nameOfGroup].T,rho) + v2/2);//Composante fantome de l'nrj
 		}
 		else if(_nbTimeStep%_freqSave ==0)
 			cout<< "Warning : fluid possibly going out through inlet boundary "<<nameOfGroup<<". Applying Neumann boundary condition"<<endl;
@@ -661,7 +441,7 @@ void SinglePhase::setBoundaryState(string nameOfGroup, const int &j,double *norm
 		if(u_ext_n + u_int_n <= 0){
 			double pression=_externalStates[0];
 			double T=_limitField[nameOfGroup].T;
-			double rho=_fluides[0]->getDensity(pression,T);
+			double rho=_compressibleFluid->getDensity(pression,T);
 
 			double v2=0;
 			v2 +=_externalStates[1]*_externalStates[1];//v_x*v_x
@@ -677,7 +457,7 @@ void SinglePhase::setBoundaryState(string nameOfGroup, const int &j,double *norm
 					_externalStates[3]*=_externalStates[0];
 				}
 			}
-			_externalStates[_nVar-1] = _externalStates[0]*(_fluides[0]->getInternalEnergy(_limitField[nameOfGroup].T,rho) + v2/2);
+			_externalStates[_nVar-1] = _externalStates[0]*(_compressibleFluid->getInternalEnergy(_limitField[nameOfGroup].T,rho) + v2/2);
 		}
 		else if(_nbTimeStep%_freqSave ==0)
 		{
@@ -724,7 +504,7 @@ void SinglePhase::setBoundaryState(string nameOfGroup, const int &j,double *norm
         
 		if(u_n<=0)
 		{
-			_externalStates[0]=porosityj*_fluides[0]->getDensity(_limitField[nameOfGroup].p+hydroPress,_limitField[nameOfGroup].T);
+			_externalStates[0]=porosityj*_compressibleFluid->getDensity(_limitField[nameOfGroup].p+hydroPress,_limitField[nameOfGroup].T);
 			
 	        //Contribution from the tangential velocity
 	        if(_Ndim>1)
@@ -754,11 +534,11 @@ void SinglePhase::setBoundaryState(string nameOfGroup, const int &j,double *norm
 			/*
 			if(_nbTimeStep%_freqSave ==0)
 				cout<< "Warning : fluid going out through inletPressure boundary "<<nameOfGroup<<". Applying Neumann boundary condition for velocity and temperature (only pressure value is imposed as in outlet BC)."<<endl;
-			_externalStates[0]=porosityj*_fluides[0]->getDensity(_limitField[nameOfGroup].p+hydroPress, _externalStates[_nVar-1]);
+			_externalStates[0]=porosityj*_compressibleFluid->getDensity(_limitField[nameOfGroup].p+hydroPress, _externalStates[_nVar-1]);
 			*/
 			if(_nbTimeStep%_freqSave ==0)
 				cout<< "Warning : fluid going out through inletPressure boundary "<<nameOfGroup<<". Applying Wall boundary condition."<<endl;
-			_externalStates[0]=porosityj*_fluides[0]->getDensity(_externalStates[0]+hydroPress, _externalStates[_nVar-1]);
+			_externalStates[0]=porosityj*_compressibleFluid->getDensity(_externalStates[0]+hydroPress, _externalStates[_nVar-1]);
 			//Changing external state velocity
             for(int k=0; k<_Ndim; k++)
                 _externalStates[(k+1)]-=2*u_n*normale[k];
@@ -770,7 +550,7 @@ void SinglePhase::setBoundaryState(string nameOfGroup, const int &j,double *norm
 			v2+=_externalStates[(k+1)]*_externalStates[(k+1)];
 			_externalStates[(k+1)]*=_externalStates[0] ;//qdm component
 		}
-		_externalStates[_nVar-1] = _externalStates[0]*(_fluides[0]->getInternalEnergy( _externalStates[_nVar-1],_externalStates[0]) + v2/2);//nrj component
+		_externalStates[_nVar-1] = _externalStates[0]*(_compressibleFluid->getInternalEnergy( _externalStates[_nVar-1],_externalStates[0]) + v2/2);//nrj component
 
 
 		_idm[0] = 0;
@@ -794,35 +574,40 @@ void SinglePhase::setBoundaryState(string nameOfGroup, const int &j,double *norm
 			cout<< "Warning : fluid going in through outlet boundary "<<nameOfGroup<<" with flow rate "<< q_n<<endl;
             cout<< "Applying Neumann boundary condition for velocity and temperature"<<endl;
         }
-		//Computation of the hydrostatic contribution : scalar product between gravity vector and position vector
-		Cell Cj=_mesh.getCell(j);
-		double hydroPress=Cj.x()*_GravityField3d[0];
-		if(_Ndim>1){
-			hydroPress+=Cj.y()*_GravityField3d[1];
-			if(_Ndim>2)
-				hydroPress+=Cj.z()*_GravityField3d[2];
-		}
-		hydroPress*=_externalStates[0]/porosityj;//multiplication by rho the total density
 
-		if(_verbose && _nbTimeStep%_freqSave ==0)
+		double hydroPress=0;
+		if( _VV.getSpaceDimension()>1)
 		{
-			cout<<"Cond lim outlet densite= "<<_externalStates[0]<<" gravite= "<<_GravityField3d[0]<<" Cj.x()= "<<Cj.x()<<endl;
-			cout<<"Cond lim outlet pression ref= "<<_limitField[nameOfGroup].p<<" pression hydro= "<<hydroPress<<" total= "<<_limitField[nameOfGroup].p+hydroPress<<endl;
+			//Computation of the hydrostatic contribution : scalar product between gravity vector and position vector
+			Cell Cj=_mesh.getCell(j);
+			hydroPress=(Cj.x()-_gravityReferencePoint[0])*_GravityField3d[0];
+			if(_Ndim>1){
+				hydroPress+=(Cj.y()-_gravityReferencePoint[1])*_GravityField3d[1];
+				if(_Ndim>2)
+					hydroPress+(Cj.z()-_gravityReferencePoint[2])*_GravityField3d[2];
+			}
+			hydroPress*=_externalStates[0]/porosityj;//multiplication by rho the total density
+			if(_verbose && _nbTimeStep%_freqSave ==0)
+			{
+				cout<<"Cond lim outlet densite= "<<_externalStates[0]<<" gravite= "<<_GravityField3d[0]<<" Cj.x()= "<<Cj.x()<<endl;
+				cout<<"Cond lim outlet pression ref= "<<_limitField[nameOfGroup].p<<" pression hydro= "<<hydroPress<<" total= "<<_limitField[nameOfGroup].p+hydroPress<<endl;
+			}
 		}
+
 		//Building the external state
 		_idm[0] = _nVar*j;// Kieu
 		for(int k=1; k<_nVar; k++)
 			_idm[k] = _idm[k-1] + 1;
 		VecGetValues(_primitiveVars, _nVar, _idm, _externalStates);
 
-		_externalStates[0]=porosityj*_fluides[0]->getDensity(_limitField[nameOfGroup].p+hydroPress, _externalStates[_nVar-1]);
+		_externalStates[0]=porosityj*_compressibleFluid->getDensity(_limitField[nameOfGroup].p+hydroPress, _externalStates[_nVar-1]);
 		double v2=0;
 		for(int k=0; k<_Ndim; k++)
 		{
 			v2+=_externalStates[(k+1)]*_externalStates[(k+1)];
 			_externalStates[(k+1)]*=_externalStates[0] ;
 		}
-		_externalStates[_nVar-1] = _externalStates[0]*(_fluides[0]->getInternalEnergy( _externalStates[_nVar-1],_externalStates[0]) + v2/2);
+		_externalStates[_nVar-1] = _externalStates[0]*(_compressibleFluid->getInternalEnergy( _externalStates[_nVar-1],_externalStates[0]) + v2/2);
 		_idm[0] = 0;
 		for(int k=1; k<_nVar; k++)
 			_idm[k] = _idm[k-1] + 1;
@@ -874,8 +659,8 @@ void SinglePhase::convectionMatrices()
 		double  c, H, K, k;
 		/***********Calcul des valeurs propres ********/
 		H = _Uroe[_nVar-1];
-		c = _fluides[0]->vitesseSonEnthalpie(H-u_2/2);//vitesse du son a l'interface
-		k = _fluides[0]->constante("gamma") - 1;//A generaliser pour porosite et stephane gas law
+		c = _compressibleFluid->vitesseSonEnthalpie(H-u_2/2);//vitesse du son a l'interface
+		k = _compressibleFluid->constante("gamma") - 1;//A generaliser pour porosite et stephane gas law
 		K = u_2*k/2; //g-1/2 *|u|²
 
 		vp_dist[0]=u_n-c;vp_dist[1]=u_n;vp_dist[2]=u_n+c;
@@ -949,8 +734,8 @@ void SinglePhase::convectionMatrices()
 		{
 			if(_usePrimitiveVarsInNewton)//Implicitation using primitive variables
 			{
-				_Vij[0]=_fluides[0]->getPressureFromEnthalpy(_Uroe[_nVar-1]-u_2/2, _Uroe[0]);//pressure
-				_Vij[_nVar-1]=_fluides[0]->getTemperatureFromPressure( _Vij[0], _Uroe[0]);//Temperature
+				_Vij[0]=_compressibleFluid->getPressureFromEnthalpy(_Uroe[_nVar-1]-u_2/2, _Uroe[0]);//pressure
+				_Vij[_nVar-1]=_compressibleFluid->getTemperatureFromPressure( _Vij[0], _Uroe[0]);//Temperature
 				for(int idim=0;idim<_Ndim; idim++)
 					_Vij[1+idim]=_Uroe[1+idim];
 				primToConsJacobianMatrix(_Vij);
@@ -1022,7 +807,7 @@ void SinglePhase::computeScaling(double maxvp)
 		_blockDiag[q]=1./maxvp;//
 		_invBlockDiag[q]= maxvp;//1.;//
 	}
-	_blockDiag[_nVar - 1]=(_fluides[0]->constante("gamma")-1)/(maxvp*maxvp);//1
+	_blockDiag[_nVar - 1]=(_compressibleFluid->constante("gamma")-1)/(maxvp*maxvp);//1
 	_invBlockDiag[_nVar - 1]=  1./_blockDiag[_nVar - 1] ;// 1.;//
 }
 
@@ -1032,8 +817,8 @@ void SinglePhase::addDiffusionToSecondMember
 		bool isBord)
 
 {
-	double lambda = _fluides[0]->getConductivity(_Udiff[_nVar-1]);
-	double mu     = _fluides[0]->getViscosity(_Udiff[_nVar-1]);
+	double lambda = _compressibleFluid->getConductivity(_Udiff[_nVar-1]);
+	double mu     = _compressibleFluid->getViscosity(_Udiff[_nVar-1]);
 
 	if(isBord )
 		lambda=max(lambda,_heatTransfertCoeff);//wall nucleate boing -> larger heat transfer
@@ -1277,7 +1062,7 @@ void SinglePhase::jacobian(const int &j, string nameOfGroup,double * normale)
 				ve2 += ve[2]*ve[2];
 				v2 = v[2]*v[2];
 			}
-			double internal_energy=_fluides[0]->getInternalEnergy(_limitField[nameOfGroup].T,_Uj[0]);
+			double internal_energy=_compressibleFluid->getInternalEnergy(_limitField[nameOfGroup].T,_Uj[0]);
 			double total_energy=internal_energy+ve2/2;
 
 			//Mass line
@@ -1315,7 +1100,7 @@ void SinglePhase::jacobian(const int &j, string nameOfGroup,double * normale)
 				v2 +=_limitField[nameOfGroup].v_z[0]*_limitField[nameOfGroup].v_z[0];
 			}
 		}
-		_Jcb[(_nVar-1)*_nVar]=_fluides[0]->getInternalEnergy(_limitField[nameOfGroup].T,rho) + v2/2;
+		_Jcb[(_nVar-1)*_nVar]=_compressibleFluid->getInternalEnergy(_limitField[nameOfGroup].T,rho) + v2/2;
 		 */
 	}
 	else if (_limitField[nameOfGroup].bcType==InletPressure && q_n<0){
@@ -1331,7 +1116,7 @@ void SinglePhase::jacobian(const int &j, string nameOfGroup,double * normale)
 			v2+=v[k]*v[k];
 		}
 
-		double rho_ext=_fluides[0]->getDensity(_limitField[nameOfGroup].p, _limitField[nameOfGroup].T);
+		double rho_ext=_compressibleFluid->getDensity(_limitField[nameOfGroup].p, _limitField[nameOfGroup].T);
 		double rho_int = _externalStates[0];
 		double density_ratio=rho_ext/rho_int;
 		//Momentum lines
@@ -1359,10 +1144,10 @@ void SinglePhase::jacobian(const int &j, string nameOfGroup,double * normale)
 			v2+=v[k]*v[k];
 		}
 
-		double rho_ext=_fluides[0]->getDensity(_limitField[nameOfGroup].p, _externalStates[_nVar-1]);
+		double rho_ext=_compressibleFluid->getDensity(_limitField[nameOfGroup].p, _externalStates[_nVar-1]);
 		double rho_int = _externalStates[0];
 		double density_ratio=rho_ext/rho_int;
-		double internal_energy=_fluides[0]->getInternalEnergy(_externalStates[_nVar-1],rho_int);
+		double internal_energy=_compressibleFluid->getInternalEnergy(_externalStates[_nVar-1],rho_int);
 		double total_energy=internal_energy+v2/2;
 
 		//Mass line
@@ -1394,10 +1179,10 @@ void SinglePhase::jacobian(const int &j, string nameOfGroup,double * normale)
 		VecGetValues(_primitiveVars, _nVar, _idm, _externalStates);
 
 		// compute the common numerator and common denominator
-		p0=_fluides[0]->constante("p0");
-		gamma =_fluides[0]->constante("gamma");
+		p0=_compressibleFluid->constante("p0");
+		gamma =_compressibleFluid->constante("gamma");
 		cn =_limitField[nameOfGroup].p +p0;
-		cd = _phi[0]*_fluides[0]->getInternalEnergy(_externalStates[_nVar-1],rho)-p0;
+		cd = _phi[0]*_compressibleFluid->getInternalEnergy(_externalStates[_nVar-1],rho)-p0;
 		cd*=cd;
 		cd*=(gamma-1);
 		//compute the v2
@@ -1420,7 +1205,7 @@ void SinglePhase::jacobian(const int &j, string nameOfGroup,double * normale)
 				_JcbDiff[(1+idim)*_nVar + jdim + 1]*=cn/cd;
 			}
 			//matrice identite*cn*(rhoe- p0)
-			_JcbDiff[(1+idim)*_nVar + idim + 1] +=( cn*(_phi[0]*_fluides[0]->getInternalEnergy(_externalStates[_nVar-1],rho)-p0))/cd;
+			_JcbDiff[(1+idim)*_nVar + idim + 1] +=( cn*(_phi[0]*_compressibleFluid->getInternalEnergy(_externalStates[_nVar-1],rho)-p0))/cd;
 
 			//derniere colonne
 			_JcbDiff[(1+idim)*_nVar + _nVar-1]=-_phi[idim+1]*cn/cd;
@@ -1477,7 +1262,7 @@ void  SinglePhase::jacobianDiff(const int &j, string nameOfGroup)
 			v2 = v[2]*v[2];
 		}
 		double rho=_Uj[0];
-		double internal_energy=_fluides[0]->getInternalEnergy(_limitField[nameOfGroup].T,rho);
+		double internal_energy=_compressibleFluid->getInternalEnergy(_limitField[nameOfGroup].T,rho);
 		double total_energy=internal_energy+ve2/2;
 
 		//Mass line
@@ -1515,12 +1300,15 @@ void  SinglePhase::jacobianDiff(const int &j, string nameOfGroup)
 void SinglePhase::primToCons(const double *P, const int &i, double *W, const int &j){
 	//cout<<"SinglePhase::primToCons i="<<i<<", j="<<j<<", P[i*(_Ndim+2)]="<<P[i*(_Ndim+2)]<<", P[i*(_Ndim+2)+(_Ndim+1)]="<<P[i*(_Ndim+2)+(_Ndim+1)]<<endl;
 
-	double rho=_fluides[0]->getDensity(P[i*(_Ndim+2)], P[i*(_Ndim+2)+(_Ndim+1)]);
+	assert( P[i*(_Ndim+2)]>0);//Pressure should be positive
+	assert( P[i*(_Ndim+2)+(_Ndim+1)]>0);//Temperature should be positive
+
+	double rho=_compressibleFluid->getDensity(P[i*(_Ndim+2)], P[i*(_Ndim+2)+(_Ndim+1)]);
 	W[j*(_Ndim+2)] =  _porosityField(j)*rho;//phi*rho
 	for(int k=0; k<_Ndim; k++)
 		W[j*(_Ndim+2)+(k+1)] = W[j*(_Ndim+2)]*P[i*(_Ndim+2)+(k+1)];//phi*rho*u
 
-	W[j*(_Ndim+2)+(_Ndim+1)] = W[j*(_Ndim+2)]*_fluides[0]->getInternalEnergy(P[i*(_Ndim+2)+ (_Ndim+1)],rho);//rho*e
+	W[j*(_Ndim+2)+(_Ndim+1)] = W[j*(_Ndim+2)]*_compressibleFluid->getInternalEnergy(P[i*(_Ndim+2)+ (_Ndim+1)],rho);//rho*e
 	for(int k=0; k<_Ndim; k++)
 		W[j*(_Ndim+2)+(_Ndim+1)] += W[j*(_Ndim+2)]*P[i*(_Ndim+2)+(k+1)]*P[i*(_Ndim+2)+(k+1)]*0.5;//phi*rho*e+0.5*phi*rho*u^2
 }
@@ -1536,20 +1324,21 @@ void SinglePhase::primToConsJacobianMatrix(double *V)
 	for(int idim=0;idim<_Ndim;idim++)
 		v2+=vitesse[idim]*vitesse[idim];
 
-	double rho=_fluides[0]->getDensity(pression,temperature);
-	double gamma=_fluides[0]->constante("gamma");
-	double Pinf=_fluides[0]->constante("p0");
-	double q=_fluides[0]->constante("q");
-	double cv=_fluides[0]->constante("cv");
+	double rho=_compressibleFluid->getDensity(pression,temperature);
+	double gamma=_compressibleFluid->constante("gamma");
+	double cv=_compressibleFluid->constante("cv");
 
 	for(int k=0;k<_nVar*_nVar; k++)
 		_primToConsJacoMat[k]=0;
 
 	if(		!_useDellacherieEOS)
 	{
-		StiffenedGas* fluide0=dynamic_cast<StiffenedGas*>(_fluides[0]);
+		StiffenedGas* fluide0=dynamic_cast<StiffenedGas*>(_compressibleFluid);
 		double e=fluide0->getInternalEnergy(temperature);
 		double E=e+0.5*v2;
+		/* To do : replace the formulas usind p0 and q by calls to sound speed */
+		double Pinf = fluide0->constante("p0");
+		double    q = fluide0->constante("q");
 
 		_primToConsJacoMat[0]=1/((gamma-1)*(e-q));
 		_primToConsJacoMat[_nVar-1]=-rho*cv/(e-q);
@@ -1567,10 +1356,13 @@ void SinglePhase::primToConsJacobianMatrix(double *V)
 	}
 	else if(	_useDellacherieEOS)
 	{
-		StiffenedGasDellacherie* fluide0=dynamic_cast<StiffenedGasDellacherie*>(_fluides[0]);
+		StiffenedGasDellacherie* fluide0=dynamic_cast<StiffenedGasDellacherie*>(_compressibleFluid);
 		double h=fluide0->getEnthalpy(temperature);
 		double H=h+0.5*v2;
-		double cp=_fluides[0]->constante("cp");
+		double cp=_compressibleFluid->constante("cp");
+		/* To do : replace the formulas usind p0 and q by calls to sound speed */
+		double Pinf = fluide0->constante("p0");
+		double    q = fluide0->constante("q");
 
 		_primToConsJacoMat[0]=gamma/((gamma-1)*(h-q));
 		_primToConsJacoMat[_nVar-1]=-rho*cp/(h-q);
@@ -1604,13 +1396,16 @@ void SinglePhase::primToConsJacobianMatrix(double *V)
 
 void SinglePhase::consToPrim(const double *Wcons, double* Wprim,double porosity)
 {
+	assert( Wcons[0]>0);//Density should be positive
+	assert( Wcons[_nVar-1]>0);//Total energy should be positive
+
 	double q_2 = 0;
 	for(int k=1;k<=_Ndim;k++)
 		q_2 += Wcons[k]*Wcons[k];
 	q_2 /= Wcons[0];	//phi rho u²
 	double rhoe=(Wcons[(_Ndim+2)-1]-q_2/2)/porosity;
 	double rho=Wcons[0]/porosity;
-	Wprim[0] =  _fluides[0]->getPressure(rhoe,rho);//pressure p
+	Wprim[0] =  _compressibleFluid->getPressure(rhoe,rho);//pressure p
 	if (Wprim[0]<0){
 		cout << "pressure = "<< Wprim[0] << " < 0 " << endl;
 		*_runLogFile<< "pressure = "<< Wprim[0] << " < 0 " << endl;
@@ -1619,7 +1414,7 @@ void SinglePhase::consToPrim(const double *Wcons, double* Wprim,double porosity)
 	}
 	for(int k=1;k<=_Ndim;k++)
 		Wprim[k] = Wcons[k]/Wcons[0];//velocity u
-	Wprim[(_Ndim+2)-1] =  _fluides[0]->getTemperatureFromPressure(Wprim[0],Wcons[0]/porosity);
+	Wprim[(_Ndim+2)-1] =  _compressibleFluid->getTemperatureFromPressure(Wprim[0],Wcons[0]/porosity);
 
 	if(_verbose && _nbTimeStep%_freqSave ==0)
 	{
@@ -1644,8 +1439,8 @@ void SinglePhase::entropicShift(double* n)//TO do: make sure _Vi and _Vj are wel
 		ur_2 += _Vj[1+i]*_Vj[1+i];
 	}
 
-	double cl = _fluides[0]->vitesseSonEnthalpie(_Vi[_Ndim+1]-ul_2/2);//vitesse du son a l'interface
-	double cr = _fluides[0]->vitesseSonEnthalpie(_Vj[_Ndim+1]-ur_2/2);//vitesse du son a l'interface
+	double cl = _compressibleFluid->vitesseSonEnthalpie(_Vi[_Ndim+1]-ul_2/2);//vitesse du son a l'interface
+	double cr = _compressibleFluid->vitesseSonEnthalpie(_Vj[_Ndim+1]-ur_2/2);//vitesse du son a l'interface
 
 	_entropicShift[0]=fabs(ul_n-cl - (ur_n-cr));
 	_entropicShift[1]=fabs(ul_n     - ur_n);
@@ -1687,7 +1482,7 @@ Vector SinglePhase::convectionFlux(Vector U,Vector V, Vector normale, double por
 
 	double vitessen=vitesse*normale;
 	double rho=phirho/porosity;
-	double e_int=_fluides[0]->getInternalEnergy(Temperature,rho);
+	double e_int=_compressibleFluid->getInternalEnergy(Temperature,rho);
 
 	Vector F(_nVar);
 	F(0)=phirho*vitessen;
@@ -1924,8 +1719,8 @@ void SinglePhase::staggeredVFFCMatricesConservativeVariables(double un)//vitesse
 		pj=_Vj[0];
 		rhoj=_Uj[0]/_porosityj;
 		H =Ei+pj/rhoi;
-		cj = _fluides[0]->vitesseSonTemperature(_Vj[_Ndim+1],rhoj);
-		kj = _fluides[0]->constante("gamma") - 1;//A generaliser pour porosite et stephane gas law
+		cj = _compressibleFluid->vitesseSonTemperature(_Vj[_Ndim+1],rhoj);
+		kj = _compressibleFluid->constante("gamma") - 1;//A generaliser pour porosite et stephane gas law
 		Kj = uj_2*kj/2; //g-1/2 *|u|²
 
 		double pi, Ej;
@@ -1933,8 +1728,8 @@ void SinglePhase::staggeredVFFCMatricesConservativeVariables(double un)//vitesse
 		Ej= _Uj[_Ndim+1]/rhoj;
 		pi=_Vi[0];
 		H =Ej+pi/rhoj;
-		ci = _fluides[0]->vitesseSonTemperature(_Vi[_Ndim+1],rhoi);
-		ki = _fluides[0]->constante("gamma") - 1;//A generaliser pour porosite et stephane gas law
+		ci = _compressibleFluid->vitesseSonTemperature(_Vi[_Ndim+1],rhoi);
+		ki = _compressibleFluid->constante("gamma") - 1;//A generaliser pour porosite et stephane gas law
 		Ki = ui_2*ki/2; //g-1/2 *|u|²
 
 		if(un>_precision)
@@ -2086,8 +1881,8 @@ void SinglePhase::staggeredVFFCMatricesConservativeVariables(double un)//vitesse
 			double  c, H, K, k;
 			/***********Calcul des valeurs propres ********/
 			H = _Uroe[_nVar-1];
-			c = _fluides[0]->vitesseSonEnthalpie(H-u_2/2);//vitesse du son a l'interface
-			k = _fluides[0]->constante("gamma") - 1;//A generaliser pour porosite et stephane gas law
+			c = _compressibleFluid->vitesseSonEnthalpie(H-u_2/2);//vitesse du son a l'interface
+			k = _compressibleFluid->constante("gamma") - 1;//A generaliser pour porosite et stephane gas law
 			K = u_2*k/2; //g-1/2 *|u|²
 
 			_maxvploc=fabs(u_n)+c;
@@ -2224,15 +2019,16 @@ void SinglePhase::staggeredVFFCMatricesPrimitiveVariables(double un)//vitesse no
 			cout<<endl;
 		}
 
-		double gamma=_fluides[0]->constante("gamma");
-		double q=_fluides[0]->constante("q");
+		double gamma=_compressibleFluid->constante("gamma");
 
 		if(fabs(un)>_precision)//non zero velocity on the interface
 		{
 			if(	!_useDellacherieEOS)
 			{
-				StiffenedGas* fluide0=dynamic_cast<StiffenedGas*>(_fluides[0]);
+				StiffenedGas* fluide0=dynamic_cast<StiffenedGas*>(_compressibleFluid);
 				double cv=fluide0->constante("cv");
+				/* To do : replace the formula using q by calls to sound speed */
+				double q = fluide0->constante("q");
 
 				if(un>_precision)
 				{
@@ -2243,7 +2039,7 @@ void SinglePhase::staggeredVFFCMatricesPrimitiveVariables(double un)//vitesse no
 					ei=Ei-0.5*ui_2;
 					pj=_Vj[0];
 					rhoj=_Uj[0]/_porosityj;
-					cj = _fluides[0]->vitesseSonTemperature(_Vj[_Ndim+1],rhoj);
+					cj = _compressibleFluid->vitesseSonTemperature(_Vj[_Ndim+1],rhoj);
 
 					/***********Calcul des valeurs propres ********/
 					vector<complex<double> > vp_dist(3,0);
@@ -2319,7 +2115,7 @@ void SinglePhase::staggeredVFFCMatricesPrimitiveVariables(double un)//vitesse no
 					ej=Ej-0.5*uj_2;
 					pi=_Vi[0];
 					rhoi=_Ui[0]/_porosityi;
-					ci = _fluides[0]->vitesseSonTemperature(_Vi[_Ndim+1],rhoi);
+					ci = _compressibleFluid->vitesseSonTemperature(_Vi[_Ndim+1],rhoi);
 
 					/***********Calcul des valeurs propres ********/
 					vector<complex<double> > vp_dist(3,0);
@@ -2395,8 +2191,10 @@ void SinglePhase::staggeredVFFCMatricesPrimitiveVariables(double un)//vitesse no
 			}
 			else if(_useDellacherieEOS )
 			{
-				StiffenedGasDellacherie* fluide0=dynamic_cast<StiffenedGasDellacherie*>(_fluides[0]);
+				StiffenedGasDellacherie* fluide0=dynamic_cast<StiffenedGasDellacherie*>(_compressibleFluid);
 				double cp=fluide0->constante("cp");
+				/* To do : replace the formula using q by calls to sound speed */
+				double q = fluide0->constante("q");
 
 				if(un>_precision)
 				{
@@ -2408,7 +2206,7 @@ void SinglePhase::staggeredVFFCMatricesPrimitiveVariables(double un)//vitesse no
 					hi=Ei-0.5*ui_2;
 					pj=_Vj[0];
 					rhoj=_Uj[0]/_porosityj;
-					cj = _fluides[0]->vitesseSonTemperature(_Vj[_Ndim+1],rhoj);
+					cj = _compressibleFluid->vitesseSonTemperature(_Vj[_Ndim+1],rhoj);
 
 					/***********Calcul des valeurs propres ********/
 					vector<complex<double> > vp_dist(3,0);
@@ -2485,7 +2283,7 @@ void SinglePhase::staggeredVFFCMatricesPrimitiveVariables(double un)//vitesse no
 					hj=Ej-0.5*uj_2;
 					pi=_Vi[0];
 					rhoi=_Ui[0]/_porosityi;
-					ci = _fluides[0]->vitesseSonTemperature(_Vi[_Ndim+1],rhoi);
+					ci = _compressibleFluid->vitesseSonTemperature(_Vi[_Ndim+1],rhoi);
 
 					/***********Calcul des valeurs propres ********/
 					vector<complex<double> > vp_dist(3,0);
@@ -2690,16 +2488,17 @@ void SinglePhase::testConservation()
 
 void SinglePhase::getDensityDerivatives( double pressure, double temperature, double v2)
 {
-	double rho=_fluides[0]->getDensity(pressure,temperature);
-	double gamma=_fluides[0]->constante("gamma");
-	double q=_fluides[0]->constante("q");
+	double rho=_compressibleFluid->getDensity(pressure,temperature);
+	double gamma=_compressibleFluid->constante("gamma");
 
 	if(	!_useDellacherieEOS)
 	{
-		StiffenedGas* fluide0=dynamic_cast<StiffenedGas*>(_fluides[0]);
+		StiffenedGas* fluide0=dynamic_cast<StiffenedGas*>(_compressibleFluid);
 		double e = fluide0->getInternalEnergy(temperature);
 		double cv=fluide0->constante("cv");
 		double E=e+0.5*v2;
+		/* To do : replace the formula using q by calls to sound speed */
+		double q = fluide0->constante("q");
 
 		_drho_sur_dp=1/((gamma-1)*(e-q));
 		_drho_sur_dT=-rho*cv/(e-q);
@@ -2708,10 +2507,12 @@ void SinglePhase::getDensityDerivatives( double pressure, double temperature, do
 	}
 	else if(_useDellacherieEOS )
 	{
-		StiffenedGasDellacherie* fluide0=dynamic_cast<StiffenedGasDellacherie*>(_fluides[0]);
+		StiffenedGasDellacherie* fluide0=dynamic_cast<StiffenedGasDellacherie*>(_compressibleFluid);
 		double h=fluide0->getEnthalpy(temperature);
 		double H=h+0.5*v2;
 		double cp=fluide0->constante("cp");
+		/* To do : replace the formula using q by calls to sound speed */
+		double q = fluide0->constante("q");
 
 		_drho_sur_dp=gamma/((gamma-1)*(h-q));
 		_drho_sur_dT=-rho*cp/(h-q);
@@ -2720,9 +2521,9 @@ void SinglePhase::getDensityDerivatives( double pressure, double temperature, do
 	}
 	else
 	{
-		*_runLogFile<< "SinglePhase::staggeredVFFCMatricesPrimitiveVariables: eos should be StiffenedGas or StiffenedGasDellacherie" << endl;
+		*_runLogFile<< "SinglePhase::getDensityDerivatives: eos should be StiffenedGas or StiffenedGasDellacherie" << endl;
 		_runLogFile->close();
-		throw CdmathException("SinglePhase::staggeredVFFCMatricesPrimitiveVariables: eos should be StiffenedGas or StiffenedGasDellacherie");
+		throw CdmathException("SinglePhase::getDensityDerivatives: eos should be StiffenedGas or StiffenedGasDellacherie");
 	}
 
 	if(_verbose && _nbTimeStep%_freqSave ==0)
@@ -2762,8 +2563,7 @@ void SinglePhase::save(){
 	}
 	_VV.setTime(_time,_nbTimeStep);
 
-	// create mesh and component info
-	if (_nbTimeStep ==0 || _restartWithNewFileName){		
+	if (_nbTimeStep ==0 || _restartWithNewFileName){	// write mesh and component info	
 		string prim_suppress ="rm -rf "+prim+"_*";
 		string cons_suppress ="rm -rf "+cons+"_*";
 
@@ -2815,8 +2615,7 @@ void SinglePhase::save(){
 		}
 
 	}
-	// do not create mesh
-	else{
+	else{// do not write mesh and component info
 		switch(_saveFormat)
 		{
 		case VTK :
@@ -2856,7 +2655,7 @@ void SinglePhase::save(){
 				_Vitesse(i,j)=0;
 		}
 		_Vitesse.setTime(_time,_nbTimeStep);
-		if (_nbTimeStep ==0 || _restartWithNewFileName){		
+		if (_nbTimeStep ==0 || _restartWithNewFileName){// write mesh and component info		
 			_Vitesse.setInfoOnComponent(0,"Velocity_x_(m/s)");
 			_Vitesse.setInfoOnComponent(1,"Velocity_y_(m/s)");
 			_Vitesse.setInfoOnComponent(2,"Velocity_z_(m/s)");
@@ -2913,7 +2712,7 @@ void SinglePhase::save(){
 				}
 			}
 
-			h   = _fluides[0]->getEnthalpy(T,rho);
+			h   = _compressibleFluid->getEnthalpy(T,rho);
 
 			_Enthalpy(i)=h;
 			_Density(i)=rho;
@@ -2931,7 +2730,7 @@ void SinglePhase::save(){
 					v2+=vz*vz;
 				}
 			}
-			_MachNumber(i)=sqrt(v2)/_fluides[0]->vitesseSonEnthalpie(h);
+			_MachNumber(i)=sqrt(v2)/_compressibleFluid->vitesseSonEnthalpie(h);
 		}
 		_Enthalpy.setTime(_time,_nbTimeStep);
 		_Density.setTime(_time,_nbTimeStep);
@@ -2945,7 +2744,7 @@ void SinglePhase::save(){
 			if(_Ndim>2)
 				_VitesseZ.setTime(_time,_nbTimeStep);
 		}
-		if (_nbTimeStep ==0 || _restartWithNewFileName){		
+		if (_nbTimeStep ==0 || _restartWithNewFileName){// write mesh and component info		
 			switch(_saveFormat)
 			{
 			case VTK :
@@ -2992,7 +2791,7 @@ void SinglePhase::save(){
 				break;
 			}
 		}
-		else{
+		else{// do not write mesh and component info
 			switch(_saveFormat)
 			{
 			case VTK :
@@ -3185,10 +2984,10 @@ Field& SinglePhase::getMachNumberField()
 				u2+=temp*temp;
 			}
 	
-			rho=_fluides[0]->getDensity(p,T);
-			h  =_fluides[0]->getEnthalpy(T,rho);
-			_MachNumber[i]  =sqrt(u2)/_fluides[0]->vitesseSonEnthalpie(h);
-			//cout<<"u="<<sqrt(u2)<<", c= "<<_fluides[0]->vitesseSonEnthalpie(h)<<", MachNumberField[i] = "<<MachNumberField[i] <<endl;
+			rho=_compressibleFluid->getDensity(p,T);
+			h  =_compressibleFluid->getEnthalpy(T,rho);
+			_MachNumber[i]  =sqrt(u2)/_compressibleFluid->vitesseSonEnthalpie(h);
+			//cout<<"u="<<sqrt(u2)<<", c= "<<_compressibleFluid->vitesseSonEnthalpie(h)<<", MachNumberField[i] = "<<MachNumberField[i] <<endl;
 		}
 		_MachNumber.setTime(_time,_nbTimeStep);
 	}
@@ -3334,8 +3133,8 @@ Field& SinglePhase::getEnthalpyField()
 			Ii = i*_nVar +_nVar-1;
 			VecGetValues(_primitiveVars,1,&Ii,&T);
 			
-			rho=_fluides[0]->getDensity(p,T);
-			_Enthalpy(i)=_fluides[0]->getEnthalpy(T,rho);
+			rho=_compressibleFluid->getDensity(p,T);
+			_Enthalpy(i)=_compressibleFluid->getEnthalpy(T,rho);
 		}
 		_Enthalpy.setTime(_time,_nbTimeStep);
 	}

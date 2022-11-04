@@ -9,7 +9,7 @@
 //============================================================================
 
 /*! \class DriftModel DriftModel.hxx "DriftModel.hxx"
- *  \brief Four equation two phase flow drift model
+ *  \brief Class simulating a mixture of two compressible fluid sharing the same velocity.Four equation two phase flow drift model
  *  \details One total mass equation, one vapour mass equation, one total momentum equation, one total energy equation, see \ref DriftModelPage for more details
  */
 #ifndef DRIFTMODEL_HXX_
@@ -26,8 +26,10 @@ public :
 	 * \param [in] bool : There are two possible equations of state for each phase
 	 *  */
 	DriftModel( pressureEstimate pEstimate, int dim, bool useDellacherieEOS=true);
-	//! system initialisation
+	//! system initialisation (allocations mémoire)
 	void initialize();
+	//!libération de la mémoire
+	void terminate();
 
 	//fonctions d'echange de flux
 	//	void getOutputField(const Vec &Flux, const string Champ, const int numBord)=0;//, PetscInt *indices_Flux, PetscInt *indices_Bord, const long range)=0;
@@ -110,9 +112,9 @@ public :
 		double titreThermo=(enthalpie-_hsatl)/(_hsatv-_hsatl);
 
 		if(titreThermo<=_precision)
-			return _fluides[1]->getTemperatureFromEnthalpy(enthalpie, 0);
+			return _fluidesCompressibles[1]->getTemperatureFromEnthalpy(enthalpie, 0);
 		else if (titreThermo>1-_precision)
-			return _fluides[0]->getTemperatureFromEnthalpy(enthalpie, 0);
+			return _fluidesCompressibles[0]->getTemperatureFromEnthalpy(enthalpie, 0);
 		else
 			return _Tsat;
 		}
@@ -181,12 +183,6 @@ public :
 		_limitField[groupName]=LimitField(InnerWall,-1,vector<double>(1,v_x),vector<double>(1,v_y),vector<double>(1,v_z),Temperature,-1,-1,-1);
 	};
 
-	/** \fn computeNewtonVariation
-	 * \brief Builds and solves the linear system to obtain the variation Vkp1-Vk in a Newton scheme using primitive variables
-	 * @param
-	 * */
-	void computeNewtonVariation();
-
 	/** \fn iterateTimeStep
 	 * \brief calls computeNewtonVariation to perform one Newton iteration and tests the convergence
 	 * @param
@@ -204,6 +200,8 @@ protected :
 	bool _saveAllFields;
 	bool _useDellacherieEOS;
 
+    Vec _Vext;
+    
 	/** \fn convectionState
 	 * \brief calcule l'etat de Roe de deux etats
 	 * @param i,j sont des entiers qui correspondent aux numeros des cellules à gauche et à droite de l'interface
@@ -332,6 +330,8 @@ protected :
 	void computeScaling(double offset);
 
 	// Fonctions utilisant la loi d'etat 
+
+	vector<	CompressibleFluid* > _fluidesCompressibles;//This class works only with compressible fluids
 
 	/** \fn consToPrim
 	 * \brief computes the primitive vector state from a conservative vector state

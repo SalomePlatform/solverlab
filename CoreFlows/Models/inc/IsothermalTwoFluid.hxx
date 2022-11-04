@@ -1,15 +1,14 @@
 //============================================================================
 /**
- * \file DriftModel.hxx
+ * \file IsothermalTwoFluid.hxx
  * \author Michael NDJINGA, Kieu Nguyen
- * \version 1.0
  * \date 15 janv. 2015
  * \brief The isothermal two-fluid model
  * */
 //============================================================================
 
 /*! \class IsothermalTwoFluid IsothermalTwoFluid.hxx "IsothermalTwoFluid.hxx"
- *  \brief Isothermal two-fluid model
+ *  \brief Class simulating a mixture of two compressible fluid having a constant temperature
  *  \details The model consists in two phasic mass equations, two phasic momentum equations, see \ref IsothermalPage for more details
  */
 #ifndef IsothermalTwoFluid_HXX_
@@ -25,12 +24,19 @@ public :
 			 * \param [in] int : mesh dimension
 			 *  */
 	IsothermalTwoFluid(pressureEstimate pEstimate, int dim);
-	//initialisation du systeme
+	//!initialisation du systeme
 	void initialize();
 
 	void testConservation();
 
 	void save();
+
+	/** \fn iterateTimeStep
+	 * \brief calls computeNewtonVariation to perform one Newton iteration and tests the convergence of the Newton scheme
+	 * @param
+	 * @return boolean ok is true is the newton iteration gave a physically acceptable result
+	 * */
+	bool iterateTimeStep(bool &ok);
 
 	// Boundary conditions
 	/** \fn setIntletBoundaryCondition
@@ -84,13 +90,14 @@ protected :
 	double _Temperature, _internalEnergy1, _internalEnergy2, _guessalpha;
 	bool _afficheg2press, _afficheg2alpha;
 	double _intPressCoeff;
+
 	//!calcule l'etat de Roe de deux etats
 	void convectionState( const long &i, const long &j, const bool &IsBord);
 	//!calcule la matrice de convection de l'etat interfacial entre deux cellules voisinnes
 	void convectionMatrices();
-	//!calcule la matrice de diffusion de l'etat interface pour la diffusion
 	//!Calcule le flux pour un état et une porosité et une normale donnés
 	Vector convectionFlux(Vector U,Vector V, Vector normale, double porosity);
+	//!calcule la matrice de diffusion de l'etat interface pour la diffusion
 	void diffusionStateAndMatrices(const long &i,const long &j, const bool &IsBord);
 	//!Ajoute au second membre la contribution de la gravite, chgt phase, chauffage et frottement
 	void sourceVector(PetscScalar * Si,PetscScalar * Ui,PetscScalar * Vi, int i);
@@ -104,7 +111,7 @@ protected :
 	void jacobian(const int &j, string nameOfGroup,double * normale);
 	//!Calcule la jacobienne de la CL de diffusion
 	void jacobianDiff(const int &j, string nameOfGroup);
-	//!Calcule l'etat fictif a� la frontiere
+	//!Calcule l'etat fictif à la frontiere
 	void setBoundaryState(string nameOfGroup, const int &j,double *normale);
 	//!Ajoute au second membre la contribution de la diffusion
 	void addDiffusionToSecondMember(const int &i,const int &j,bool isBoundary);
@@ -118,6 +125,7 @@ protected :
 	void entropicShift(double* n);
 
 	// Functions of equations of states
+	vector<	CompressibleFluid* > _fluidesCompressibles;//This class works only with compressible fluids 
 	void consToPrim(const double *Ucons, double* Vprim,double porosity=1);
 	void primToCons(const double *V, const int &i, double *U, const int &j);
 	void primToConsJacobianMatrix(double *V);

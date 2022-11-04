@@ -16,7 +16,6 @@
 #define SINGLEPHASE_HXX_
 
 #include "ProblemFluid.hxx"
-#include "StiffenedGas.hxx"
 
 class SinglePhase : public ProblemFluid{
 public :
@@ -29,12 +28,26 @@ public :
 	 *  */
 	SinglePhase(phaseType fluid, pressureEstimate pEstimate,int dim,bool useDellacherieEOS=false);
 
-	/** \fn setViscosity
+	/** \fn setViscosityConstant
 	 * \brief sets the viscosity
 	 * @param viscosite : value of the dynamic viscosity
 	 * 	 * */
 	void setViscosityConstant( double viscosite ){
 		_fluides[0]->setViscosity(viscosite);
+	};
+	/** \fn setConductivityConstant
+	 * \brief sets the conductivity of the fluid
+	 * @param conductivite : value of the cnductivity
+	 * */
+	void setConductivityConstant( double conductivite){
+		_fluides[0]->setConductivity(conductivite);
+	};
+	/** \fn setDragCoeffConstant
+	 * \brief Sets the drag coefficient
+	 * @param dragCoeff value of the drag coefficient
+	 * */
+	void setDragCoeffConstant(double dragCoeff){
+		_fluides[0]->setDragCoeff(dragCoeff);
 	};
 
 	//! system initialisation
@@ -128,21 +141,7 @@ public :
 			_limitField[groupName]=LimitField(Wall,-1,vector<double>(1,v_x),vector<double>(1,v_y),vector<double>(1,v_z),getReferenceTemperature(),-1,-1,-1);
 	};
 
-	/** \fn computeNewtonVariation
-	 * \brief Builds and solves the linear system to obtain the variation Vkp1-Vk in a Newton scheme using primitive variables
-	 * @param
-	 * */
-	void computeNewtonVariation();
-
-	/** \fn iterateTimeStep
-	 * \brief calls computeNewtonVariation to perform one Newton iteration and tests the convergence
-	 * @param
-	 * @return boolean ok is true is the newton iteration gave a physically acceptable result
-	 * */
-	bool iterateTimeStep(bool &ok);
-
 	//EOS functions
-	StiffenedGas getFluidEOS(){ return *dynamic_cast<StiffenedGas*>(_fluides[0]); }
 	double getReferencePressure()    { return _Pref; };
 	double getReferenceTemperature() { return _Tref; };
 	
@@ -211,6 +210,8 @@ protected :
 	//!Calcule les saut de valeurs propres pour la correction entropique
 	void entropicShift(double* n);
 	// Fonctions utilisant la loi d'etat
+	/** Fluid equation of state **/
+	CompressibleFluid *_compressibleFluid;//This class works only with compressible fluids
 	void consToPrim(const double *Ucons, double* Vprim,double porosity=1);
 	void primToCons(const double *V, const int &i, double *U, const int &j);
 	void primToConsJacobianMatrix(double *V);
