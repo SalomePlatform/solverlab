@@ -547,14 +547,19 @@ LinearSolver::solve( Vector X0 )
 	KSPConvergedReason reason;
 	KSPGetConvergedReason(_ksp,&reason);
 
-	if (reason==2 || reason==3)
+	if (reason>0)
 		_convergence=true;
 	else{
 		_convergence=false;
 		cout<<endl<<"!!!!!!!!!!!!!!!!!!  Linear system algorithm did not converge  !!!!!!!!!!!!!!" <<endl;
 		if( reason == -3)
 		    cout<<"Maximum number of iterations "<<_numberMaxOfIter<<" reached"<<endl;
-		else{
+		else if( reason == -11)
+		    cout<<"!!!!!!! Construction of preconditioner failed !!!!!!"<<endl;
+		else if( reason == -5)
+		    cout<<"!!!!!!! Generic breakdown of the linear solver (Could be due to a singular matrix or preconditioner)!!!!!!"<<endl;
+		else
+		{
 		    cout<<"PETSc divergence reason  "<< reason <<endl;
 			cout<<"Final iteration= "<<_numberOfIter<<". Maximum allowed was " << _numberMaxOfIter<<endl;
 		}
