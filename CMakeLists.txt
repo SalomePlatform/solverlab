@@ -738,3 +738,16 @@ configure_file(
     @ONLY
 )
 
+
+# resume TRACE log
+# "COREFLOWS_." is regExp
+printCmakeTraceVariable( "COREFLOWS_." )
+printCmakeTraceVariable( "CDMATH_." )
+printCmakeTraceVariable( "SOLVERLAB_." )
+printCmakeTraceVariable( "DOWNLOAD_." )
+
+
+# optionally get trace of all cmake main variables in log (for debug)
+if( SOLVERLAB_WITH_TRACE )
+  printCmakeTrace()
+endif()
