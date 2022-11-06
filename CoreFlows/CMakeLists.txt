@@ -5,14 +5,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Project name
 project (CoreFlows C CXX)
 set (COREFLOWS_VERSION_MAJOR 9)
-set (COREFLOWS_VERSION_MINOR 8)
+set (COREFLOWS_VERSION_MINOR 9)
 
-# CDMATH project options (deprecated, see SOLVERLAB options)
-set (COREFLOWS_WITH_DOCUMENTATION ON CACHE STRING "Generate documentation for CoreFlows use")
-set (COREFLOWS_WITH_PYTHON ON CACHE STRING "Compile Python interface for COREFLOWS")
-set (COREFLOWS_WITH_GUI OFF CACHE STRING "Compile Graphic user Interface for COREFLOWS")
-set (COREFLOWS_WITH_PACKAGE OFF CACHE STRING "Generate RPM, Debian and tarball packages")
-set (COREFLOWS_WITH_TESTS ON CACHE STRING "Compile with testing and examples")
+# Coreflows project options (deprecated, see SOLVERLAB options)
+set (COREFLOWS_WITH_DOCUMENTATION ${SOLVERLAB_WITH_DOCUMENTATION} CACHE STRING "Generate documentation for CoreFlows use")
+set (COREFLOWS_WITH_PYTHON ${SOLVERLAB_WITH_PYTHON} CACHE STRING "Compile Python interface for COREFLOWS")
+set (COREFLOWS_WITH_GUI ${SOLVERLAB_WITH_GUI} CACHE STRING "Compile Graphic user Interface for COREFLOWS")
+set (COREFLOWS_WITH_PACKAGE ${SOLVERLAB_WITH_PACKAGE} CACHE STRING "Generate RPM, Debian and tarball packages")
+set (COREFLOWS_WITH_TESTS ${SOLVERLAB_WITH_TESTS} CACHE STRING "Compile with testing and examples")
 
 # Debug mode activates testing and profiling --------------------------------------------------------------#
 if   (CMAKE_BUILD_TYPE STREQUAL Debug)									   #
@@ -41,7 +41,7 @@ set (CoreFlows_EXAMPLES ${CoreFlows_SOURCE_DIR}/examples)
 
 set( CoreFlows_INCLUDES 
   ${CDMATH_INCLUDES}											    #
-  ${PETSC_INCLUDES}											    #
+  ${PETSC_INCLUDES}#Contains SLEPC include files											    #
   ${CoreFlows_MODELS}/inc											    #    
   ${CoreFlows_MODELS}/inc/EOS   										    #    
   )													    #
@@ -97,8 +97,6 @@ endif(COREFLOWS_WITH_GUI)                                                       
 													    #
 INCLUDE_DIRECTORIES(						   					    #
   ${CoreFlows_INCLUDES}											    #
-  ${PETSC_INCLUDES}
-  ${SLEPC_INCLUDES}
   )													    #
 													    #
 SET(MAIN_SOURCES											    #
