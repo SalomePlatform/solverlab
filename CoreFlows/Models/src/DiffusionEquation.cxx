@@ -134,7 +134,7 @@ void DiffusionEquation::initialize()
 	
 		if(_Ndim != _mesh.getSpaceDimension() or _Ndim!=_mesh.getMeshDimension())//for the moment we must have space dim=mesh dim
 		{
-	        PetscPrintf(PETSC_COMM_SELF,"Problem : dimension defined is %d but mesh dimension= %d, and space dimension is %d",_Ndim,_mesh.getMeshDimension(),_mesh.getSpaceDimension());
+	        PetscPrintf(PETSC_COMM_SELF,"Problem : dimension defined is %d but mesh dimension= %d, and space dimension is %d\n",_Ndim,_mesh.getMeshDimension(),_mesh.getSpaceDimension());
 			*_runLogFile<< "Problem : dim = "<<_Ndim<< " but mesh dim= "<<_mesh.getMeshDimension()<<", mesh space dim= "<<_mesh.getSpaceDimension()<<endl;
 			*_runLogFile<<"DiffusionEquation::initialize: mesh has incorrect dimension"<<endl;
 			_runLogFile->close();
@@ -203,7 +203,7 @@ void DiffusionEquation::initialize()
 					PetscPrintf(PETSC_COMM_SELF,"1D Finite element method on a 3D network : space dimension is %d, mesh dimension is %d\n",_Ndim,_mesh.getMeshDimension());			
 				else
 				{
-					PetscPrintf(PETSC_COMM_SELF,"Error Finite element with space dimension %d, and mesh dimension  %d, mesh should be either tetrahedral, either a triangularised surface or 1D network",_Ndim,_mesh.getMeshDimension());
+					PetscPrintf(PETSC_COMM_SELF,"Error Finite element with space dimension %d, and mesh dimension  %d, mesh should be either tetrahedral, either a triangularised surface or 1D network\n",_Ndim,_mesh.getMeshDimension());
 					*_runLogFile<<"DiffusionEquation::initialize mesh has incorrect dimension"<<endl;
 					_runLogFile->close();
 					throw CdmathException("DiffusionEquation::initialize: mesh has incorrect cell types");
@@ -214,7 +214,7 @@ void DiffusionEquation::initialize()
 	        _NboundaryNodes=_boundaryNodeIds.size();
 	
 	        if(_NboundaryNodes==_Nnodes)
-	            PetscPrintf(PETSC_COMM_SELF,"!!!!! Warning : all nodes are boundary nodes !!!!!");
+	            PetscPrintf(PETSC_COMM_SELF,"!!!!! Warning : all nodes are boundary nodes !!!!!\n");
 	
 	        for(int i=0; i<_NboundaryNodes; i++)
 	            if(_limitField[(_mesh.getNode(_boundaryNodeIds[i])).getGroupName()].bcType==DirichletDiffusion)
@@ -381,16 +381,21 @@ double DiffusionEquation::computeDiffusionMatrixFE(bool & stop){
 	                        dirichletCell_treated=true;
 	                        for (int kdim=0; kdim<_Ndim+1;kdim++)
 	                        {
-								std::map<int,double>::iterator it=_dirichletBoundaryValues.find(nodeIds[kdim]);
-								if( it != _dirichletBoundaryValues.end() )
-	                            {
-	                                if( _dirichletValuesSet )
-	                                    valuesBorder[kdim]=_dirichletBoundaryValues[it->second];
-	                                else    
-	                                    valuesBorder[kdim]=_limitField[_mesh.getNode(nodeIds[kdim]).getGroupName()].T;
-	                            }
+								if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),nodeIds[kdim])!=_dirichletNodeIds.end())//node kdim is a Dirichlet BC node
+								{
+	                                if( _dirichletValuesSet )//BC set via setDirichletValues
+	                                {
+										std::map<int,double>::iterator it=_dirichletBoundaryValues.find(nodeIds[kdim]);
+										if( it != _dirichletBoundaryValues.end() )
+		                                    valuesBorder[kdim]=_dirichletBoundaryValues[it->second]; 
+		                                else    
+											throw CdmathException("setDirichletValues has not given all Dirichlet values");
+									}
+									else//BC set via setDirichletBoundaryCondition
+		                                    valuesBorder[kdim]=_limitField[_mesh.getNode(nodeIds[kdim]).getGroupName()].T;
+								}
 	                            else
-	                                valuesBorder[kdim]=0;                            
+	                                valuesBorder[kdim]=0;                      
 	                        }
 	                        GradShapeFuncBorder=gradientNodal(M,valuesBorder)/fact(_Ndim);
 	                        coeff =-1.*(_DiffusionTensor*GradShapeFuncBorder)*GradShapeFuncs[idim]/Cj.getMeasure();
@@ -549,23 +554,36 @@ double DiffusionEquation::computeRHS(bool & stop){//Contribution of the PDE RHS 
 	            if(_timeScheme == Explicit)
 	            {
 	                VecGetValues(_Tn, 1, &i, &Ti);
-	                VecSetValue(_b,i,(_heatTransfertCoeff*(_fluidTemperatureField(i)-Ti)+_heatPowerField(i))/(_rho*_cp),ADD_VALUES);
+	                VecSetValue(_b,i,(_heatTransfertCoeff*(_fluidTemperatureField(i)-Ti)+_heatPowerField(i))/(_rho*_cp), ADD_VALUES);
 	            }
 	            else//Implicit scheme    
-	                VecSetValue(_b,i,(_heatTransfertCoeff* _fluidTemperatureField(i)    +_heatPowerField(i))/(_rho*_cp)    ,ADD_VALUES);
+	                VecSetValue(_b,i,(_heatTransfertCoeff* _fluidTemperatureField(i)    +_heatPowerField(i))/(_rho*_cp), ADD_VALUES);
 	    else
 	        {
 	            Cell Ci;
 	            std::vector< int > nodesId;
+	            double Tj;//To store the temperature in a node j of the cell i
+	            double coeff;//To store the contribution of the right hand side before space integration
 	            for (int i=0; i<_Nmailles;i++)
 	            {
 	                Ci=_mesh.getCell(i);
 	                nodesId=Ci.getNodesId();
 	                for (int j=0; j<nodesId.size();j++)
-	                    if(!_mesh.isBorderNode(nodesId[j])) //or for better performance nodeIds[idim]>dirichletNodes.upper_bound()
-	                    {
-	                        double coeff = (_heatTransfertCoeff*_fluidTemperatureField(nodesId[j]) + _heatPowerField(nodesId[j]))/(_rho*_cp);
-	                        VecSetValue(_b,unknownNodeIndex(nodesId[j], _dirichletNodeIds), coeff*Ci.getMeasure()/(_Ndim+1),ADD_VALUES);
+	                    if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),nodesId[j])==_dirichletNodeIds.end())//!_mesh.isBorderNode(nodesId[j]))
+	                    {//nodeIds[j] is an unknown node (not a dirichlet node)
+				            //Contribution due to fluid/solide heat exchange + Contribution of the volumic heat power
+							int nodej_unknown_index = unknownNodeIndex(nodesId[j], _dirichletNodeIds);//global index of the local node j in the global unknown vector Tn
+				            if(_timeScheme == Explicit)
+				            {
+				                VecGetValues(_Tn, 1, &nodej_unknown_index, &Tj);
+		                        double coeff = (_heatTransfertCoeff*(_fluidTemperatureField(nodesId[j])-Tj) + _heatPowerField(nodesId[j]))/(_rho*_cp);
+		                        VecSetValue(_b,nodej_unknown_index, coeff*Ci.getMeasure()/(_Ndim+1),ADD_VALUES);
+							}
+				            else//Implicit scheme    
+				            {
+		                        double coeff = (_heatTransfertCoeff*_fluidTemperatureField(nodesId[j]) + _heatPowerField(nodesId[j]))/(_rho*_cp);
+		                        VecSetValue(_b,nodej_unknown_index, coeff*Ci.getMeasure()/(_Ndim+1),ADD_VALUES);
+							}
 	                    }
 	            }
 	        }
@@ -579,27 +597,30 @@ double DiffusionEquation::computeRHS(bool & stop){//Contribution of the PDE RHS 
 
 bool DiffusionEquation::initTimeStep(double dt){
 
-	/* tricky because of code coupling */
-    if(_dt>0 and dt>0)//Previous time step was set and used
-    {
-        //Remove the contribution from dt to prepare for new time step. The diffusion matrix is not recomputed
-        if(_timeScheme == Implicit)
-            MatShift(_A,-1/_dt+1/dt);
-        //No need to remove the contribution to the right hand side since it is recomputed from scratch at each time step
-    }
-    else if(dt>0)//_dt==0, first time step
-    {
-        if(_timeScheme == Implicit)
-            MatShift(_A,1/dt);        
-    }
-    else//dt<=0
-    {
-        PetscPrintf(PETSC_COMM_WORLD,"DiffusionEquation::initTimeStep %.2e = \n",dt);
-        throw CdmathException("Error DiffusionEquation::initTimeStep : cannot set time step to zero");        
-    }
-    //At this stage _b contains _b0 + power + heat exchange
-    VecAXPY(_b, 1/dt, _Tn);        
-
+    if(_nbTimeStep==0)// first time step
+	    if(dt>0)
+	    {
+	        if(_timeScheme == Implicit)
+	           MatShift(_A,1/dt); 
+	    }
+	    else//dt<=0
+	    {
+	        PetscPrintf(PETSC_COMM_WORLD,"DiffusionEquation::initTimeStep Error : zero time step set%.2e = \n",dt);
+	        throw CdmathException("Error DiffusionEquation::initTimeStep : cannot set time step to zero");        
+	    }
+    else /* tricky because of code coupling */
+	    if(_dt>0 and dt>0)//Previous time step was set and used
+	    {
+	        //Remove the contribution from dt to prepare for new time step. The diffusion matrix is not recomputed
+	        if(_timeScheme == Implicit && fabs(-1/_dt+1/dt)>_precision)
+	            MatShift(_A,-1/_dt+1/dt);
+	        //No need to remove the contribution to the right hand side since it is recomputed from scratch at each time step
+	    }
+	    else//dt<=0
+	    {
+	        PetscPrintf(PETSC_COMM_WORLD,"DiffusionEquation::initTimeStep Error : zero time step set %.2e = \n",dt);
+	        throw CdmathException("Error DiffusionEquation::initTimeStep : cannot set time step to zero");        
+	    }
 	_dt = dt;
 
 	if(_verbose && _nbTimeStep%_freqSave ==0)
@@ -626,12 +647,15 @@ bool DiffusionEquation::iterateTimeStep(bool &converged)
 
 	if(_NEWTON_its>0){//Pas besoin de computeTimeStep à la première iteration de Newton
 		_maxvp=0;
-		computeTimeStep(stop);
+		computeTimeStep(stop);//This adds heat source and fluid coupling to the RHS _b
 	}
 	if(stop){
 		converged=false;
 		return false;
 	}
+
+    //At this stage _b contains _b0 + power + heat exchange with fluid
+    VecAXPY(_b, 1/_dt, _Tn);//Final contribution to _b cannot be added earlier because dt might not be known 
 
 	if(_timeScheme == Explicit)
 	{
@@ -652,28 +676,74 @@ bool DiffusionEquation::iterateTimeStep(bool &converged)
 
 		if(_conditionNumber)
 			KSPSetComputeEigenvalues(_ksp,PETSC_TRUE);
+
+		if(_system)
+		{
+			cout << "Matrice du système linéaire" << endl;
+			MatView(_A,PETSC_VIEWER_STDOUT_SELF);
+			cout << endl;
+			cout << "Second membre du système linéaire" << endl;
+			VecView(_b, PETSC_VIEWER_STDOUT_SELF);
+			cout << endl;
+		}
+
 		KSPSolve(_ksp, _b, _Tk);
 
-		KSPGetIterationNumber(_ksp, &_PetscIts);
-		if( _MaxIterLinearSolver < _PetscIts)
-			_MaxIterLinearSolver = _PetscIts;
-		if(_PetscIts>=_maxPetscIts)
-		{
-			PetscPrintf(PETSC_COMM_WORLD,"Systeme lineaire : pas de convergence de Petsc. Itérations maximales %d atteintes \n",_maxPetscIts);
-			*_runLogFile<<"Systeme lineaire : pas de convergence de Petsc. Itérations maximales "<<_maxPetscIts<<" atteintes"<<endl;
-			converged=false;
-			return false;
-		}
+		KSPConvergedReason reason;
+		KSPGetConvergedReason(_ksp,&reason);
+	    KSPGetIterationNumber(_ksp, &_PetscIts);
+	    double residu;
+	    KSPGetResidualNorm(_ksp,&residu);
+
+		if (reason!=2 and reason!=3)
+	    {
+	        PetscPrintf(PETSC_COMM_WORLD,"!!!!!!!!!!!!! Erreur système linéaire : pas de convergence de Petsc.\n");
+	        PetscPrintf(PETSC_COMM_WORLD,"!!!!!!!!!!!!! Itérations maximales %d atteintes, résidu = %1.2e, précision demandée= %1.2e.\n",_maxPetscIts,residu,_precision);
+	        PetscPrintf(PETSC_COMM_WORLD,"Solver used %s, preconditioner %s, Final number of iteration = %d.\n",_ksptype,_pctype,_PetscIts);
+			if(_mpi_rank==0)//Avoid redundant printing
+			{
+				*_runLogFile<<"!!!!!!!!!!!!! Erreur système linéaire : pas de convergence de Petsc."<<endl;
+		        *_runLogFile<<"!!!!!!!!!!!!! Itérations maximales "<<_maxPetscIts<<" atteintes, résidu="<<residu<<", précision demandée= "<<_precision<<endl;
+		        *_runLogFile<<"Solver used "<<  _ksptype<<", preconditioner "<<_pctype<<", Final number of iteration= "<<_PetscIts<<endl;
+				_runLogFile->close();
+			}
+			if( reason == -3)
+			    cout<<"Maximum number of iterations "<<_maxPetscIts<<" reached"<<endl;
+			else if( reason == -11)
+			    cout<<"!!!!!!! Construction of preconditioner failed !!!!!!"<<endl;
+			else if( reason == -5)
+			    cout<<"!!!!!!! Generic breakdown of the linear solver (Could be due to a singular matrix or preconditioner)!!!!!!"<<endl;
+			else
+			{
+			    cout<<"PETSc divergence reason  "<< reason <<endl;
+				cout<<"Final iteration= "<<_PetscIts<<". Maximum allowed was " << _maxPetscIts<<endl;
+			}
+	        converged = false;
+	        stop = true;
+	        
+	        return false;
+	    }
 		else
 		{
-			VecCopy(_Tk, _deltaT);//ici on a deltaT=Tk
-			VecAXPY(_deltaT,  -1, _Tkm1);//On obtient deltaT=Tk-Tkm1
+	        if( _MaxIterLinearSolver < _PetscIts)
+	            _MaxIterLinearSolver = _PetscIts;
+
+	        VecCopy(_Tk, _deltaT);//ici on a deltaT=Tk
+	        VecAXPY(_deltaT,  -1, _Tkm1);//On obtient deltaT=Tk-Tkm1
+	
+			if(_verbose)
+				PetscPrintf(PETSC_COMM_WORLD,"Début calcul de l'erreur maximale\n");
+	
 			VecNorm(_deltaT,NORM_INFINITY,&_erreur_rel);
+	
+			if(_verbose)
+				PetscPrintf(PETSC_COMM_WORLD,"Fin calcul de la variation relative, erreur maximale : %1.2e\n", _erreur_rel );
+
+	        stop=false;
 			converged = (_erreur_rel <= _precision) ;//converged=convergence des iterations de Newton
+			VecCopy(_Tk, _Tkm1);
 		}
 	}
-
-	VecCopy(_Tk, _Tkm1);
 
 	return true;
 }
@@ -686,7 +756,8 @@ void DiffusionEquation::validateTimeStep()
 	_isStationary =(_erreur_rel <_precision);
 
 	VecCopy(_Tk, _Tn);
-	VecCopy(_Tk, _Tkm1);
+	if(_timeScheme == Implicit)
+		VecCopy(_Tk, _Tkm1);
 
 	_time+=_dt;
 	_nbTimeStep++;
@@ -736,7 +807,7 @@ void DiffusionEquation::save(){
 				if(_mpi_size>1)
 					VecGetValues(_Tn_seq, 1, &i, &Ti);
 				else
-					VecGetValues(_Tk    , 1, &i, &Ti);
+					VecGetValues(_Tn    , 1, &i, &Ti);
 	            globalIndex = globalNodeIndex(i, _dirichletNodeIds);
 	            _VV(globalIndex)=Ti;
 	        }
