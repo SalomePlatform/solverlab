@@ -188,6 +188,25 @@ void ProblemCoreFlows::setInitialField(const Field &VV)
 	int nbNeib,indexFace;
 	Cell Ci;
 	Face Fk;
+        
+	//Compute Delta x and the cell perimeters
+	for (int i=0; i<_mesh.getNumberOfCells(); i++){
+		Ci = _mesh.getCell(i);
+		if (_Ndim > 1){
+			_perimeters(i)=0;
+			for (int k=0 ; k<Ci.getNumberOfFaces() ; k++){
+				indexFace=Ci.getFacesId()[k];
+				Fk = _mesh.getFace(indexFace);
+				_minl = min(_minl,Ci.getMeasure()/Fk.getMeasure());
+				_perimeters(i)+=Fk.getMeasure();
+			}
+		}else{
+			_minl = min(_minl,Ci.getMeasure());
+			_perimeters(i)=Ci.getNumberOfFaces();
+		}
+	}
+	if(_verbose)
+		cout<<_perimeters<<endl;
 
 	if(_verbose)
 		PetscPrintf(PETSC_COMM_SELF,"Processor %d Computing cell perimeters and mesh minimal diameter\n", _mpi_rank);
@@ -198,25 +217,6 @@ void ProblemCoreFlows::setInitialField(const Field &VV)
     else
     {
         _neibMaxNbCells=_mesh.getMaxNbNeighbours(CELLS);
-        
-		//Compute Delta x and the cell perimeters
-		for (int i=0; i<_mesh.getNumberOfCells(); i++){
-			Ci = _mesh.getCell(i);
-			if (_Ndim > 1){
-				_perimeters(i)=0;
-				for (int k=0 ; k<Ci.getNumberOfFaces() ; k++){
-					indexFace=Ci.getFacesId()[k];
-					Fk = _mesh.getFace(indexFace);
-					_minl = min(_minl,Ci.getMeasure()/Fk.getMeasure());
-					_perimeters(i)+=Fk.getMeasure();
-				}
-			}else{
-				_minl = min(_minl,Ci.getMeasure());
-				_perimeters(i)=Ci.getNumberOfFaces();
-			}
-		}
-		if(_verbose)
-			cout<<_perimeters<<endl;
 	}
 	
 	/*** MPI distribution of parameters ***/
@@ -566,8 +566,8 @@ bool ProblemCoreFlows::run()
 			{
 				validateTimeStep();
 				if ((_nbTimeStep-1)%_freqSave ==0){
-					PetscPrintf(PETSC_COMM_WORLD,"Solved time step = %d, dt = %.2e, time = %.2e, ||Un+1-Un||= %.2e\n\n",_nbTimeStep+1,_dt,_time,_erreur_rel);
-					*_runLogFile << "Solved time step = "<< _nbTimeStep+1 << ", dt = "<< _dt <<", time = "<<_time << ", ||Un+1-Un||= "<<_erreur_rel<<endl<<endl;
+					PetscPrintf(PETSC_COMM_WORLD,"Solved time step = %d, dt = %.2e, time = %.2e, ||Un+1-Un||= %.2e\n\n",_nbTimeStep,_dt,_time,_erreur_rel);
+					*_runLogFile << "Solved time step = "<< _nbTimeStep << ", dt = "<< _dt <<", time = "<<_time << ", ||Un+1-Un||= "<<_erreur_rel<<endl<<endl;
 				}
 			}
 		}
@@ -636,8 +636,8 @@ bool ProblemCoreFlows::solveTimeStep(){
 
 		if(_timeScheme == Implicit && _nbTimeStep%_freqSave ==0)//To monitor the convergence of the newton scheme
 		{
-			PetscPrintf(PETSC_COMM_WORLD," Newton iteration %d, %s iterations : %d maximum variation ||Uk+1-Uk||: %.2e\n",_NEWTON_its,_ksptype,_PetscIts,_erreur_rel);
-			*_runLogFile<< " Newton iteration " << _NEWTON_its<< ", "<< _ksptype << " iterations : " << _PetscIts<< " maximum variation ||Uk+1-Uk||: " << _erreur_rel << endl;
+			PetscPrintf(PETSC_COMM_WORLD," Newton iteration %d, %s iterations : %d, preconditioner : %s, variation ||Uk+1-Uk||: %.2e\n",_NEWTON_its,_ksptype,_PetscIts,_pctype,_erreur_rel);
+			*_runLogFile<< " Newton iteration " << _NEWTON_its<< ", "<< _ksptype << " iterations : " << _PetscIts<< ", preconditioner : "<<_pctype<<", maximum variation ||Uk+1-Uk||: " << _erreur_rel << endl;
 
 			if(_conditionNumber)
 			{
@@ -651,8 +651,8 @@ bool ProblemCoreFlows::solveTimeStep(){
 	}
 	if(!converged){
 		if(_NEWTON_its >= _maxNewtonIts){
-			PetscPrintf(PETSC_COMM_WORLD,"Maximum number of Newton iterations %d reached\n",_maxNewtonIts);
-			*_runLogFile << "Maximum number of Newton iterations "<<_maxNewtonIts<<" reached"<< endl;
+			PetscPrintf(PETSC_COMM_WORLD,"Maximum number of allowed Newton iterations %d reached\n",_maxNewtonIts);
+			*_runLogFile << "Maximum number of allowed Newton iterations "<<_maxNewtonIts<<" reached"<< endl;
 		}
 		else if(!ok){
 			PetscPrintf(PETSC_COMM_WORLD,"iterateTimeStep: solving Newton iteration %d Failed\n",_NEWTON_its);
