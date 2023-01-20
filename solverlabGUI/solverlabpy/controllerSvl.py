@@ -48,7 +48,6 @@ from salomepy.threadWorkerForWidgetEdit import ThreadWorkerForWidgetEdit
 import sys
 # from qtRootCanvasWidget import QtRootCanvasWidget
 
-import solverlab
 import xyzpy.utilsXyz as UXYZ
 import salomepy.utilsWorkdir as UTW
 import solverlabpy.solverlabFilePatterns as UFPA
@@ -60,6 +59,11 @@ verbose = True
 verboseEvent = True
 
 _MyDir = os.path.split(os.path.realpath(__file__))[0]
+
+try:
+  import solverlab
+except Exception as e:
+  logger.warning("problem import solverlab : %s" % e)
 
 
 ##############################################################################################################################################

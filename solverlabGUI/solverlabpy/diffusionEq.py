@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import MEDLoader as ML
 
 from xyzpy.baseXyz import _XyzConstrainBase
 import xyzpy.classFactoryXyz as CLFX
@@ -120,6 +119,12 @@ class BoundaryDiffusionEq(ListOfBaseXyz):  #TODO read boundary condition in .med
     super(BoundaryDiffusionEq, self).__init__()
 
   def update(self):
+    try:
+      import MEDLoader as ML
+    except Exception as e:
+      QTW.QMessageBox.warning(self.getController().getDesktop(), "warning", "problem import MEDLoader : %s" % e)
+      return
+
     file = self.getRoot().getMedfile()
     data = ML.MEDFileData(file)
     meshes = data.getMeshes()

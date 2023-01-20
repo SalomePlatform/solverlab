@@ -1,10 +1,14 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import os
-
-import solverlab
-
 import xyzpy.loggingXyz as LOG
 
 logger = LOG.getLogger()
+try:
+  import solverlab
+except Exception as e:
+  logger.warning("problem import solverlab : %s" % e)
 
 # All get convert string to the coresponding solverlab enum
 def getFormat(computation):
