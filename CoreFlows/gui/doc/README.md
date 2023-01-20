@@ -1,33 +1,39 @@
-</center>
+### MAKE documentation (LINUX)
 
-| **SOLVERLABGUI** |
-|:--:|
-| ![logo](images/icon_about_SolverlabGUI.png) |
+- Needs python sphinx-build to make doc html
+- solverlabGUI.pdf and html's are pushed in git
+  to get up-to-date documentation directly from git clone
+- Compilation sphinx have to be *done before* MATIX-sat compilation.
 
-</center>
+```
+# may be to get python/sphinx prerequisites
+matix context
+# or
+conda activate py3
 
-The Solverlab GUI code is a [Graphical User Interface](https://en.wikipedia.org/wiki/Graphical_user_interface)
-used to perform simulations with [Solverlab physical models](https://github.com/ndjinga/SOLVERLAB/blob/master/CoreFlows/Documentation/PhysicalModels.md).
+cd solverlabGUI
 
-The Solverlab GUI is designed with the library [PACKAGESPY](https://github.com/ndjinga/PACKAGESPYGUI), which is based on [PyQt5](https://pypi.org/project/PyQt5) and [Python3](https://docs.python.org/3.5) scripts files.
+# to make doc html apidoc on commands dir ok
+export PYTHONPATH=$(pwd)
 
+cd doc
+rm -rf buid/*
+make html
+firefox build/html/index.html &
 
+# to make doc pdf
+# needs texlive up to date (done on machines lgls for x86_64-linux)
+# https://www.tug.org/texlive/quickinstall.html
 
-User's manual
-==============
+# an example of set PATH's
+export TEX_ROOT_PATH=/data/tmplgls/wambeke/share/texlive/2017
+export INFOPATH=${TEX_ROOT_PATH}/texmf-dist/doc/info
+export MANPATH=${TEX_ROOT_PATH}/texmf-dist/doc/man
+export PATH=${TEX_ROOT_PATH}/bin/x86_64-linux:${PATH}
 
-   [Installation](svlinstallation.rst)  
-   [Solverlab GUI main widget](iramainwidget.rst)  
-   [Usage](generaluse.rst)  
-   [Physical models](modelusage.rst)  
-
-
-
-Programmer's guide
-====================
-
-   [Launch in background](background.rst)  
-   [How to add a new physical model to SolverlabGUI](packagespy.rst)  
-
-
-
+cd doc
+make latexpdf
+# makefile copy build/latex/solverlabGUI.pdf in src/solverlabDocuments
+evince build/latex/solverlabGUI.pdf &
+evince src/solverlabDocuments/solverlabGUI.pdf &
+```
