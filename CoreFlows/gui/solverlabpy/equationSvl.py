@@ -7,6 +7,7 @@ from xyzpy.intFloatListXyz import StrInListXyz, IntRangeXyz
 
 class Int20Xyz(IntRangeXyz):
   _allowedRange = [-2, 0]
+  _defaultValue = _allowedRange[0]
 
 
 class FieldOptionSvl(_XyzConstrainBase):
