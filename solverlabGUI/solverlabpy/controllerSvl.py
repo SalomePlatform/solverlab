@@ -397,7 +397,7 @@ class ControllerSvl(ControllerXyz):
     eq = self._model.getSelectedEquation()
     if eq is not None:
       # eq.boundary_condition.update()
-      print("ok")
+      logger.warning("TODO RefreshSolverlabModelAction eq is not None :\nmay be eq.boundary_condition.update")
     for treeView in self.treeViews:
       # treeView.update()
       treeView.refreshModel()
