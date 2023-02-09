@@ -138,7 +138,7 @@ class SOLVERLABDesktop( QObject ):
        log(" activateDesktop done: %s" % self.addTreeDockDone)
        import solverlabpy.configSvl as CFGSVL
        self.config = CFGSVL.getMainConfig()
-       log('config\n%s' % selfconfig )
+       log('config\n%s' % self.config )
 
        if self.addTreeDockDone is False:
          self.createActions()
