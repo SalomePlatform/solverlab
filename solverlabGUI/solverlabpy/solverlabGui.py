@@ -20,9 +20,9 @@
 """
 This file is the main API file for solverlabGUI
 
-| Warning: NO '__main__ ' call allowed, 
+| Warning: NO '__main__ ' call allowed,
 |          Use '../solverlabGUI' (in parent directory)
-| 
+|
 | Usage: see file ../solverlabGUI
 """
 
@@ -33,11 +33,11 @@ _KOSYS = 1 # avoid import src
 
 # Compatibility python 2/3 for input function
 # input stays input for python 3 and input = raw_input for python 2
-try: 
+try:
     input = raw_input
-except NameError: 
+except NameError:
     pass
-  
+
 ########################################################################
 # NO __main__ entry allowed, use '../solverlabGUI' (in parent directory)
 ########################################################################
@@ -113,11 +113,11 @@ def launchSvl(command):
   # env["LANG"] == ''
   res = UTS.Popen(command, env=env, logger=None) # no logger! unittest!
   return res
-    
+
 def getVersion():
   """get version number as string"""
   return solverlabpy.__version__
- 
+
 def assumeAsList(strOrList):
   """return a list as sys.argv if string"""
   if type(strOrList) is list:
@@ -534,6 +534,9 @@ class Svl(object):
       return RCO.ReturnCode("OK", "exit if arguments contains '--help'")
 
     import solverlabpy.configSvl as CFGSVL
+    self.config = CFGSVL.getMainConfig()
+
+    """
     cfgMgr = CFGSVL.ConfigManager(self)
     # as main config, current config from option.workdir/solverlabGUI_*.cfg
     rc = cfgMgr.getMainConfig() # current config from options.workdir/xxx.cfg
@@ -541,6 +544,7 @@ class Svl(object):
       return rc
     self.config = rc.getValue()
     cfgMgr.setMainConfig(self.config) # set as global with CFGSVL.getMainConfig()
+    """
 
     # cvw TODO logger.debug("Configuration values:\n%s", self.config.writeToStr())
 
@@ -722,5 +726,3 @@ class Svl(object):
     msg = "END run GUI, return '%s'" % res
     logger.info(msg)
     return RCO.ReturnCode("OK", msg, res)
-
-

@@ -34,8 +34,7 @@ import solverlabpy.dateTime as DATT
 
 import configparserpy.configParserUtils as CPAU
 
-verbose = False
-
+_verbose = False
 
 _configUserStr = """\
 # User config file solverlabGUI_user.cfg
@@ -93,17 +92,12 @@ logdir = LOG
 
 """
 
-_mainConfig = [None] # EZ use global unique main config (mutable)
+_mainConfig = None # singleton for a general config
+_mainConfigManager = None # singleton for a general config manager
+_SOLVERLABGUI_WORKDIR = None
 
 # import methods for EZ direct use from configSvl
 toListInt = CPAU.toListInt
-
-def getMainConfig():
-  return _mainConfig[0] # have to be set in ConfigManager.getMainConfig()
-
-def getMainConfigCatchAll():
-  return getMainConfig().toCatchAll() # have to be set in ConfigManager.getMainConfig()
-
 
 class ConfigManager(object):
   """
@@ -114,10 +108,17 @@ class ConfigManager(object):
   | file solverlabGUI_default.cfg
   """
 
-  def __init__(self, runner):
-    self.runner = runner
-    self.logger = runner.getLogger()
-    self.options = runner.getOptions()
+  def __init__(self, runner=None):
+
+    if runner is not None:
+      self.runner = runner
+      # self.logger = runner.getLogger()
+      self.options = runner.getOptions()
+    else:
+      self.runner = None
+      # self.logger = None
+      self.options = None
+
     self.fileUser = "solverlabGUI_user.cfg"
     self.fileDefault = "solverlabGUI_default.cfg"
     # better store string as ready to create new config instance(s)
@@ -128,7 +129,16 @@ class ConfigManager(object):
     self._configDefaultStr = _configDefaultStr
 
   def getWorkdir(self):
-    return self.options.workdir
+    global _SOLVERLABGUI_WORKDIR
+    if self.options is not None:
+      return self.options.workdir
+    else:
+      if _SOLVERLABGUI_WORKDIR is None:
+        default = "${HOME}/SOLVERLABGUI_WORKDIR"
+        res = os.getenv("SOLVERLABGUI_WORKDIR", default)
+        _SOLVERLABGUI_WORKDIR = os.path.realpath(os.path.expandvars(res))
+        if _verbose: print("configSvl default workdir %s" % _SOLVERLAB_WORKDIR)
+      return _SOLVERLABGUI_WORKDIR
 
   def getRealPath(self, name):
     res = os.path.join(self.getWorkdir(), name)
@@ -218,7 +228,7 @@ _modes = {
 }
 
 _currentMode = ["simple"] # list as global mutable
-if verbose: print("set _currentMode", _currentMode[0])
+if _verbose: print("set _currentMode", _currentMode[0])
 
 """
 def getUserName():
@@ -247,7 +257,7 @@ def setCurrentMode(modeName):
 
 def getCurrentMode():
   res = _currentMode[0]
-  if verbose: print("getCurrentMode", res)
+  if _verbose: print("getCurrentMode", res)
   return res
 
 def isHidden(item, nameAttr=None, modeName=None):
@@ -266,7 +276,7 @@ def isHidden(item, nameAttr=None, modeName=None):
   res = False
   for i in hidden:
     if fnmatch.fnmatch(name, "*" + i):
-      # if verbose: print("fnmatch hidden ", name, "*" + i)
+      # if _verbose: print("fnmatch hidden ", name, "*" + i)
       res = True
       break
     # else:
@@ -274,3 +284,19 @@ def isHidden(item, nameAttr=None, modeName=None):
   # DBG.write("congigSvl.isHidden '%s' %s" % (name, res), "")
   return res
 
+
+def getMainConfig():
+  global _mainConfig
+  global _mainConfigManager
+  if _mainConfig is None:
+    _mainConfigManager = ConfigManager()
+    rc = _mainConfigManager.getMainConfig() # current config from options.workdir/xxx.cfg
+    if not rc.isOk():
+      raise Exception("Problem getMainConfig : %s" % rc)
+    _mainConfig = rc.getValue()
+  if _verbose: print("configSvl.getMainConfig()\n%s" % _mainConfig)
+  return _mainConfig  # set as main singleton ConfigManager.getMainConfig()
+
+def getMainConfigCatchAll():
+  res = getMainConfig()
+  return res.toCatchAll() # have to be set in ConfigManager.getMainConfig()

@@ -124,18 +124,18 @@ def windows():
 
 def views():
     """
-    for centralwidget, this method is called when module is initialized. 
+    for centralwidget, this method is called when module is initialized.
     It returns a list of 2D/3D views to be used by the module
     """
     log(" views()")
     return []
 
 def createPreferences():
-    """This method is called when module is initialized. It exports module preferences"""  
+    """This method is called when module is initialized. It exports module preferences"""
     pass
 
 def activate():
-    """This method is called when module is initialized. It returns True if activating is successfull, False otherwise"""    
+    """This method is called when module is initialized. It returns True if activating is successfull, False otherwise"""
     global moduleDesktops
     log(" activate()")
     study = str(getStudy())
@@ -210,5 +210,3 @@ def engineIOR():
     res = getEngineIOR()
     log(" engineIOR(): %s" % res)
     return res
-
-

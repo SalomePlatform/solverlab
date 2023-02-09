@@ -19,7 +19,7 @@ _NAMEGUI = "SOLVERLABGUI"
 _Name = _NAME.title()
 
 def verbose():
-  return False
+  return True
 
 def log(mess):
   if verbose: MUT.log_print(_NAME+ "Desktop" + mess)
@@ -49,6 +49,7 @@ class SOLVERLABDesktop( QObject ):
        #Getting the help file
        self._helpFile = os.path.join( os.getenv(_NAMEGUI + "_ROOT_DIR"),"doc","index.html" )
        self._actions = []
+       self.config = None  # user configuration will come from file ${SOLVERLAB_WORKDIR}/*cfg
 
    def tryHide(self, anObject):
        """avoid RuntimeError: wrapped C/C++ object of type QDockWidget has been deleted"""
@@ -106,24 +107,24 @@ class SOLVERLABDesktop( QObject ):
          return
 
        for aDock in toTabify[1:]:
-         if isinstance(aDock, str): 
+         if isinstance(aDock, str):
            theDock = self.findDockByName(aDock)
          else:
            if isinstance(aDock, QDockWidget):
              theDock = aDock
            else:
              theDock = None
-         if theDock == None : continue 
+         if theDock == None : continue
          self._sgDesktop.tabifyDockWidget(aFirstDock, theDock)
 
    def getWidgetDialogBox(self):
        #only one, which change title and inside
-       if self._widgetDialogBox == None: 
+       if self._widgetDialogBox == None:
          self._widgetDialogBox = QDockWidget( self._sgDesktop )
        return self._widgetDialogBox
 
 
-   def createTreeView( self, treeView=None ): 
+   def createTreeView( self, treeView=None ):
        log(" createTreeView")
        self._globalTree = self._controller.treeViews[0] #TreeWidget( self )
        self._dockGlobalTree = self._controller.docks[0]
@@ -132,9 +133,13 @@ class SOLVERLABDesktop( QObject ):
        self._dockGlobalTree = QDockWidget( _Name + "Objects", self._sgDesktop )
        self._dockGlobalTree.setWidget( self._globalTree )
        """
-       
+
    def activateDesktop( self ):
        log(" activateDesktop done: %s" % self.addTreeDockDone)
+       import solverlabpy.configSvl as CFGSVL
+       self.config = CFGSVL.getMainConfig()
+       log('config\n%s' % selfconfig )
+
        if self.addTreeDockDone is False:
          self.createActions()
          self.createMenus()
@@ -146,7 +151,7 @@ class SOLVERLABDesktop( QObject ):
          self.addTreeDockDone=True
          #self.createPlotView()
          #self.createWindowForLog()
-         
+
        self.getGlobalSimplePlotView()
        self.getGlobalWindowForLog()
        if self._globalSimplePlotViewID is not None:
@@ -215,12 +220,12 @@ class SOLVERLABDesktop( QObject ):
        self._globalSimplePlotView = MatplotlibWindowToolbar()
        self._globalSimplePlotViewID = self._sgPyQt.createView( _Name + "Plot", self._globalSimplePlotView )
        log(" createPlotView controller: %i view: %i" % ( id(self._controller), self._globalSimplePlotViewID ))
-   
+
    def createWindowForLog( self ):
        if self._controller.centralLogView is None: # sometimes gui user delete viewer, recreate it!
          self._controller.addCentral()
        centralLogView = self._controller.centralLogView
-       for dock in centralLogView.docks: 
+       for dock in centralLogView.docks:
          self.tryHide(dock) # only tabs, not treeview
        self._globalWindowForLog = centralLogView
        self._globalWindowForLogID = self._sgPyQt.createView( _Name + "Log", self._globalWindowForLog )
@@ -229,11 +234,11 @@ class SOLVERLABDesktop( QObject ):
    def activatePlotView( self ):
        if self._globalSimplePlotViewID != None:
          self._sgPyQt.activateView( self._globalSimplePlotViewID)
-   
+
    def activateLogView( self ):
        if self._globalWindowForLogID != None:
          self._sgPyQt.activateView( self._globalWindowForLogID )
-   
+
    def createActions( self ):
        ii = self._END_ID  #marging if user want to set some actions directly
        if self._controller == None: return
@@ -275,5 +280,3 @@ class SOLVERLABDesktop( QObject ):
 
    def getDockGlobalTree( self ):
        return self._dockGlobalTree
-
-
