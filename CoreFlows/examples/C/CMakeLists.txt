@@ -49,8 +49,22 @@ CreateTestExecAndInstall(CoupledTransportDiffusionEquations_1DHeatedChannel.cxx 
 
 CreateTestExecAndInstall(TransportEquation_1DHeatedChannel.cxx  "${libs_for_tests}" "C++ fv transport 1D heating structured coreflows" )
 
-CreateTestExecAndInstall(DiffusionEquation_1DHeatedRod.cxx  "${libs_for_tests}" "C++ fv diffusion 1D heating structured coreflows" )
-CreateTestExecAndInstall(DiffusionEquation_1DHeatedRod_FE.cxx  "${libs_for_tests}" "C++ fe diffusion 1D heating structured coreflows" )
+CreateTestExecAndInstall(DiffusionEquation_1DHeatedRod.cxx  "${libs_for_tests}" "C++ fv diffusion 1D explicit heating structured coreflows" )
+CreateTestExecAndInstall(DiffusionEquation_1DHeatedRod_Implicit.cxx  "${libs_for_tests}" "C++ fv diffusion 1D implicit heating structured coreflows" )
+CreateTestExecAndInstall(DiffusionEquation_1DHeatedRod_FE.cxx  "${libs_for_tests}" "C++ fe diffusion 1D explicit heating structured coreflows" )
+CreateTestExecAndInstall(DiffusionEquation_1DHeatedRod_FE_Implicit.cxx  "${libs_for_tests}" "C++ fe diffusion 1D implicit heating structured coreflows" )
+add_executable(DiffusionEquation_2D_SQUARE_Implicit.exe DiffusionEquation_2D_SQUARE_Implicit.cxx)
+target_link_libraries(DiffusionEquation_2D_SQUARE_Implicit.exe CoreFlowsLibs )
+install(TARGETS DiffusionEquation_2D_SQUARE_Implicit.exe DESTINATION share/examples)
+
+add_test(NAME DiffusionEquation_2D_SQUARE_Implicit_FE_Neumann.exe         COMMAND ./DiffusionEquation_2D_SQUARE_Implicit.exe FE NEUMANN )     
+  set_property (TEST DiffusionEquation_2D_SQUARE_Implicit_FE_Neumann.exe PROPERTY LABELS "C++ diffusion heating 2D fe Neumann squares SQUARE coreflows")     
+add_test(NAME DiffusionEquation_2D_SQUARE_Implicit_FE_Dirichlet.exe         COMMAND ./DiffusionEquation_2D_SQUARE_Implicit.exe FE Dirichlet )     
+  set_property (TEST DiffusionEquation_2D_SQUARE_Implicit_FE_Dirichlet.exe PROPERTY LABELS "C++ diffusion heating 2D fe Dirichlet squares SQUARE coreflows")     
+add_test(NAME DiffusionEquation_2D_SQUARE_Implicit_FV_Neumann.exe         COMMAND ./DiffusionEquation_2D_SQUARE_Implicit.exe FV Neumann )     
+  set_property (TEST DiffusionEquation_2D_SQUARE_Implicit_FV_Neumann.exe PROPERTY LABELS "C++ diffusion heating 2D fv Neumann squares SQUARE coreflows")     
+add_test(NAME DiffusionEquation_2D_SQUARE_Implicit_FV_Dirichlet.exe         COMMAND ./DiffusionEquation_2D_SQUARE_Implicit.exe FV DIRICHLET )     
+  set_property (TEST DiffusionEquation_2D_SQUARE_Implicit_FV_Dirichlet.exe PROPERTY LABELS "C++ diffusion heating 2D fv Dirichlet squares SQUARE coreflows")     
 
 CreateTestExecAndInstall(StationaryDiffusionEquation_2DEF_StructuredTriangles.cxx  "${libs_for_tests}" "C++ fe stationary diffusion 2D dirichlet structured triangles coreflows" )
 CreateTestExecAndInstall(StationaryDiffusionEquation_2DEF_StructuredTriangles_Neumann.cxx  "${libs_for_tests}" "C++ fe stationary diffusion 2D neumann structured triangles coreflows" )
@@ -86,6 +100,7 @@ CreateTestExecAndInstall(IsothermalSinglePhase_1DRiemannProblem.cxx  "${libs_for
 CreateTestExecAndInstall(IsothermalSinglePhase_1DRiemannProblem_Implicit.cxx  "${libs_for_tests}" "C++ fv isothermalsinglephase 1D implicit upwind riemann structured coreflows" )
 CreateTestExecAndInstall(IsothermalSinglePhase_1DChannelGravity_Incompressible.cxx "${libs_for_tests}" "C++ fv isothermalsinglephase 1D incompressible implicit staggered gravity structured coreflows" )
 CreateTestExecAndInstall(IsothermalSinglePhase_2DLidDrivenCavity_Incompressible.cxx "${libs_for_tests}" "C++ fv isothermalsinglephase 1D incompressible  implicit staggered viscosity structured coreflows" )
+CreateTestExecAndInstall(IsothermalSinglePhase_2DPoiseuilleFlow.cxx "${libs_for_tests}" "C++ fv isothermalsinglephase 1D incompressible  implicit staggered viscosity structured coreflows" )
 
 CreateTestExecAndInstall(DriftModel_1DBoilingAssembly.cxx  "${libs_for_tests}" "C++ fv driftmodel 1D heating boiling structured coreflows" )
 CreateTestExecAndInstall(DriftModel_1DBoilingChannel.cxx  "${libs_for_tests}" "C++ fv driftmodel 1D heating boiling structured coreflows" )
@@ -181,7 +196,7 @@ if( SOLVERLAB_WITH_MPI )#Tests parallèles
   add_test(NAME WaveSystem_3DFV_SphericalExplosion_MPI_2Procs_CUBE.exe           COMMAND "${MPIEXEC}" "-n" "2" "./WaveSystem_FV_SphericalExplosion_MPI.exe" resources/meshCube.med) 
   set_property (TEST WaveSystem_3DFV_SphericalExplosion_MPI_2Procs_CUBE.exe PROPERTY LABELS "C++ wave 3D fv riemann mpi 2Proc tetrahedra CUBE cdmath")     
   add_test(NAME WaveSystem_3DFV_SphericalExplosion_MPI_2Procs_TETRAHEDRON.exe    COMMAND "${MPIEXEC}" "-n" "2" "./WaveSystem_FV_SphericalExplosion_MPI.exe" resources/meshTetrahedron10.med) 
-  set_property (TEST WaveSystem_3DFV_SphericalExplosion_MPI_2Procs_TETRAHEDRON.exe PROPERTY LABELS "C++ wave 3D fv riemann mpi 2Proc tetrahedra TETRAHEDRON cdmath")
+  set_property (TEST WaveSystem_3DFV_SphericalExplosion_MPI_2Proc_TETRAHEDRON.exe PROPERTY LABELS "C++ wave 3D fv riemann mpi 2Proc tetrahedra TETRAHEDRON cdmath")     
 
 endif( SOLVERLAB_WITH_MPI )
 
