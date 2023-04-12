@@ -35,6 +35,12 @@ class Field
 
     /**
     * constructor with data:
+    * @param field : the medcouplingfield
+    */
+    Field(const MEDCoupling::MCAuto<MEDCoupling::MEDCouplingFieldDouble> field ) ;
+
+    /**
+    * constructor with data:
     * @param fieldName : name of the field
     * @param type : type of the field
     * @param mesh : mesh of the field
@@ -204,6 +210,7 @@ class Field
                        int iteration = -1,
                        int order = -1) ;
 
+    //Allocation d'un tableau pour le stockage des valeurs du champs_field
     void buildFieldMemoryStructure();
 
     MEDCoupling::DataArrayDouble * getArray();
@@ -244,7 +251,7 @@ class Field
      * return the MEDCouplingField pointer
      * return _field
      */
-    MEDCoupling::MCAuto<MEDCoupling::MEDCouplingFieldDouble> getField ( void )  const ;
+    MEDCoupling::MCAuto<MEDCoupling::MEDCouplingFieldDouble> getMEDCouplingField ( void )  const ;
 
     void setFieldByMEDCouplingFieldDouble ( const MEDCoupling::MEDCouplingFieldDouble* field );
 
