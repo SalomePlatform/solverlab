@@ -32,6 +32,8 @@
 #include "Face.hxx"
 #include "CdmathException.hxx"
 
+#include "MEDCouplingFieldDouble.hxx"
+
 using namespace std;
 
 //! enumeration linearSolver
@@ -352,6 +354,14 @@ public :
 	 * \param [out] void
 	 *  */
 	void setInitialField(const Field &VV);
+
+	/** \fn setInitialField
+	 * \brief sets the initial field
+	 * \details
+	 * \param [in] MEDCouplingField
+	 * \param [out] void
+	 *  */
+	void setInitialField( const MEDCoupling::MCAuto<MEDCoupling::MEDCouplingFieldDouble> myMEDCouplingield );
 
 	/** \fn setInitialField
 	 * \brief sets the initial field from a field in a med file
