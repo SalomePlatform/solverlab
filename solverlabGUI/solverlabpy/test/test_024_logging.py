@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
 
-#  Copyright (C) 2010-2018  CEA/DEN
+#  Copyright (C) 2010-2023  CEA
 #
 #  This library is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU Lesser General Public
