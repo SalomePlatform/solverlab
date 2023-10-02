@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Solverlab typeClass="ModelSvl" treePyName="" icon="solverlabpy.resources.solverlabgui">
   <GeometryMed typeClass="DataFromFileMedXyz" treePyName=".GeometryMed" icon="datafromfilemed">
-    <fileMed typeClass="FileOnlyBrowseXyz" treePyName=".GeometryMed.fileMed"> {SOLVERLAB_SRC}/CoreFlows/examples/resources/meshSquare.med</fileMed>
+      <fileMed typeClass="FileOnlyBrowseXyz" treePyName=".GeometryMed.fileMed"> ${SOLVERLAB_ROOT_DIR}/share/examples/resources/meshSquare.med</fileMed>
     <contents typeClass="BaseFreeXyz" treePyName=".GeometryMed.contents">
       <Header typeClass="StrNoEditionXyz" treePyName=".GeometryMed.contents.Header">             </Header>
       <fields typeClass="ListOfBaseXyz" treePyName=".GeometryMed.contents.fields" size="10">

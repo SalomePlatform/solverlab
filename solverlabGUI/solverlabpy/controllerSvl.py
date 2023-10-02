@@ -175,6 +175,9 @@ class ControllerSvl(ControllerXyz):
 
     self.isController = True
 
+    self.SOLVERLABGUI_ROOT_DIR = os.getenv("SOLVERLABGUI_ROOT_DIR")
+    self.SOLVERLABGUI_WORKDIR = os.getenv("SOLVERLABGUI_WORKDIR")
+
   def __initialize(self):
     if self.initializeDone == True:
       logger.error("initialize only once for controller %s" % (self.objectName()))
@@ -325,8 +328,7 @@ class ControllerSvl(ControllerXyz):
 
   def SolverlabGuiHelpAction(self):
     nameBrowser = UXYZ.getBrowser()
-    tmp = "${SOLVERLABGUI_ROOT_DIR}/doc/build/html/index.html".split("/")
-    tmp = os.path.join(*tmp)
+    tmp = os.path.join(self.SOLVERLABGUI_ROOT_DIR, 'doc', 'build', 'html', 'index.html')
     nameUrlHelp = os.path.expandvars(tmp)
     if os.path.exists(nameUrlHelp):
       cmd = "%s %s &" % (nameBrowser, nameUrlHelp)
@@ -336,8 +338,7 @@ class ControllerSvl(ControllerXyz):
 
   def SolverlabCodeHelpAction(self):
     nameBrowser = UXYZ.getBrowser()
-    tmp = "${SOLVERLAB_ROOT_DIR}/share/doc/CoreFlows.pdf".split("/")
-    tmp = os.path.join(*tmp)
+    tmp = os.path.join(self.SOLVERLABGUI_ROOT_DIR, 'share', 'doc', 'CoreFlows.pdf')
     nameUrlHelp = os.path.expandvars(tmp)
     if os.path.exists(nameUrlHelp):
       cmd = "%s %s &" % (nameBrowser, nameUrlHelp)
@@ -411,11 +412,11 @@ class ControllerSvl(ControllerXyz):
 
   def LaunchAllTestsAction(self):
     # cmd = "AllTestLauncher.py 2>&1" #unittests strerr to stdout
-    filesh = os.path.expandvars('${SOLVERLABGUI_ROOT_DIR}/bin/AllSolverlabGuiTestLauncher.sh')
+    filesh = os.path.join(self.SOLVERLABGUI_ROOT_DIR, 'bin', 'AllSolverlabGuiTestLauncher.sh')
     if os.path.exists(filesh):
-      cmd = "cd ${SOLVERLABGUI_ROOT_DIR}; pwd ; ./bin/AllSolverlabGuiTestLauncher.sh"
+      cmd = "cd " + self.SOLVERLABGUI_ROOT_DIR + "; pwd ; ./bin/AllSolverlabGuiTestLauncher.sh"
     else:
-      cmd = "cd ${SOLVERLABGUI_ROOT_DIR}; pwd ; ./bin/AllTestLauncher.sh"
+        cmd = "cd " + self.SOLVERLABGUI_ROOT_DIR + "; pwd ; ./bin/AllTestLauncher.sh"
     logger.debug("LaunchAllTestsAction '%s'" % cmd)
     self.centralLogView.launchCmdIntoPopen(cmd)
     return True
@@ -430,8 +431,7 @@ class ControllerSvl(ControllerXyz):
   def SolverlabExampleAction(self):
     from widgetpy.salomeQFileDialog import SalomeQFileDialog
     aDialog = SalomeQFileDialog(parent=self._desktop)
-    aDir = os.getenv("SOLVERLABGUI_ROOT_DIR")
-    aDir = os.path.join(aDir, "example", "model")
+    aDir = os.path.join(self.SOLVERLABGUI_ROOT_DIR, "example", "model")
     nameFile = aDialog.browseFileDialog('Load Solverlab file xml', aDir, "(*.xml *.XML)", [])
     logger.debug("LoadSolverlabModelXml %s" % nameFile)
     if nameFile == "": return True  # cancel
@@ -794,7 +794,7 @@ class ControllerSvl(ControllerXyz):
       nameFile = os.path.join(etudeDir, self._solverlabXmlDefaultName)
       self._model.toFileXml(nameFile)
 
-    shutil.copy2("./solverlabpy/runSolverlab.py", self.getEtudeWorkdirExpanded())
+    shutil.copy2(self.SOLVERLABGUI_ROOT_DIR + "/solverlabpy/runSolverlab.py", self.getEtudeWorkdirExpanded())
 
     if platform.system() == "Windows":
       name = "launchSOLVERLAB.bat"
@@ -930,8 +930,11 @@ echo "launchTime="`date` >> lock
 echo "launchDirectory="`pwd` >> lock
 rm -f lock_old
 
+python {SOLVERLABGUI_ROOT_DIR}/solverlabpy/runSolverlab.py solverlabGui.xml
 
-mpirun -n {nbproc} python ../../runSolverlab.py solverlabGui.xml
+if [ $? -ne 0  ]; then
+    echo "run test failed !"
+fi
 
 echo "pidSolverlab="$! >> lock
 cat lock
