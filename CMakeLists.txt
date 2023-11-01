@@ -17,7 +17,6 @@ set (SOLVERLAB_VERSION ${SOLVERLAB_VERSION_MAJOR}.${SOLVERLAB_VERSION_MINOR}.${S
 
 option (SOLVERLAB_WITH_DOCUMENTATION "Generate SOLVERLAB documentation" ON)
 option (SOLVERLAB_WITH_PYTHON        "Generate Python interface of SOLVERLAB using SWIG" ON)
-option (SOLVERLAB_WITH_GUI           "Compile a Graphic user Interface for SOLVERLAB" OFF)
 option (SOLVERLAB_WITH_PACKAGE       "Generate RPM, Debian and tarball packages" OFF)
 option (SOLVERLAB_WITH_COREFLOWS     "Generate COREFLOWS module" ON)
 option (SOLVERLAB_WITH_PETSC         "Link with PETSc for linear systems" ON)
@@ -35,7 +34,6 @@ set (MEDCOUPLING_ROOT_DIR OFF CACHE STRING "MEDCoupling library path" )
 set (PYTHON_ROOT_DIR      OFF CACHE STRING "Python library path" )
 set (PARAVIEW_ROOT_DIR    OFF CACHE STRING "PARAVIEW library path" )
 set (MPI4PY_ROOT_DIR      OFF CACHE STRING "MPI4PY library path" )
-set (PACKAGESPY_ROOT_DIR  OFF CACHE STRING "PACKAGESPY library path" )
 
 #url of tarball librairies
 set (DOWNLOAD_PETSC         https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-3.17.0.tar.gz
@@ -56,8 +54,6 @@ set (DOWNLOAD_HYPRE         https://github.com/hypre-space/hypre/archive/v2.25.0
      CACHE STRING           "HYPRE tarball path/url" )
 set (DOWNLOAD_MPI4PY         https://bitbucket.org/mpi4py/mpi4py/downloads/mpi4py-3.1.3.tar.gz
      CACHE STRING           "MPY4PY tarball path/url" )
-set (DOWNLOAD_PACKAGESPY    https://github.com/ndjinga/PACKAGESPYGUI/archive/refs/heads/main.zip
-     CACHE STRING           "PACKAGESPY zip file path/url" )
 
 
 include(ExternalProject)#For PETSc, MED and MEDCoupling
@@ -615,14 +611,6 @@ IF   ( NOT DEFINED MATPLOTLIB_ROOT_DIR )
     set(MATPLOTLIB_ROOT_DIR $ENV{MATPLOTLIB_ROOT_DIR} )
 ENDIF( NOT DEFINED MATPLOTLIB_ROOT_DIR )
 
-#For GUI : PyQt5 root dir
-if   ( SOLVERLAB_WITH_GUI )
-  IF   ( NOT DEFINED PYQT5_ROOT_DIR )
-    set(PYQT5_ROOT_DIR $ENV{PYQT5_ROOT_DIR} )
-  ENDIF( NOT DEFINED PYQT5_ROOT_DIR )
-  find_package(PyQt5)
-endif   ( SOLVERLAB_WITH_GUI )
-
 #Paraview library paths
 set (PV_LIB_DIR    /usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:${MATPLOTLIB_ROOT_DIR}/lib/:${PARAVIEW_LIBRARIES_DIR})
 set (PV_PYTHON_DIR /usr/lib/python${Python_VERSION_MAJOR}/dist-packages/:/usr/lib/python${Python_VERSION_MAJOR}/dist-packages/paraview/:/usr/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages/paraview/:/usr/lib64/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtk/:/usr/lib64/paraview/site-packages/:/usr/lib64/paraview/site-packages/paraview/:/usr/lib64/paraview/site-packages/vtk/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/paraview/:/usr/lib64/paraview/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules:/usr/lib/paraview/site-packages/paraview:/usr/lib/paraview/site-packages/paraview/vtk:${PARAVIEW_ROOT_DIR}/lib/:${PARAVIEW_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/:${PARAVIEW_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/vtkmodules/:${MATPLOTLIB_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages:${PYQT5_ROOT_DIR}:${PYQT5_ROOT_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages)
@@ -701,10 +689,6 @@ if (SOLVERLAB_WITH_DOCUMENTATION)                                               
   find_package(Sphinx)
   add_custom_target (doc-sphinx COMMAND ${SPHINX_EXECUTABLE} -M html "${PROJECT_SOURCE_DIR}/CoreFlows/Documentation"  "${PROJECT_BINARY_DIR}/doc/sphinx-doc" SOURCES ${PROJECT_SOURCE_DIR}/CoreFlows/Documentation)                                            #
 
-  if   ( SOLVERLAB_WITH_GUI )
-    add_custom_target (docGUI COMMAND ${SPHINX_EXECUTABLE} -M html "${PROJECT_SOURCE_DIR}/CoreFlows/gui/doc"  "${PROJECT_BINARY_DIR}/CoreFlows/gui/doc/gui-doc" SOURCES ${PROJECT_SOURCE_DIR}/CoreFlows/gui/doc)                                            #
-    install (DIRECTORY ${PROJECT_BINARY_DIR}/CoreFlows/gui/doc/gui-doc/html DESTINATION share/doc/solverlab-gui-doc OPTIONAL)                  #
-  endif( SOLVERLAB_WITH_GUI )
 endif(SOLVERLAB_WITH_DOCUMENTATION)
 
 if (SOLVERLAB_WITH_TESTS)                                                                                  #
