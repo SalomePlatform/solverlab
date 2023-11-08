@@ -18,10 +18,10 @@
 # See http://www.salome-platform.org or email : webmaster.salome@opencascade.com
 # %% LICENSE_END
 
-
-
-# 2020 THIS IS NOT WORKING !!!!!!!!!
-
+# WARNING: This file is not used and is not working. 
+#          It's an archive of an old build procedure based on CMake
+#          Instead, the present build procedure directly copy 
+#          and use the Makefile located in the source directory
 
 SALOME_CONFIGURE_FILE(src/conf.py conf.py)
 # SALOME_CONFIGURE_FILE(utilSphinxSalome.py utilSphinxSalome.py)

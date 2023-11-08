@@ -35,6 +35,7 @@
     <parameter name="SOLVERLABGUI"    value="%SOLVERLABGUI_ROOT_DIR%/share/salome/resources/solverlabgui"/>
   </section>
   <section name="solverlab_help" >
-    <parameter name="Developer's Guide/SOLVERLAB module/Developer's Guide" value="%SOLVERLAB_ROOT_DIR%/share/doc/coreflows-dev-doc/html/index.html"/>
+    <parameter name="Developer's Guide/SOLVERLABGUI module" value="%SOLVERLAB_ROOT_DIR%/share/doc/coreflows-dev-doc/html/index.html"/>
+    <parameter name="User's Guide/SOLVERLABGUI module" value="%SOLVERLABGUI_ROOT_DIR%/doc/build/html/index.html"/>
   </section>
 </document>

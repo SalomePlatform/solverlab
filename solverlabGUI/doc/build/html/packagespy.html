@@ -1,23 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>Packagespy &#8212; solverlabGUI 0.0.1 documentation</title>
-    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
-    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-    <script type="text/javascript" src="_static/jquery.js"></script>
-    <script type="text/javascript" src="_static/underscore.js"></script>
-    <script type="text/javascript" src="_static/doctools.js"></script>
-    <script type="text/javascript" src="_static/language_data.js"></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Packagespy &#8212; SOLVERLABGUI 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Release notes" href="release_notes/release_notes_1.0.0.html" />
-    <link rel="prev" title="Background" href="background.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -32,12 +29,12 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <div class="section" id="packagespy">
+  <section id="packagespy">
 <span id="id1"></span><h1>Packagespy<a class="headerlink" href="#packagespy" title="Permalink to this headline">¶</a></h1>
 <p>Packagespy est une bibliothèque python développé au CEA permettant la création d’interface graphique. Elle est basé sur le design du Model-Vue-Controller.
 Le Model est une structure de donnée de type Arbre ou les feuilles contiennent les valeurs.
 (Chaque partie est normalement indépendante et ne peux pas agir directement sur l’autre ainsi elle communique la l’aide de request au coeur de l’api)</p>
-<div class="section" id="vue">
+<section id="vue">
 <h2>Vue<a class="headerlink" href="#vue" title="Permalink to this headline">¶</a></h2>
 <p>Packagespy a d’abord été pensé pour une disposition graphique spécifique et est basé sur PyQt5. Un arbre (TREEVIEW) dans le dock de gauche, un barre d’action (TOOLBAR) dans le dock du haut et une fenetre central pour afficher du contenu.
 La classe TreeXmlXyz peut être directement instancié et utilisera donc des réglages par defaut.
@@ -49,27 +46,27 @@ On peut aussi la dériver et créer un affichage spécifique pour une applicatio
   <span class="n">Text</span> <span class="o">=</span> <span class="mi">1</span>
   <span class="n">Attributes</span> <span class="o">=</span> <span class="mi">2</span>
 
-  <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+  <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
   <span class="nb">super</span><span class="p">(</span><span class="n">TreeViewSvl</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
 
   <span class="bp">self</span><span class="o">.</span><span class="n">setHeaderLabels</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">COLS</span><span class="o">.</span><span class="n">labels</span><span class="p">)</span>
-  <span class="bp">self</span><span class="o">.</span><span class="n">setAlternatingRowColors</span><span class="p">(</span><span class="bp">True</span><span class="p">)</span>
+  <span class="bp">self</span><span class="o">.</span><span class="n">setAlternatingRowColors</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
   <span class="bp">self</span><span class="o">.</span><span class="n">formats_treeview</span> <span class="o">=</span> <span class="n">FORMATS_TREEVIEW</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="model">
+</section>
+<section id="model">
 <h2>Model<a class="headerlink" href="#model" title="Permalink to this headline">¶</a></h2>
 <p>Le Model est la structure de donnée qui va enregistrer les données entrées par l’utilisateur. Packagespy à été concu pour fonctionner avec un arbre de donnée. Chaque noeud comportant une Key, son nom et une Value, sa classe.</p>
 <p>Toute les classes utilisées en tant que noeud doivent hérité de xyz.BaseFreeXyz
 Packagespy fournit des classes abstraites (reconnaissable car commançant par “_” ) ainsi que des classes basique permettant de répondre a une grande parties des besoins de la plupart des structures de données necessaire aux lancements des applications.</p>
 <p>Une classe typique est composé de 3 éléments:</p>
 <ul class="simple">
-<li>_attributesList : une liste contenant les fils du noeud actuel.</li>
-<li>_helpDict : un dictionnaire contenant des tooltips a afficher a l’utilisateur pour chaque fils du noeud.</li>
-<li>__init__ : la fonction qui va definir le comportement a l’initialisation.</li>
+<li><p>_attributesList : une liste contenant les fils du noeud actuel.</p></li>
+<li><p>_helpDict : un dictionnaire contenant des tooltips a afficher a l’utilisateur pour chaque fils du noeud.</p></li>
+<li><p>__init__ : la fonction qui va definir le comportement a l’initialisation.</p></li>
 </ul>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">xyzpy.classFactoryXyz</span> <span class="kn">as</span> <span class="nn">CLFX</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">xyzpy.classFactoryXyz</span> <span class="k">as</span> <span class="nn">CLFX</span>
 <span class="kn">from</span> <span class="nn">xyzpy.intFloatListXyz</span> <span class="kn">import</span> <span class="n">StrInListXyz</span> <span class="c1">#only need to import class we want to derivate.</span>
 <span class="kn">from</span> <span class="nn">xyzpy.baseXyz</span> <span class="kn">import</span> <span class="n">_XyzConstrainBase</span><span class="p">,</span> <span class="n">ListOfBaseXyz</span>
 
@@ -91,7 +88,7 @@ Packagespy fournit des classes abstraites (reconnaissable car commançant par �
 
    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
      <span class="nb">super</span><span class="p">(</span><span class="n">NodeExample</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-     <span class="bp">self</span><span class="o">.</span><span class="n">setIsCast</span><span class="p">(</span><span class="bp">True</span><span class="p">)</span>
+     <span class="bp">self</span><span class="o">.</span><span class="n">setIsCast</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
      <span class="bp">self</span><span class="o">.</span><span class="n">_setAllAttributesList</span><span class="p">()</span>
 
 <span class="k">class</span> <span class="nc">ListExample</span><span class="p">(</span><span class="n">ListOfBaseXy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z</span><span class="p">)</span>
@@ -109,7 +106,7 @@ Packagespy fournit des classes abstraites (reconnaissable car commançant par �
 
   <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="nb">super</span><span class="p">(</span><span class="n">MyModel</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">setIsCast</span><span class="p">(</span><span class="bp">True</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">setIsCast</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_defautNameAsRoot</span> <span class="o">=</span> <span class="s2">&quot;Hotel&quot;</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_setAllAttributesList</span><span class="p">()</span>
 
@@ -117,15 +114,16 @@ Packagespy fournit des classes abstraites (reconnaissable car commançant par �
 </pre></div>
 </div>
 <p>CLFX.appendAllXyzClasses() est une méthode qui permet d’informer n’importe quel partie du code de la présence des classes ajoutées en parametres. Ca permet au code d’intancier un classe uniquement en connaissant son nom.</p>
-</div>
-<div class="section" id="controller">
+</section>
+<section id="controller">
 <h2>Controller<a class="headerlink" href="#controller" title="Permalink to this headline">¶</a></h2>
-<p>Le Controller est la partie du code qui va gérer les interactions entre le Model en mémoire et les actions de l’utilisateur sur la fenetre ainsi que celle avec le code sur lequel la GUI s’appuie.</p>
+<p>Le Controller est la partie du code qui va gérer les interactions entre le Model en mémoire et les actions de l’utilisateur sur la fenetre ainsi que celle avec le code sur lequel la GUI s’appuie.
+Il faut donc créer des signaux pyqt qui vont ensuite pouvoir etre intercepté lorsque l’utilisateur va faire des actions sur la GUI pour pouvoir répondre en conséquence.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="ajouter-un-model-dans-solverlabgui">
+</section>
+<section id="ajouter-un-model-dans-solverlabgui">
 <h2>Ajouter un model dans SolverlabGui<a class="headerlink" href="#ajouter-un-model-dans-solverlabgui" title="Permalink to this headline">¶</a></h2>
 <p>L’ajout d’un nouveau modele utilisable dans l’interface devrait normalement se limiter à la creation d’un model spécifique pour l’équation choisi et du script faisant le lien entre celui ci et solverlab.</p>
 <p>EquationSvl est une classe qui ne doit pas etre instanciée, elle contient tous les paramètres commun aux modèles ainsi que ceux necessaires au fonctionnement de solverlab.
@@ -142,9 +140,9 @@ Il faut donc créer une nouvelle classe pour acceuillir les données specifiques
       <span class="p">]</span>
 </pre></div>
 </div>
-<p>Il faut ensuite</p>
-</div>
-</div>
+<p>Il faut ensuite créer un script qui va faire la liaison entre les données du model et solverlab.</p>
+</section>
+</section>
 
 
           </div>
@@ -155,7 +153,7 @@ Il faut donc créer une nouvelle classe pour acceuillir les données specifiques
             <p class="logo"><a href="index.html">
               <img class="logo" src="_static/icon_applogo_SolverlabGUI.png" alt="Logo"/>
             </a></p>
-<h1 class="logo"><a href="index.html">solverlabGUI</a></h1>
+<h1 class="logo"><a href="index.html">SOLVERLABGUI</a></h1>
 
 
 
@@ -166,52 +164,37 @@ Il faut donc créer une nouvelle classe pour acceuillir les données specifiques
 
 <h3>Navigation</h3>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="svlinstallation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="iramainwidget.html">Solverlab GUI main widget</a></li>
-<li class="toctree-l1"><a class="reference internal" href="generaluse.html">Usage</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modelusage.html">Model</a></li>
-</ul>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="background.html">Background</a></li>
-</ul>
-<ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Packagespy</a></li>
-</ul>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="release_notes/release_notes_1.0.0.html">Release Notes 1.0.0</a></li>
+<li class="toctree-l1"><a class="reference internal" href="main_widget.html">SOLVERLABGUI main widget</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
 </ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="background.html" title="previous chapter">Background</a></li>
-      <li>Next: <a href="release_notes/release_notes_1.0.0.html" title="next chapter">Release notes</a></li>
   </ul></li>
 </ul>
 </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
-<script type="text/javascript">$('#searchbox').show(0);</script>
+<script>$('#searchbox').show(0);</script>
         </div>
       </div>
       <div class="clearer"></div>
     </div>
     <div class="footer">
-      &copy;2018-2020, CEA.
+      &copy;2018-2023, CEA.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.8.5</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |
       <a href="_sources/packagespy.rst.txt"
