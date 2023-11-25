@@ -1,5 +1,5 @@
 
-.. include:: ../rst_prolog.rst
+.. include:: ./rst_prolog.rst
 
 
 .. _packagespy:
@@ -106,6 +106,7 @@ Controller
 ------------
 
 Le Controller est la partie du code qui va gérer les interactions entre le Model en mémoire et les actions de l'utilisateur sur la fenetre ainsi que celle avec le code sur lequel la GUI s'appuie.
+Il faut donc créer des signaux pyqt qui vont ensuite pouvoir etre intercepté lorsque l'utilisateur va faire des actions sur la GUI pour pouvoir répondre en conséquence.
 
 .. code-block:: python
 
@@ -136,7 +137,7 @@ Pour exemple:
           ]
           
           
-Il faut ensuite 
+Il faut ensuite créer un script qui va faire la liaison entre les données du model et solverlab.
 
 
 

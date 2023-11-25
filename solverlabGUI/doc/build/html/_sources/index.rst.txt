@@ -1,67 +1,37 @@
-
-.. include:: ../rst_prolog.rst
-
-.. empty first toctree is used for pdf contents maxdepth, see sphinx/builders/latex/__init__.py, toctrees[0].get('maxdepth')
+.. include:: ./rst_prolog.rst
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
-
-.. _iraHome:
-
-**************
-Solverlab GUI
-**************
+SOLVERLABGUI
+************
 
 .. image:: images/icon_about_SolverlabGUI.png
    :align: center
 
-.. note:: Find *Solverlab code* documentation `here <SolverlabManualPdf_>`_ [1]_.
+Introduction
+============
 
-The Solverlab GUI code is a GUI_ (Graphical User Interface)
-used to perform simulations with `Solverlab physical models <SolverlabPresentationPdf_>`_.
-
-The Solverlab GUI is designed with (Packagespy based on) PyQt5_ and Python3_ scripts files.
-
-
+SOLVERLABGUI is a GUI frontend to the `SOLVERLAB
+<https://github.com/ndjinga/SOLVERLAB>`_ library, integrated inside the `SALOME
+<http://www.salome-platform.org>`_ platform. This documentation gives
+information about how to use the GUI frontend only. For any information about
+the SOLVERLAB library, please consult `its proper documentation
+<https://github.com/ndjinga/SOLVERLAB/blob/master/README.md>`_. 
 
 User's manual
-==============
-
-.. toctree::
-   :maxdepth: 2
-
-   svlinstallation
-   iramainwidget
-   generaluse
-   modelusage
-
-
-
-Programmer's guide
-====================
-
-.. toctree::
-   :maxdepth: 1
-
-   background
-
-Packagespy 
-============   
-(TODO packagespy doc)
-
-.. toctree::
-   :maxdepth: 1
-   
-   packagespy
-
-
-Release Notes
 =============
 
 .. toctree::
    :maxdepth: 1
 
-   Release Notes 1.0.0 <release_notes/release_notes_1.0.0>
+   main_widget
+   usage
 
-.. [1] solverlabGUI/doc/src/solverlabDocuments/20140804_solverlab_manual.pdf
+.. Developer's manual
+.. ===================
+.. TODO add a separate developper documentation
+.. .. toctree::
+..    :maxdepth: 1
+..    
+..    packagespy

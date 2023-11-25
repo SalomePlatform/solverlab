@@ -45,7 +45,7 @@ print("\n\n\nxxxxxxxxxxxxxxxx sphinx on file", __file__)
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
-  #   'sphinx.ext.autodoc',
+    # 'sphinx.ext.autodoc',
      'sphinx.ext.intersphinx',
      'sphinx.ext.todo',
      'sphinx.ext.mathjax',
@@ -55,9 +55,6 @@ extensions = [
 # the following exception was raised:
 # No module named PyQt5
 autodoc_mock_imports = ["PyQt5", ""]
-
-# do not use rst_prolog please use doc/rst_prolog.rst and '.. include:: ../rst_prolog.rst'
-# https://github.com/sphinx-doc/sphinx/issues/2445
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -74,7 +71,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'solverlabGUI'
+project = 'SOLVERLABGUI'
 copyright = '2018-2023, CEA'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -247,7 +244,7 @@ latex_elements = {
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
   ('index', 'solverlabGUI.tex', 'solverlabGUI Documentation',
-   'CEA DEN/DANS/DM2S/STMF/LGLS', 'manual'),
+   'CEA DES/ISAS/DM2S/SGLS', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -280,6 +277,6 @@ latex_show_urls = 'footnote' # sphinx version 1.7 # True
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'solverlabGUI', 'solverlabGUI Documentation',
-     ['CEA DEN/DANS/DM2S/STMF/LGLS'], 1)
+     ['CEA DES/ISAS/DM2S/SGLS'], 1)
 ]
 
