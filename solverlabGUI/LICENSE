@@ -1,5 +1,5 @@
 # %% LICENSE_SALOME_CEA_BEGIN
-# Copyright (C) 2008-2023  CEA
+# Copyright (C) 2008-2024  CEA
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public

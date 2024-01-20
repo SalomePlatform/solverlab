@@ -72,7 +72,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'SOLVERLABGUI'
-copyright = '2018-2023, CEA'
+copyright = '2018-2024, CEA'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
