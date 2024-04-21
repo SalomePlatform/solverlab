@@ -20,7 +20,16 @@ SparseMatrixPetsc::SparseMatrixPetsc()
 	_numberOfNonZeros=0;
 	_isSparseMatrix=true;
 	_mat=NULL;
-	PetscInitialize(0, (char ***)"", PETSC_NULL, PETSC_NULL);
+
+#if CMAKE_BUILD_TYPE==DEBUG
+	int argc = 2;
+	char **argv = new char*[argc];
+	argv[0] = (char*)"SparseMatrixPetsc";
+	argv[1] = (char*)"-on_error_attach_debugger";
+	PetscInitialize(&argc, &argv, 0, 0);//Note this is ok if MPI has been been initialised independently from PETSC
+#else
+	PetscInitialize(NULL,NULL,0,0);//Note this is ok if MPI has been been initialised independently from PETSC
+#endif
 }
 
 //----------------------------------------------------------------------
@@ -30,7 +39,7 @@ SparseMatrixPetsc::SparseMatrixPetsc( int numberOfRows, int numberOfColumns)
 	_numberOfRows = numberOfRows;
 	_numberOfColumns=numberOfColumns;
 	_isSparseMatrix=true;
-	PetscInitialize(0, (char ***)"", PETSC_NULL, PETSC_NULL);
+	PetscInitialize(0, (char ***)"", NULL, NULL);
 	MatCreateSeqAIJ(MPI_COMM_SELF,_numberOfRows,_numberOfColumns,PETSC_DEFAULT,NULL,&_mat);
 }
 
@@ -38,7 +47,7 @@ SparseMatrixPetsc::SparseMatrixPetsc( int numberOfRows, int numberOfColumns)
 SparseMatrixPetsc::SparseMatrixPetsc( Mat mat )
 //----------------------------------------------------------------------
 {
-	PetscInitialize(0, (char ***)"", PETSC_NULL, PETSC_NULL);
+	PetscInitialize(0, (char ***)"", NULL, NULL);
 	_isSparseMatrix=true;
 	_mat=mat;
 	//extract number of row and column
@@ -59,7 +68,7 @@ SparseMatrixPetsc::SparseMatrixPetsc( int numberOfRows, int numberOfColumns, int
 	_numberOfNonZeros=nnz;
 	_isSparseMatrix=true;
 	_mat=NULL;
-	PetscInitialize(0, (char ***)"", PETSC_NULL, PETSC_NULL);
+	PetscInitialize(0, (char ***)"", NULL, NULL);
 	MatCreateSeqAIJ(MPI_COMM_SELF,_numberOfRows,_numberOfColumns,_numberOfNonZeros,NULL,&_mat);
 }
 
@@ -72,13 +81,13 @@ SparseMatrixPetsc::SparseMatrixPetsc( int blockSize, int numberOfRows, int numbe
 	_numberOfNonZeros=nnz;
 	_isSparseMatrix=true;
 	_mat=NULL;
-	PetscInitialize(0, (char ***)"", PETSC_NULL, PETSC_NULL);
+	PetscInitialize(0, (char ***)"", NULL, NULL);
 	MatCreateSeqBAIJ(MPI_COMM_SELF,blockSize, _numberOfRows,_numberOfColumns,_numberOfNonZeros,NULL,&_mat);
 }
 
 SparseMatrixPetsc::SparseMatrixPetsc(std::string filename, bool hdf5BinaryMode)
 {
-	PetscInitialize(0, (char ***)"", PETSC_NULL, PETSC_NULL);
+	PetscInitialize(0, (char ***)"", NULL, NULL);
 	_mat = NULL;
 	readPETScMatrixFromFile( filename, hdf5BinaryMode);
 
@@ -602,7 +611,7 @@ SparseMatrixPetsc::computeSpectrum(int nev, double ** valPr, double ** valPi, do
   Vec            xr,xi;
   PetscInt       i,maxit,its, nconv;
 
-  SlepcInitialize(0, (char ***)"", PETSC_NULL, PETSC_NULL);
+  SlepcInitialize(0, (char ***)"", NULL, NULL);
 
   MatAssemblyBegin(_mat,MAT_FINAL_ASSEMBLY);
   MatAssemblyEnd(_mat,MAT_FINAL_ASSEMBLY);
@@ -656,13 +665,13 @@ SparseMatrixPetsc::computeSpectrum(int nev, double ** valPr, double ** valPi, do
 	 Optional: Get some information from the solver and display it on the screen
 	*/
 	EPSGetIterationNumber(eps,&its);
-	PetscPrintf(PETSC_COMM_WORLD," Number of iterations of the method: %D\n",its);
+	PetscPrintf(PETSC_COMM_WORLD," Number of iterations of the method: %d \n",its);
 	EPSGetType(eps,&type);
 	PetscPrintf(PETSC_COMM_WORLD," Solution method: %s\n\n",type);
 	EPSGetDimensions(eps,&nev,NULL,NULL);
-	PetscPrintf(PETSC_COMM_WORLD," Number of requested eigenvalues: %D\n",nev);
+	PetscPrintf(PETSC_COMM_WORLD," Number of requested eigenvalues: %d \n",nev);
 	EPSGetTolerances(eps,&tol,&maxit);
-	PetscPrintf(PETSC_COMM_WORLD," Stopping condition: tol=%.4g, maxit=%D\n",(double)tol,maxit);
+	PetscPrintf(PETSC_COMM_WORLD," Stopping condition: tol=%.4g, maxit=%d \n",(double)tol,maxit);
 
 	/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 					Display solution and clean up
@@ -671,7 +680,7 @@ SparseMatrixPetsc::computeSpectrum(int nev, double ** valPr, double ** valPi, do
 	 Get number of converged approximate eigenpairs
 	*/
 	EPSGetConverged(eps,&nconv);
-	PetscPrintf(PETSC_COMM_WORLD," Number of converged eigenpairs: %D\n\n",nconv);
+	PetscPrintf(PETSC_COMM_WORLD," Number of converged eigenpairs: %d \n\n",nconv);
 
   *valPr=new double[nconv];
   *valPi=new double[nconv];
@@ -762,7 +771,7 @@ SparseMatrixPetsc::computeSVD(int nsv, double ** valS, double ***vecS, SVDWhich 
   Vec            u,v;
   PetscInt       i,maxit,its, nconv;
 
-  SlepcInitialize(0, (char ***)"", PETSC_NULL, PETSC_NULL);
+  SlepcInitialize(0, (char ***)"", NULL, NULL);
 
   MatAssemblyBegin(_mat,MAT_FINAL_ASSEMBLY);
   MatAssemblyEnd(  _mat,MAT_FINAL_ASSEMBLY);
@@ -818,13 +827,13 @@ SparseMatrixPetsc::computeSVD(int nsv, double ** valS, double ***vecS, SVDWhich 
      Optional: Get some information from the solver and display it
   */
   SVDGetIterationNumber(svd,&its);
-  PetscPrintf(PETSC_COMM_WORLD," Number of iterations of the method: %D\n",its);
+  PetscPrintf(PETSC_COMM_WORLD," Number of iterations of the method: %d \n",its);
   SVDGetType(svd,&type);
   PetscPrintf(PETSC_COMM_WORLD," Solution method: %s\n\n",type);
   SVDGetDimensions(svd,&nsv,NULL,NULL);
-  PetscPrintf(PETSC_COMM_WORLD," Number of requested singular values: %D\n",nsv);
+  PetscPrintf(PETSC_COMM_WORLD," Number of requested singular values: %d \n",nsv);
   SVDGetTolerances(svd,&tol,&maxit);
-  PetscPrintf(PETSC_COMM_WORLD," Stopping condition: tol=%.4g, maxit=%D\n",(double)tol,maxit);
+  PetscPrintf(PETSC_COMM_WORLD," Stopping condition: tol=%.4g, maxit=%d \n",(double)tol,maxit);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
                     Display solution and clean up
@@ -833,7 +842,7 @@ SparseMatrixPetsc::computeSVD(int nsv, double ** valS, double ***vecS, SVDWhich 
      Get number of converged approximate singular values
   */
   SVDGetConverged(svd,&nconv);
-  PetscPrintf(PETSC_COMM_WORLD," Number of converged singular values: %D\n\n",nconv);
+  PetscPrintf(PETSC_COMM_WORLD," Number of converged singular values: %d \n\n",nconv);
 
   *valS=new double[nconv];
   *vecS=new double * [2*nconv];
