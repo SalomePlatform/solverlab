@@ -53,7 +53,7 @@ SinglePhase::SinglePhase(phaseType fluid, pressureEstimate pEstimate, int dim, b
 	_fluides.resize(1,_compressibleFluid);
 
 	_fileName = "SolverlabSinglePhase";
-    PetscPrintf(PETSC_COMM_WORLD,"\n Navier-Stokes equations for single phase flow\n");
+	PetscPrintf(PETSC_COMM_WORLD,"\n Navier-Stokes equations for single phase flow\n");
 }
 
 void SinglePhase::initialize(){

@@ -147,7 +147,7 @@ void ProblemFluid::initialize()
 
 	//creation de la matrice
 	if(_timeScheme == Implicit)
-		MatCreateSeqBAIJ(PETSC_COMM_SELF, _nVar, _nVar*_Nmailles, _nVar*_Nmailles, (1+_neibMaxNbCells), PETSC_NULL, &_A);
+		MatCreateSeqBAIJ(PETSC_COMM_SELF, _nVar, _nVar*_Nmailles, _nVar*_Nmailles, (1+_neibMaxNbCells), NULL, &_A);
 
 	//creation des vecteurs
 	VecCreateSeq(PETSC_COMM_SELF, _nVar, &_Uext);
@@ -179,8 +179,7 @@ void ProblemFluid::initialize()
 	VecAssemblyBegin(_conservativeVars);
 	VecAssemblyEnd(_conservativeVars);
 	VecCopy(_conservativeVars, _old);
-	VecAssemblyBegin(_old);
-	VecAssemblyEnd(_old);
+
 	VecSetValuesBlocked(_primitiveVars, _Nmailles, indices, initialFieldPrim, INSERT_VALUES);
 	VecAssemblyBegin(_primitiveVars);
 	VecAssemblyEnd(_primitiveVars);
@@ -221,6 +220,10 @@ void ProblemFluid::initialize()
 			throw CdmathException("!!! Error : only 'Newton_PETSC_LINESEARCH', 'Newton_PETSC_TRUSTREGION', 'Newton_PETSC_NGMRES', 'Newton_PETSC_ASPIN' or 'Newton_SOLVERLAB' nonlinear solvers are acceptable !!!" );
 		}
 
+		PetscPrintf(PETSC_COMM_WORLD,"PETSc Newton solver ");
+		*_runLogFile << "PETSc Newton solver " << snestype << endl;
+		_runLogFile->close();
+
 		SNESCreate(PETSC_COMM_WORLD, &_snes);
 		SNESSetType( _snes, snestype);
 		SNESGetLineSearch( _snes, &_linesearch);
@@ -241,7 +244,13 @@ void ProblemFluid::initialize()
 		SNESSetFunction(_snes,_newtonVariation,computeSnesRHS,this);
 		SNESSetJacobian(_snes,_A,_A,computeSnesJacobian,this);	
 	}
-
+	else
+	{
+		PetscPrintf(PETSC_COMM_WORLD,"SOLVERLAB Newton solver ");
+		*_runLogFile << "SOLVERLAB Newton solver" << endl;
+		_runLogFile->close();
+	}
+	
 	_initializedMemory=true;
 	save();//save initial data
 }
@@ -418,7 +427,7 @@ double ProblemFluid::computeTimeStep(bool & stop){//dt is not known and will not
 	if(_restartWithNewTimeScheme)//This is a change of time scheme during a simulation
 	{
 		if(_timeScheme == Implicit)
-			MatCreateSeqBAIJ(PETSC_COMM_SELF, _nVar, _nVar*_Nmailles, _nVar*_Nmailles, (1+_neibMaxNbCells), PETSC_NULL, &_A);			
+			MatCreateSeqBAIJ(PETSC_COMM_SELF, _nVar, _nVar*_Nmailles, _nVar*_Nmailles, (1+_neibMaxNbCells), NULL, &_A);			
 		else
 			MatDestroy(&_A);
 		_restartWithNewTimeScheme=false;

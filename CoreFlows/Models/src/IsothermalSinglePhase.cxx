@@ -94,13 +94,13 @@ IsothermalSinglePhase::IsothermalSinglePhase(phaseType fluid, pressureEstimate p
 	}
 
 	_compressibleFluid=dynamic_cast< CompressibleFluid * >(_fluides[0] );//To be used when the numerical method requires a compressible fluid e.g. upwind
-    _usePrimitiveVarsInNewton=true;//This class is designed only to solve linear system in primitive variables
-    _Vdiff=NULL;
-    _saveAllFields = false;
+	_usePrimitiveVarsInNewton=true;//This class is designed only to solve linear system in primitive variables
+	_Vdiff=NULL;
+	_saveAllFields = false;
 	_nonLinearFormulation=reducedRoe;//Only case implemented is reduced roe
 
 	_fileName = "SolverlabIsothermalSinglePhase";
-    PetscPrintf(PETSC_COMM_WORLD,"\n Isothermal single phase problem \n");
+	PetscPrintf(PETSC_COMM_WORLD,"\n Isothermal single phase problem \n");
     }
 
 void IsothermalSinglePhase::initialize(){
