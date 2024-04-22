@@ -69,7 +69,7 @@ ProblemCoreFlows::ProblemCoreFlows(MPI_Comm comm)
 	_stationaryMode=false;
 	_timeScheme=Explicit;
 	_wellBalancedCorrection=false;
-    _FECalculation=false;
+	_FECalculation=false;
 	_nonLinearSolver = Newton_SOLVERLAB;
 	_conditionNumber=false;
 	_maxvp=0;
@@ -162,7 +162,7 @@ void ProblemCoreFlows::setInitialField(const MEDCoupling::MCAuto<MEDCoupling::ME
 
 void ProblemCoreFlows::setInitialField( MEDCoupling::MEDCouplingFieldDouble* myMEDCouplingField )
 {
-	MEDCoupling::MCAuto<MEDCoupling::MEDCouplingFieldDouble> myMCAutoMEDCouplingField(myMEDCouplingField);
+    MEDCoupling::MCAuto<MEDCoupling::MEDCouplingFieldDouble> myMCAutoMEDCouplingField(myMEDCouplingField);
     Field VV(myMCAutoMEDCouplingField);
     return ProblemCoreFlows::setInitialField( VV );
 }
@@ -487,17 +487,39 @@ void ProblemCoreFlows::setLinearSolver(linearSolver kspType, preconditioner pcTy
 	else if (pcType ==LU)
 		_pctype = (char*)&PCLU;
 	else if (pcType == ILU)
+	{
 		_pctype = (char*)&PCILU;
+		_ksptype = (char*)&KSPPREONLY;
+	}
 	else if (pcType ==CHOLESKY)
+	{
 		_pctype = (char*)&PCCHOLESKY;
+		_ksptype = (char*)&KSPPREONLY;
+	}
 	else if (pcType == ICC)
 		_pctype = (char*)&PCICC;
+	else if (pcType == GAMG)
+		_pctype = (char*)&PCGAMG;
+	else if (pcType == Svd)
+	{
+		_pctype = (char*)&PCSVD;
+		PetscOptionsSetValue(NULL, "-pc_svd_zero_sing", to_string(_precision).c_str());
+	}
+	else if (pcType == QR)
+	{
+		_pctype = (char*)&PCQR;
+		_ksptype = (char*)&KSPPREONLY;
+	}
 	else {
 		PetscPrintf(PETSC_COMM_WORLD,"!!! Error : only 'NOPC', 'LU', 'ILU', 'CHOLESKY' or 'ICC' preconditioners are acceptable !!!\n");
 		*_runLogFile << "!!! Error : only 'NOPC' or 'LU' or 'ILU' preconditioners are acceptable !!!" << endl;
 		_runLogFile->close();
 		throw CdmathException("!!! Error : only 'NOPC' or 'LU' or 'ILU' preconditioners are acceptable !!!" );
 	}
+
+	PetscPrintf(PETSC_COMM_WORLD,"Linear solver %s , preconditioner %s ", _ksptype, _pctype);
+	*_runLogFile << "Linear solver " << _ksptype << ", preconditioner " <<_pctype << endl;
+	_runLogFile->close();
 }
 
 void ProblemCoreFlows::setLinearSolver(std::string solverName, std::string pcName, double maxIts)
@@ -792,10 +814,12 @@ ProblemCoreFlows::createKSP()
 {
 	//PETSc Linear solver
 	KSPCreate(PETSC_COMM_WORLD, &_ksp);
+	KSPSetErrorIfNotConverged(_ksp, PETSC_TRUE);
 	KSPSetType(_ksp, _ksptype);
 	KSPSetTolerances(_ksp,_precision,_precision,PETSC_DEFAULT,_maxPetscIts);
 	KSPGetPC(_ksp, &_pc);
 	//PETSc preconditioner
+	PCFactorSetZeroPivot(_pc, _precision);
 	if(_mpi_size==1 )
 		PCSetType(_pc, _pctype);
 	else
