@@ -164,6 +164,8 @@ void IsothermalSinglePhase::initialize(){
 			cout<<"!!!!!!!########## non singular system ###########!!!!!!!!!!"<<endl;
 	}
 	
+	_globalNbUnknowns = _nVar*_Nmailles;//Colocated discretisation
+	//_globalNbUnknowns = (_nVar-1)*_Nmailles + _Nfaces;//Staggered discretisation : velocity is on faces
 	ProblemFluid::initialize();
 
 	/* Deal with the particular case of singular systems */

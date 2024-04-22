@@ -72,6 +72,9 @@ void IsothermalTwoFluid::initialize(){
 	if(_entropicCorrection)
 		_entropicShift=vector<double>(3,0);
 
+	_globalNbUnknowns = _nVar*_Nmailles;//Colocated discretisation
+	//_globalNbUnknowns = (_nVar-2)*_Nmailles + _Nfaces;//Staggered discretisation : velocities are on faces
+
 	ProblemFluid::initialize();
 }
 
