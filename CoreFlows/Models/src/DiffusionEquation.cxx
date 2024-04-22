@@ -82,7 +82,7 @@ DiffusionEquation::DiffusionEquation(int dim, bool FECalculation,double rho,doub
     }
     if(dim<=0)
     {
-        PetscPrintf(PETSC_COMM_WORLD,"Space dimension = %.2f\n",dim);
+        PetscPrintf(PETSC_COMM_WORLD,"Space dimension = %d\n",dim);
         throw CdmathException("Error : parameter dim cannot  be negative");
     }
 
