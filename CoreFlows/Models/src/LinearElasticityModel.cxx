@@ -20,6 +20,16 @@ LinearElasticityModel::LinearElasticityModel(int dim, bool FECalculation,  doubl
 		if(mpiInitialized)
 			PETSC_COMM_WORLD = comm;
 		PetscInitialize(NULL,NULL,0,0);//Note this is ok if MPI has been been initialised independently from PETSC
+
+#if CMAKE_BUILD_TYPE==DEBUG
+		int argc = 2;
+		char **argv = new char*[argc];
+		argv[0] = (char*)"LinearElasticityModel";
+		argv[1] = (char*)"-on_error_attach_debugger";
+		PetscInitialize(&argc, &argv, 0, 0);//Note this is ok if MPI has been been initialised independently from PETSC
+#else
+		PetscInitialize(NULL,NULL,0,0);//Note this is ok if MPI has been been initialised independently from PETSC
+#endif
 	}
 	MPI_Comm_rank(PETSC_COMM_WORLD,&_rank);
 	MPI_Comm_size(PETSC_COMM_WORLD,&_size);
@@ -177,9 +187,9 @@ void LinearElasticityModel::initialize()
 
 	//creation de la matrice
     if(!_FECalculation)
-        MatCreateSeqAIJ(PETSC_COMM_SELF, _Nmailles*_nVar, _Nmailles*_nVar, (1+_neibMaxNbCells), PETSC_NULL, &_A);
+        MatCreateSeqAIJ(PETSC_COMM_SELF, _Nmailles*_nVar, _Nmailles*_nVar, (1+_neibMaxNbCells), NULL, &_A);
     else
-        MatCreateSeqAIJ(PETSC_COMM_SELF, _NunknownNodes*_nVar, _NunknownNodes*_nVar, (1+_neibMaxNbNodes), PETSC_NULL, &_A);
+        MatCreateSeqAIJ(PETSC_COMM_SELF, _NunknownNodes*_nVar, _NunknownNodes*_nVar, (1+_neibMaxNbNodes), NULL, &_A);
 
 	VecCreate(PETSC_COMM_SELF, &_displacements);
 
@@ -224,7 +234,7 @@ void LinearElasticityModel::initialize()
 				throw CdmathException("Singular matrix should be symmetric with kernel composed of constant vectors");
 			}
 		MatNullSpace nullsp;
-		MatNullSpaceCreate(PETSC_COMM_WORLD, PETSC_TRUE, 0, PETSC_NULL, &nullsp);
+		MatNullSpaceCreate(PETSC_COMM_WORLD, PETSC_TRUE, 0, NULL, &nullsp);
 		MatSetNullSpace(_A, nullsp);
 		MatSetTransposeNullSpace(_A, nullsp);
 		MatNullSpaceDestroy(&nullsp);
