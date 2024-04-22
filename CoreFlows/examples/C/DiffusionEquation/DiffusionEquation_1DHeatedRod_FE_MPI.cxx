@@ -19,6 +19,7 @@ void power_field_diffusionTest(Field & Phi){
 
 int main(int argc, char** argv)
 {
+	PetscInitialize(&argc,&argv, NULL,NULL);
 	//Preprocessing: mesh and group creation
 	double xinf=0.0;
 	double xsup=4.2;
@@ -36,10 +37,10 @@ int main(int argc, char** argv)
 	double rho_ur=10000;//Uranium density
 	double lambda_ur=5;
  
-    bool FEcalculation=true;
+	bool FEcalculation=true;
 	DiffusionEquation  myProblem(spaceDim,FEcalculation,rho_ur,cp_ur,lambda_ur);
 
-	//Set initial field
+	//Set initial field 
 	Vector VV_Constant(1);
 	VV_Constant(0) = 623;//Rod clad temperature
 
@@ -61,15 +62,15 @@ int main(int argc, char** argv)
 	myProblem.setNeumannBoundaryCondition("Neumann");
 
 	// set the numerical method
-	myProblem.setTimeScheme( Implicit);
+	myProblem.setTimeScheme( Explicit);
 
 	// name result file
-	string fileName = "1DRodTemperature_FE_Implicit";
+	string fileName = "1DRodTemperature_FE";
 
 	// parameters calculation
 	unsigned MaxNbOfTimeStep =3;
 	int freqSave = 1;
-	double cfl = 100;
+	double cfl = 0.5;
 	double maxTime = 1000000;
 	double precision = 1e-6;
 
@@ -89,9 +90,9 @@ int main(int argc, char** argv)
 	myProblem.initialize();
 	bool ok = myProblem.run();
 	if (ok)
-		cout << "Simulation of "<<fileName<<" is successful !" << endl;
+		cout << "Simulation "<<fileName<<" is successful !" << endl;
 	else
-		cout << "Simulation of "<<fileName<<"  failed ! " << endl;
+		cout << "Simulation "<<fileName<<"  failed ! " << endl;
 
 	cout << "------------ End of simulation -----------" << endl;
 	myProblem.terminate();

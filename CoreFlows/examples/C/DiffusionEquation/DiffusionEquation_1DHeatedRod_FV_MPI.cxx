@@ -10,15 +10,16 @@ void power_field_diffusionTest(Field & Phi){
 	double phi=1e5;
 	double x;
 	Mesh M = Phi.getMesh();
-	int nbNodes = M.getNumberOfNodes();
-	for (int j = 0; j < nbNodes; j++) {
-		x=M.getNode(j).x();
+	int nbCells = M.getNumberOfCells();
+	for (int j = 0; j < nbCells; j++) {
+		x=M.getCell(j).x();
 		Phi(j) = phi*cos(PI*(x-L/2)/(L+lambda));
 	}
 }
 
 int main(int argc, char** argv)
 {
+	PetscInitialize(&argc,&argv, NULL,NULL);
 	//Preprocessing: mesh and group creation
 	double xinf=0.0;
 	double xsup=4.2;
@@ -36,15 +37,15 @@ int main(int argc, char** argv)
 	double rho_ur=10000;//Uranium density
 	double lambda_ur=5;
  
-    bool FEcalculation=true;
+	bool FEcalculation=false;
 	DiffusionEquation  myProblem(spaceDim,FEcalculation,rho_ur,cp_ur,lambda_ur);
 
-	//Set initial field 
+	// Set initial field
 	Vector VV_Constant(1);
 	VV_Constant(0) = 623;//Rod clad temperature
 
 	cout << "Building initial data" << endl;
-	myProblem.setInitialFieldConstant(M,VV_Constant,NODES);
+	myProblem.setInitialFieldConstant(M,VV_Constant);
 
 	//Set fluid temperature (temperature du fluide)
 	double fluidTemp=573;//fluid mean temperature
@@ -52,7 +53,7 @@ int main(int argc, char** argv)
 	myProblem.setFluidTemperature(fluidTemp);
 	myProblem.setHeatTransfertCoeff(heatTransfertCoeff);
 	//Set heat source
-	Field Phi("Heat power field", NODES, M, 1);
+	Field Phi("Heat power field", CELLS, M, 1);
 	power_field_diffusionTest(Phi);
 	myProblem.setHeatPowerField(Phi);
 	Phi.writeVTK("1DheatPowerField");
@@ -64,7 +65,7 @@ int main(int argc, char** argv)
 	myProblem.setTimeScheme( Explicit);
 
 	// name result file
-	string fileName = "1DRodTemperature_FE";
+	string fileName = "1DRodTemperature_FV";
 
 	// parameters calculation
 	unsigned MaxNbOfTimeStep =3;
@@ -93,7 +94,7 @@ int main(int argc, char** argv)
 	else
 		cout << "Simulation "<<fileName<<"  failed ! " << endl;
 
-	cout << "------------ End of simulation -----------" << endl;
+	cout << "------------ End of calculation -----------" << endl;
 	myProblem.terminate();
 
 	return EXIT_SUCCESS;
