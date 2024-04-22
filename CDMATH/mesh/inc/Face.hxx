@@ -14,6 +14,7 @@
  * - number of cells allocated for this face
  * - measure of this face
  * - barycenter of this face
+ * - normal vector to the face
  */
 
 #include "Point.hxx"
@@ -117,13 +118,13 @@ public: //----------------------------------------------------------------
     /**
      * @param groupName : set a groupe name for this face
      */
-    void setGroupName(const std::string groupName);
+    void setGroupName(const std::string groupName, bool belongToInnerWall = false);
 
     /**
-     * return 0 if the face is on the border of domain
-     * else -1
+     * return true if the face is on an inner wall
+     * else false
      */
-    int getRegion(void) const ;
+    bool belongToInnerWall(void) const ;
 
     /**
      * return True if the face is on the border of domain
@@ -132,14 +133,14 @@ public: //----------------------------------------------------------------
     bool isBorder(void) ;
 
     /**
-     * @param numCell : index local of cell to add in this face
-     * @param cellId : index global of cell to add in this face
+     * @param numCell : local index of cell to add in this face
+     * @param cellId : global index of cell to add in this face
      */
     void addCellId (const int numCell, const int cellId ) ;
 
     /**
-     * @param numNode : index local of node to add in this face
-     * @param nodeId : index global of node to add in this face
+     * @param numNode : local index of node to add in this face
+     * @param nodeId : global index of node to add in this face
      */
     void addNodeId (const int numNode, const int nodeId ) ;
 
@@ -155,9 +156,22 @@ public: //----------------------------------------------------------------
 
     double getZN(void) const ;
 
+    /**
+     * @param localId : local index of surrounding node
+     * @return global index of neighbouring node with local index localId
+     */
     int getNodeId(int localId) const ;
     
+    /**
+     * @param localId : local index of neighbouring cell
+     * @return global index of neighbouring cell with local index localId
+     */
     int getCellId(int localId) const ;
+
+    /**
+     * @return ghost cell associated to this face (return an exception of this face is not associated to a periodic boundary condition
+     */
+    int getPeriodicCellId() const ;
 
 private: //----------------------------------------------------------------
 
@@ -198,9 +212,9 @@ private: //----------------------------------------------------------------
     Point _point ;
 
     /*
-     * The region of this face. -1 internal or number of edge that this face belongs to
+     * This is to manage internal wall boundary conditions where a face is geometrically surrounded by two cells but is physically considered an inner wall.
      */
-    int _region ;
+    bool _belongToInnerWall ;
 
     /*
      * The group names of the face.
