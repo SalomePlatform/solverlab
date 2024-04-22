@@ -30,7 +30,6 @@ StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalcula
 #else
         PetscInitialize(NULL,NULL,0,0);//Note this is ok if MPI has been been initialised independently from PETSC
 #endif
-		PetscInitialize(NULL,NULL,0,0);//Note this is ok if MPI has been been initialised independently from PETSC
 	}
 	MPI_Comm_rank(PETSC_COMM_WORLD,&_mpi_rank);
 	MPI_Comm_size(PETSC_COMM_WORLD,&_mpi_size);
@@ -79,7 +78,7 @@ StationaryDiffusionEquation::StationaryDiffusionEquation(int dim, bool FECalcula
 	_maxPetscIts=50;
 	_maxNewtonIts=50;
 	_NEWTON_its=0;
-	int _PetscIts=0;//the number of iterations of the linear solver
+	_PetscIts=0;//the number of iterations of the linear solver
 	_ksptype = (char*)&KSPGMRES;
 	_pctype = (char*)&PCILU;
 
