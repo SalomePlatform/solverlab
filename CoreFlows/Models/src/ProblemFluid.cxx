@@ -287,7 +287,7 @@ bool ProblemFluid::solveNewtonPETSc()
 			cout<<"Reached the maximum number of iterations"<<endl;
 
 	    SNESGetIterationNumber(_snes, &_NEWTON_its);
-	    PetscPrintf(PETSC_COMM_WORLD,"Number of SNES iterations = %D\n\n", _NEWTON_its);
+	    PetscPrintf(PETSC_COMM_WORLD,"Number of SNES iterations = %d \n\n", _NEWTON_its);
 		*_runLogFile <<endl;
 		*_runLogFile << "Nombre d'iterations de Newton "<< _NEWTON_its <<endl;
 	}
