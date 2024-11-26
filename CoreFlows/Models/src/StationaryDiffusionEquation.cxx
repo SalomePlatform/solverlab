@@ -400,7 +400,7 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFE(bool & stop){
                                 {
 									std::map<int,double>::iterator it=_dirichletBoundaryValues.find(nodeIds[kdim]);
 									if( it != _dirichletBoundaryValues.end() )//Une valeur limite est associée au noeud
-										valuesBorder[kdim]=_dirichletBoundaryValues[it->second];
+										valuesBorder[kdim]=it->second;
                                     else//Une valeur limite est associée au groupe frontière    
                                         valuesBorder[kdim]=_limitField[_mesh.getNode(nodeIds[kdim]).getGroupName()].T;
                                 }
