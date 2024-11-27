@@ -269,7 +269,7 @@ void StationaryDiffusionEquation::initialize()
     }
 
     //Checking whether at least one boundary conditions is imposed
-	if( _limitField.size()==0 && _neumannBoundaryValues.size()==0 && _dirichletBoundaryValues.size()==0 )
+	if( _limitField.size()==0 && _neumannBoundaryValues.size()==0 && _dirichletBoundaryValues.size()==0 && _dirichletBoundaryField.getMEDCouplingField()==NULL && _neumannBoundaryField.getMEDCouplingField()==NULL )
 		throw CdmathException("No boundary condition imposed. Cannot initialize simulation.");
 		
     //Checking on all procs whether all boundary conditions are Neumann boundary condition ->singular system
@@ -303,6 +303,7 @@ void StationaryDiffusionEquation::initialize()
         //PCFactorSetShiftType(_pc,MAT_SHIFT_NONZERO);
         //PCFactorSetShiftAmount(_pc,1e-10);
     }
+
     _initializedMemory=true;
 }
 
@@ -961,6 +962,7 @@ void StationaryDiffusionEquation::save(){
                 }
         else
         {
+        /* Noeuds inconnus */
             int globalIndex;
             for(int i=0; i<_NunknownNodes; i++)
             {
@@ -972,13 +974,21 @@ void StationaryDiffusionEquation::save(){
                 _VV(globalIndex)=Ti;
             }
     
+            /* Noeuds connus (condition limite de Dirichlet */
             Node Ni;
             string nameOfGroup;
+            std::map<int,double>::iterator it;
             for(int i=0; i<_NdirichletNodes; i++)
             {
-                Ni=_mesh.getNode(_dirichletNodeIds[i]);
-                nameOfGroup = Ni.getGroupName();
-                _VV(_dirichletNodeIds[i])=_limitField[nameOfGroup].T;
+                it=_dirichletBoundaryValues.find(_dirichletNodeIds[i]);
+                if( it != _dirichletBoundaryValues.end() )//Une valeur limite est associée au noeud
+                    _VV(_dirichletNodeIds[i])=it->second;
+                else//Une valeur limite est associée au groupe frontière    
+                {
+                    Ni=_mesh.getNode(_dirichletNodeIds[i]);
+                    nameOfGroup = Ni.getGroupName();
+                    _VV(_dirichletNodeIds[i])=_limitField[nameOfGroup].T;
+                }
             }
         }
     
@@ -1200,11 +1210,65 @@ StationaryDiffusionEquation::setDirichletBoundaryCondition(string groupName, str
             *_runLogFile<<"Warning : StationaryDiffusionEquation::setDirichletBoundaryCondition : finite volume simulation should not have boundary field on nodes!!! Change parameter field_support_type"<< endl;
     }
 
-    Field VV = Field(fileName, field_support_type, fieldName, timeStepNumber, order, meshLevel);
-
-    /* For the moment the boundary value is taken constant equal to zero */
-    _limitField[groupName]=LimitFieldStationaryDiffusion(DirichletStationaryDiffusion,0,-1);//This line will be deleted when variable BC are properly treated in solverlab 
+    setDirichletBoundaryCondition( groupName, Field(fileName, field_support_type, fieldName, timeStepNumber, order, meshLevel));
 }
+
+void StationaryDiffusionEquation::setDirichletBoundaryCondition(string groupName, Field bc_field){
+    if(_FECalculation && bc_field.getTypeOfField() != NODES)
+    {
+        PetscPrintf(PETSC_COMM_WORLD,"\n Warning : StationaryDiffusionEquation::setDirichletBoundaryCondition : finite element simulation should have boundary field on nodes!!! Change parameter field_support_type \n");
+        if(_mpi_rank==0)//Avoid redundant printing
+            *_runLogFile<< "Warning : StationaryDiffusionEquation::setDirichletBoundaryCondition : finite element simulation should have boundary field on nodes!!! Change parameter field_support_type"<< endl;
+    }
+    else if(!_FECalculation && bc_field.getTypeOfField() == NODES)
+    {
+        PetscPrintf(PETSC_COMM_WORLD,"\n Warning : StationaryDiffusionEquation::setDirichletBoundaryCondition : finite volume simulation should not have boundary field on nodes!!! Change parameter field_support_type \n");
+        if(_mpi_rank==0)//Avoid redundant printing
+            *_runLogFile<<"Warning : StationaryDiffusionEquation::setDirichletBoundaryCondition : finite volume simulation should not have boundary field on nodes!!! Change parameter field_support_type"<< endl;
+    }
+    
+    _dirichletBoundaryField = bc_field;
+   	MEDCoupling::MCAuto<MEDCoupling::MEDCouplingMesh> dirichletBoundaryMesh = bc_field.getMesh().getMEDCouplingMesh();
+
+	//* Check that the boundary field is based on the correct boundary mesh */
+	int compType=2;//This is the weakest comparison policy for medcoupling meshes. It can be used by users not sensitive to cell orientation
+	MEDCoupling::DataArrayIdType * arr;//DataArrayIdType to contain the correspondence between cells of the two meshes
+	MEDCoupling::MEDCouplingUMesh* dirichletBoundaryUMesh = dynamic_cast<MEDCoupling::MEDCouplingUMesh*> ( dirichletBoundaryMesh.retn());
+	
+	if( !_mesh.getBoundaryMEDCouplingMesh()->areCellsIncludedIn(dirichletBoundaryUMesh, compType, arr) )
+	    throw CdmathException(" !!!!! StationaryDiffusionEquation::setDirichletBoundaryCondition : The boundary field is not based on the correct boundary mesh. Use mesh::getBoundaryMesh");
+
+	int nBoundaryCells = dirichletBoundaryUMesh->getNumberOfCells();
+	std::map<int,double>::iterator it;
+	long int iCell_global;
+    if(!_FECalculation)//Finite volume simulation
+        for(int i=0; i<nBoundaryCells ; i++)
+        {
+			arr->getTuple(i,&iCell_global);
+			it=_dirichletBoundaryValues.find(iCell_global);
+			if( it == _dirichletBoundaryValues.end() )//Aucune valeur limite est associée au noeud
+				it->second = bc_field[i];
+		}
+	long int inode, length;
+    if(_FECalculation)
+    {
+		const MEDCoupling::DataArrayIdType *nodal  = dirichletBoundaryUMesh->getNodalConnectivity() ;
+		const MEDCoupling::DataArrayIdType *nodalI = dirichletBoundaryUMesh->getNodalConnectivityIndex() ;
+
+		/*longueur du tableau de connectivité */
+		nodalI->getTuple(nBoundaryCells,&length);
+        for(int i=0; i<length; i++)
+        {
+			nodal->getTuple(i,&inode);
+			it=_neumannBoundaryValues.find(inode);
+			if( it == _neumannBoundaryValues.end() )//Aucune valeur limite est associée au noeud
+				it->second = bc_field[i];  
+		}
+		nodal->decrRef();
+		nodalI->decrRef();
+	}
+    arr->decrRef();
+};
 
 void 
 StationaryDiffusionEquation::setNeumannBoundaryCondition(string groupName, string fileName, string fieldName, int timeStepNumber, int order, int meshLevel, EntityType field_support_type){
@@ -1221,8 +1285,18 @@ StationaryDiffusionEquation::setNeumannBoundaryCondition(string groupName, strin
             *_runLogFile<<"Warning : StationaryDiffusionEquation::setNeumannBoundaryCondition : finite volume simulation should not have boundary field on nodes!!! Change parameter field_support_type"<< endl;
     }
 
-    Field VV = Field(fileName, field_support_type, fieldName, timeStepNumber, order, meshLevel);
-    
-    /* For the moment the boundary value is taken constant equal to zero */
-    _limitField[groupName]=LimitFieldStationaryDiffusion(NeumannStationaryDiffusion,0,-1);//This line will be deleted when variable BC are properly treated in solverlab 
+    setNeumannBoundaryCondition( groupName, Field(fileName, field_support_type, fieldName, timeStepNumber, order, meshLevel) );    
 }
+
+void StationaryDiffusionEquation::setNeumannBoundaryCondition(string groupName, Field bc_field){
+    _neumannBoundaryField = bc_field;
+   	MEDCoupling::MCAuto<MEDCoupling::MEDCouplingMesh> neumannBoundaryMesh = _neumannBoundaryField.getMesh().getMEDCouplingMesh();
+
+	//* Check that the boundary field is based on the correct boundary mesh */
+	int compType=2;//This is the weakest comparison policy for medcoupling meshes. It can be used by users not sensitive to cell orientation
+	MEDCoupling::DataArrayIdType * arr;//DataArrayIdType to contain the correspondence between cells of the two meshes
+	MEDCoupling::MEDCouplingUMesh* neumannBoundaryUMesh = dynamic_cast<MEDCoupling::MEDCouplingUMesh*> ( neumannBoundaryMesh.retn());
+
+	if( !_mesh.getBoundaryMEDCouplingMesh()->areCellsIncludedIn(neumannBoundaryUMesh, compType, arr) )
+	    throw CdmathException(" !!!!! StationaryDiffusionEquation::setNeumannBoundaryCondition : The boundary field is not based on the correct boundary mesh. Use mesh::getBoundaryMesh");
+};
