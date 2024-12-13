@@ -736,6 +736,8 @@ printCmakeTraceVariable( "CDMATH_." )
 printCmakeTraceVariable( "SOLVERLAB_." )
 printCmakeTraceVariable( "DOWNLOAD_." )
 
+SET(SOLVERLAB_SALOME_TESTS "bin/salome/test")
+ADD_SUBDIRECTORY(test)
 
 # optionally get trace of all cmake main variables in log (for debug)
 if( SOLVERLAB_WITH_TRACE )
