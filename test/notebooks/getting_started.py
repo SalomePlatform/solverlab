@@ -195,7 +195,7 @@ fig.savefig("diffusion_1D.svg")
 # This example seeks to solve the diffusion equation in a 2D context:
 # 
 # $$
-# \lambdaDelta T=\Phi(T) + \lambda_{sf} (T_{fluid}-T)
+# \lambda\Delta T=\Phi(T) + \lambda_{sf} (T_{fluid}-T)
 # $$
 # 
 # with
