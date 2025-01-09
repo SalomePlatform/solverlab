@@ -1,22 +1,22 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Étude complète avec Salome
+# # Complete study with Salome
 # 
-# ## Introduction: diffusion instationnaire en 3D
+# ## Introduction: non-stationary 3D diffusion
 # 
-# Dans ce nouvel exemple, on cherche à résoudre un problème instationnaire,
-# c'est-à-dire avec une évolution temporelle de la solution.
+# In this new example, we're trying to solve an unsteady problem,
+# i.e. with a temporal evolution of the solution.
 # 
-# On considère à nouveau l'équation de diffusion :
+# The diffusion equation is again considered:
 # 
 # $$
-# \rho c_p \frac{\partial T}{\partial t} - \lambda\Delta T = \Phi 
+# \rho c_p \frac{partial T}{partial t} - \lambda\Delta T = \Phi 
 # $$
 # 
-# On commence par créer la géométrie et le maillage avec Salome.
+# We begin by creating the geometry and mesh with Salome.
 # 
-# ## Préparation du maillage
+# ## Preparing the mesh
 
 # In[1]:
 
@@ -107,9 +107,9 @@ except:
   print('ExportPartToMED() failed. Invalid file name?')
 
 
-# ## Résolution avec CoreFlows
+# ## Resolution with CoreFlows
 # 
-# On charge le maillage au format MED créé juste avant.
+# Load the MED format mesh created earlier.
 
 # In[5]:
 
@@ -118,7 +118,7 @@ except:
 mesh = cdmath.Mesh("Mesh_1.med")
 
 
-# On peut alors définir le problème avec les caractéristiques du matériau
+# We can then define the problem with the material characteristics
 
 # In[6]:
 
@@ -129,11 +129,11 @@ conductivity = 5
 problem = cf.DiffusionEquation(3, False, density, specificHeat, conductivity)
 
 
-# en précisant qu'on souhaite ici une résolution par les volume finis (argument `False`).
-# On définit la condition initiale en détaillant le domaine de définition,
-# la liste des valeurs à assigner (ici on en a qu'une) et enfin le support, qui est ici la cellule
-# dans le cadre des volumes finis. Si on avait demandé une résolution aux éléments finis, on aurait du
-# donner une champ aux noeuds comme dans l'exemple précédent.
+# specifying that a finite volume resolution is desired (argument `False`).
+# We define the initial condition, detailing the definition domain,
+# the list of values to be assigned (here we have only one) and finally the mesh entity type, which here is the cell
+# in the finite volume framework. If we had asked for a finite element resolution, we would have had to
+# give a field to the nodes as in the previous example.
 
 # In[7]:
 
@@ -141,8 +141,8 @@ problem = cf.DiffusionEquation(3, False, density, specificHeat, conductivity)
 problem.setInitialFieldConstant(mesh, [15], cdmath.CELLS)
 
 
-# En ce qui concerne les conditions aux limites, on choisit ici de donner une flux nul
-# sur les frontières de la sphère, soit une condition de Neumann :
+# As far as the boundary conditions are concerned, we choose here to give a zero flow
+# on the sphere's boundaries, i.e. a Neumann condition:
 
 # In[8]:
 
@@ -151,8 +151,8 @@ problem.setInitialFieldConstant(mesh, [15], cdmath.CELLS)
 problem.setNeumannBoundaryCondition("External_Face")
 
 
-# On prépare une source de chaleur centrée à l'origine de la sphère en pacourant les
-# cellules du maillage pour attribuer les valeurs au champ.
+# We prepare a heat source centered at the sphere's origin by traversing the mesh cells
+# to assign values to the field.
 
 # In[9]:
 
@@ -176,11 +176,11 @@ if not exitStatus:
 problem.terminate()
 
 
-# On définit quelques paramètres de résolution
-# - schéma temporel implicite
-# - l'algorithme d'inversion de matrice
-# - le nom du problème
-# - la fréquence de sortie
+# We define some resolution parameters
+# - implicit time scheme
+# - matrix inversion algorithm
+# - problem name
+# - output frequency
 
 # In[10]:
 
@@ -198,9 +198,7 @@ problem.setFileName("diffusion_3D")
 problem.setResultDirectory(".")
 
 
-# 
-# Et on peut alors lancer la résolution :
-# 
+# The resolution can then be launched:
 
 # In[11]:
 
@@ -213,8 +211,8 @@ if not exitStatus:
 problem.terminate()
 
 
-# Les résultats sont automatiquement enregistrés selon les informations données
-# au problème et peuvent être observés avec **Salome**.
+# The results are automatically recorded according to the information
+# and can be observed with **Salome**.
 
 # In[12]:
 
@@ -276,7 +274,7 @@ SaveScreenshot('result.png', renderView1, ImageResolution=[3056, 1115],
     TransparentBackground=1)
 
 
-# [Résultat diffusion 3D](result.png)
+# [3D diffusion results](result.png)
 
 # In[ ]:
 
