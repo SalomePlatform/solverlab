@@ -11,7 +11,7 @@
 # The diffusion equation is again considered:
 # 
 # $$
-# \rho c_p \frac{partial T}{partial t} - \lambda\Delta T = \Phi 
+# \rho c_p \frac{\partial T}{\partial t} - \lambda\Delta T = \Phi 
 # $$
 # 
 # We begin by creating the geometry and mesh with Salome.

@@ -36,7 +36,7 @@
 # In this example, we consider the following diffusion equation:
 # 
 # $$
-# \frac{partial u}{partial t} = d \frac{partial^2 u}{partial x^2}
+# \frac{\partial u}{\partial t} = d \frac{\partial^2 u}{\partial x^2}
 # $$
 # 
 # on the 1D domain, $\Omega = [0,1]$ and where $d$ is the diffusion coefficient. Consider periodic boundary conditions on both sides and an initial condition of the form $u(x,t=0) = u_0(x)$.
@@ -55,7 +55,7 @@
 # Development in finite volumes finally gives the equation:
 # 
 # $$
-# \frac{u_i^{n+1} - u_i^n}{\Delta t_n} = d \frac{u_i+1}^{n,n+1} - 2u_i^{n,n+1} + 2 u_{i-1}^{n,n+1}}{\Delta x^2}
+# \frac{u_i^{n+1} - u_i^n}{\Delta t_n} = d \frac{u_{i+1}^{n,n+1} - 2u_i^{n,n+1} + 2 u_{i-1}^{n,n+1}}{\Delta x^2}
 # $$
 # 
 # with $u_i^{n,n+1} = \frac{1}{\Delta t} \int_{t_n}^{t_{n+1}} u_i(t) \mathrm{d}t$. This quantity can be expressed simply using the rectangle formula  
@@ -134,7 +134,7 @@ for nn in range(time_steps):
 
 # 
 # For implicit solving, we write the matrix such that $\mathbf{A} \mathbf{U}^{n+1} = \mathbf{U}^n$.  
-# The probem then requires the matrix $\mathbf{A}$ to be inverted at each time step. The `cdmath` linear system solver is used for this. The solving method is based on Krylov subspaces.
+# The problem then requires the matrix $\mathbf{A}$ to be inverted at each time step. The `cdmath` linear system solver is used for this. The solving method is based on Krylov subspaces.
 
 # In[4]:
 
@@ -329,7 +329,7 @@ if not exitStatus:
     raise RuntimeError(f"{fileName} simulation failed")
 
 
-# The result fields (here the unknown `T` called `Temprature` in this problem) are automatically saved and can be viewed with **Salome**. It is also possible to retrieve the solution field in python to extract interesting properties such as the maximum value:
+# The result fields (here the unknown `T` called `Temperature` in this problem) are automatically saved and can be viewed with **Salome**. It is also possible to retrieve the solution field in python to extract interesting properties such as the maximum value:
 
 # In[17]:
 
