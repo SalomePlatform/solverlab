@@ -80,7 +80,7 @@
 # 
 # In this example, we'll use only the `cdmath` package. First, we define the problem parameters, the initial condition `U_initial` and the cell coordinates:
 
-# In[1]:
+# In[ ]:
 
 
 from math import sin, pi
@@ -106,7 +106,7 @@ U_initial = [
 # 
 # For the explicit solution, the matrix is written as $\mathbf{U}^{n+1} = \mathbf{M} \mathbf{U}^n$ :
 
-# In[2]:
+# In[ ]:
 
 
 # Explicit resolution
@@ -136,7 +136,7 @@ for nn in range(time_steps):
 # For implicit solving, we write the matrix such that $\mathbf{A} \mathbf{U}^{n+1} = \mathbf{U}^n$.  
 # The problem then requires the matrix $\mathbf{A}$ to be inverted at each time step. The `cdmath` linear system solver is used for this. The solving method is based on Krylov subspaces.
 
-# In[4]:
+# In[ ]:
 
 
 # Implicit resolution
@@ -166,7 +166,7 @@ for nn in range(time_steps):
 # 
 # Finally, you can plot the profiles with `matplotlib` :
 
-# In[5]:
+# In[ ]:
 
 
 # Post processing
@@ -185,22 +185,19 @@ fig.savefig("diffusion_1D.svg")
 
 
 # 
-# 
-# ![AD diffusion results](diffusion_1D.svg)
-# 
 # * * *
 # 
 # ## Example: stationary diffusion in 2D
 # 
 # This example seeks to solve the diffusion equation in a 2D context:
 # 
-# $$
+# $$\n
 # \lambda\Delta T=\Phi(T) + \lambda_{sf} (T_{fluid}-T)
 # $$
 # 
 # with
 # 
-# - T$ the unknown, defined for the solid
+# - $T$ the unknown, defined for the solid
 # - the conductivity of the solid
 # - $\Phi(T)$ the source term
 # - $T_{fluid}$ the temperature of a fluid and $\lambda_{sf}$ calibrating the temperature exchanges between the fluid and the solid.
@@ -225,7 +222,7 @@ mesh = cdmath.Mesh(xinf, xsup, nx, yinf, ysup, ny, 0)  # Regular triangular mesh
 # 
 # With this mesh, we can create the *problem* that will be used to solve the diffusion equation:
 
-# In[7]:
+# In[ ]:
 
 
 problem = cf.StationaryDiffusionEquation(2, True, 1.75)
@@ -320,7 +317,7 @@ problem.setLinearSolver(cf.GMRES, cf.ILU)
 
 # We can now move on to the resolution:
 
-# In[16]:
+# In[ ]:
 
 
 problem.initialize()
@@ -331,7 +328,7 @@ if not exitStatus:
 
 # The result fields (here the unknown `T` called `Temperature` in this problem) are automatically saved and can be viewed with **Salome**. It is also possible to retrieve the solution field in python to extract interesting properties such as the maximum value:
 
-# In[17]:
+# In[ ]:
 
 
 T_field = problem.getOutputTemperatureField()
@@ -344,10 +341,4 @@ print(T_field.max())
 
 
 problem.terminate()
-
-
-# In[ ]:
-
-
-
 

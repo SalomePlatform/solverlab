@@ -18,23 +18,27 @@
 # 
 # ## Preparing the mesh
 
-# In[1]:
+# In[ ]:
 
 
 import cdmath
 import CoreFlows as cf
 from math import exp
+try:
+    from IPython.display import Image, display
+    withJupyter = True
+except ImportError:
+    withJupyter = False
 
 import salome
-#salome.salome_init()
 
-#import pvsimple
-#pvsimple.ShowParaviewView()
-from pvsimple import *
-#pvsimple._DisableFirstRenderCameraReset()
+try:
+    from pvsimple import *
+except:
+    from paraview.simple import *
 
 
-# In[2]:
+# In[ ]:
 
 
 # Create the geometry
@@ -55,7 +59,7 @@ import SHAPERSTUDY
 Sphere_1_1, = SHAPERSTUDY.shape(model.featureStringId(Sphere_1))
 
 
-# In[3]:
+# In[ ]:
 
 
 # Create the mesh from the geometry
@@ -214,70 +218,47 @@ problem.terminate()
 # The results are automatically recorded according to the information
 # and can be observed with **Salome**.
 
-# In[12]:
-
-
-
-
-diffusionEquation_diffusion_3Dpvd = PVDReader(registrationName='DiffusionEquation_diffusion_3D.pvd', FileName='./DiffusionEquation_diffusion_3D.pvd')
-
-
-# In[13]:
-
-
-animationScene1 = GetAnimationScene()
-timeKeeper1 = GetTimeKeeper()
-animationScene1.UpdateAnimationUsingDataTimeSteps()
-renderView1 = GetActiveViewOrCreate('RenderView')
-diffusionEquation_diffusion_3DpvdDisplay = Show(diffusionEquation_diffusion_3Dpvd, renderView1, 'UnstructuredGridRepresentation')
-diffusionEquation_diffusion_3DpvdDisplay.Representation = 'Surface'
-animationScene1.GoToLast()
-
-
-# In[14]:
-
-
-renderView1.ResetCamera(False)
-materialLibrary1 = GetMaterialLibrary()
-renderView1.Update()
-clip1 = Clip(registrationName='Clip1', Input=diffusionEquation_diffusion_3Dpvd)
-clip1.ClipType.Origin = [0.0, 0.0, 0.0]
-clip1.ClipType.Normal = [0.0, 0.0, 1.0]
-clip1Display = Show(clip1, renderView1, 'UnstructuredGridRepresentation')
-clip1Display.Representation = 'Surface'
-Hide(diffusionEquation_diffusion_3Dpvd, renderView1)
-renderView1.Update()
-ColorBy(clip1Display, ('CELLS', 'SOLVERLAB results'))
-clip1Display.RescaleTransferFunctionToDataRange(True, False)
-clip1Display.SetScalarBarVisibility(renderView1, True)
-sOLVERLABresultsLUT = GetColorTransferFunction('SOLVERLABresults')
-sOLVERLABresultsPWF = GetOpacityTransferFunction('SOLVERLABresults')
-sOLVERLABresultsTF2D = GetTransferFunction2D('SOLVERLABresults')
-clip1Display.RescaleTransferFunctionToDataRange(False, True)
-SetActiveSource(diffusionEquation_diffusion_3Dpvd)
-HideInteractiveWidgets(proxy=clip1.ClipType)
-SetActiveSource(clip1)
-ShowInteractiveWidgets(proxy=clip1.ClipType)
-layout1 = GetLayout()
-layout1.SetSize(3056, 1115)
-
-
-# In[15]:
-
-
-renderView1.CameraPosition = [4.013230503985284, 1.4341159836510837, 5.1589435816460725]
-renderView1.CameraFocalPoint = [-0.00011444091796874981, -4.827976226806646e-06, -6.239227298405378e-20]
-renderView1.CameraViewUp = [-0.0835939881493395, 0.9749749758733987, -0.20599961545098572]
-renderView1.CameraParallelScale = 1.7319295439543239
-
-SaveScreenshot('result.png', renderView1, ImageResolution=[3056, 1115],
-    TransparentBackground=1)
-
-
-# [3D diffusion results](result.png)
-
 # In[ ]:
 
 
+if withJupyter:
+    diffusionEquation_diffusion_3Dpvd = PVDReader(registrationName='DiffusionEquation_diffusion_3D.pvd', FileName='./DiffusionEquation_diffusion_3D.pvd')
+    animationScene1 = GetAnimationScene()
+    timeKeeper1 = GetTimeKeeper()
+    animationScene1.UpdateAnimationUsingDataTimeSteps()
+    renderView1 = GetActiveViewOrCreate('RenderView')
+    diffusionEquation_diffusion_3DpvdDisplay = Show(diffusionEquation_diffusion_3Dpvd, renderView1, 'UnstructuredGridRepresentation')
+    diffusionEquation_diffusion_3DpvdDisplay.Representation = 'Surface'
+    animationScene1.GoToLast()
+    renderView1.ResetCamera(False)
+    materialLibrary1 = GetMaterialLibrary()
+    renderView1.Update()
+    clip1 = Clip(registrationName='Clip1', Input=diffusionEquation_diffusion_3Dpvd)
+    clip1.ClipType.Origin = [0.0, 0.0, 0.0]
+    clip1.ClipType.Normal = [0.0, 0.0, 1.0]
+    clip1Display = Show(clip1, renderView1, 'UnstructuredGridRepresentation')
+    clip1Display.Representation = 'Surface'
+    Hide(diffusionEquation_diffusion_3Dpvd, renderView1)
+    renderView1.Update()
+    ColorBy(clip1Display, ('CELLS', 'SOLVERLAB results'))
+    clip1Display.RescaleTransferFunctionToDataRange(True, False)
+    clip1Display.SetScalarBarVisibility(renderView1, True)
+    sOLVERLABresultsLUT = GetColorTransferFunction('SOLVERLABresults')
+    sOLVERLABresultsPWF = GetOpacityTransferFunction('SOLVERLABresults')
+    sOLVERLABresultsTF2D = GetTransferFunction2D('SOLVERLABresults')
+    clip1Display.RescaleTransferFunctionToDataRange(False, True)
+    SetActiveSource(diffusionEquation_diffusion_3Dpvd)
+    HideInteractiveWidgets(proxy=clip1.ClipType)
+    SetActiveSource(clip1)
+    ShowInteractiveWidgets(proxy=clip1.ClipType)
+    layout1 = GetLayout()
+    layout1.SetSize(3056, 1115)
+    renderView1.CameraPosition = [4.013230503985284, 1.4341159836510837, 5.1589435816460725]
+    renderView1.CameraFocalPoint = [-0.00011444091796874981, -4.827976226806646e-06, -6.239227298405378e-20]
+    renderView1.CameraViewUp = [-0.0835939881493395, 0.9749749758733987, -0.20599961545098572]
+    renderView1.CameraParallelScale = 1.7319295439543239
 
+    SaveScreenshot('result.png', renderView1, ImageResolution=[3056, 1115],
+        TransparentBackground=1)
+    display(Image(filename="result.png"))
 

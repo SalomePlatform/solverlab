@@ -20,4 +20,5 @@
 SET(ALL_TESTS
   notebooks/getting_started.py
   notebooks/getting_further.py
+  notebooks/mesh_in_the_loop.py
 )
