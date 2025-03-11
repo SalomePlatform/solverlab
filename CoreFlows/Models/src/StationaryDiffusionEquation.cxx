@@ -347,7 +347,7 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFE(bool & stop){
         {
         Cell Cj;
         string nameOfGroup;
-        double coeff;//Diffusion coefficients between nodes i and j
+        double coeff;//Diffusion coefficients between nodes i and j (to be inserted in stiffness matrix), or boundary coefficient (to be inserted in RHS)
         
         Matrix M(_Ndim+1,_Ndim+1);//cell geometry matrix
         std::vector< Vector > GradShapeFuncs(_Ndim+1);//shape functions of cell nodes
@@ -389,12 +389,17 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFE(bool & stop){
                     for (int jdim=0; jdim<_Ndim+1;jdim++)
                     {
                         if(find(_dirichletNodeIds.begin(),_dirichletNodeIds.end(),nodeIds[jdim])==_dirichletNodeIds.end())//!_mesh.isBorderNode(nodeIds[jdim])
-                        {//Second node of the edge is not Dirichlet node
+                        {//Second node of the edge is not Dirichlet node -> contribution to the stiffness matrix
                             j_int= DiffusionEquation::unknownNodeIndex(nodeIds[jdim], _dirichletNodeIds);//assumes Dirichlet boundary node numbering is strictly increasing
-                            MatSetValue(_A,i_int,j_int,(_DiffusionTensor*GradShapeFuncs[idim])*GradShapeFuncs[jdim]/Cj.getMeasure(), ADD_VALUES);
+                            coeff = (_DiffusionTensor*GradShapeFuncs[idim])*GradShapeFuncs[jdim]/Cj.getMeasure();
+#if CMAKE_BUILD_TYPE==DEBUG
+                            if( coeff>0)//non acute triangle/tetrahedron -> violation of mawimum principle
+                                PetscPrintf(PETSC_COMM_WORLD,"\n !!! Warning : non acute triangle/tetrahedron cell %d, nodes %d and %d, possible violation of the maximum principle \n",j, nodeIds[idim], nodeIds[jdim]);
+#endif
+                            MatSetValue(_A,i_int,j_int, coeff, ADD_VALUES);
                         }
                         else if (!dirichletCell_treated)
-                        {//Second node of the edge is a Dirichlet node
+                        {//Second node of the edge is a Dirichlet node -> contribution to the right hand side
                             dirichletCell_treated=true;
                             for (int kdim=0; kdim<_Ndim+1;kdim++)
                             {
@@ -588,7 +593,6 @@ double StationaryDiffusionEquation::computeDiffusionMatrixFV(bool & stop){
 
 double StationaryDiffusionEquation::computeRHS(bool & stop)//Contribution of the PDE RHS to the linear systemm RHS (boundary conditions do contribute to the system RHS via the function computeDiffusionMatrix
 {
-
     if(_mpi_rank == 0)
     {
         if(!_FECalculation)
@@ -598,6 +602,7 @@ double StationaryDiffusionEquation::computeRHS(bool & stop)//Contribution of the
             {
                 Cell Ci;
                 std::vector< int > nodesId;
+                double coeff;// Coefficient to be inserted in RHS
                 for (int i=0; i<_Nmailles;i++)
                 {
                     Ci=_mesh.getCell(i);
@@ -605,7 +610,7 @@ double StationaryDiffusionEquation::computeRHS(bool & stop)//Contribution of the
                     for (int j=0; j<nodesId.size();j++)
                         if(!_mesh.isBorderNode(nodesId[j])) 
                         {
-                            double coeff = _heatTransfertCoeff*_fluidTemperatureField(nodesId[j]) + _heatPowerField(nodesId[j]);
+                            coeff = _heatTransfertCoeff*_fluidTemperatureField(nodesId[j]) + _heatPowerField(nodesId[j]);
                             VecSetValue(_b,DiffusionEquation::unknownNodeIndex(nodesId[j], _dirichletNodeIds), coeff*Ci.getMeasure()/(_Ndim+1),ADD_VALUES);
                         }
                 }
@@ -1229,7 +1234,7 @@ void StationaryDiffusionEquation::setDirichletBoundaryCondition(string groupName
     }
     
     _dirichletBoundaryField = bc_field;
-       MEDCoupling::MCAuto<MEDCoupling::MEDCouplingMesh> dirichletBoundaryMesh = bc_field.getMesh().getMEDCouplingMesh();
+    MEDCoupling::MCAuto<MEDCoupling::MEDCouplingMesh> dirichletBoundaryMesh = bc_field.getMesh().getMEDCouplingMesh();
 
     //* Check that the boundary field is based on the correct boundary mesh */
     int compType=2;//This is the weakest comparison policy for medcoupling meshes. It can be used by users not sensitive to cell orientation
@@ -1239,7 +1244,7 @@ void StationaryDiffusionEquation::setDirichletBoundaryCondition(string groupName
     if( !_mesh.getBoundaryMEDCouplingMesh()->areCellsIncludedIn(dirichletBoundaryUMesh, compType, arr) )
         throw CdmathException(" !!!!! StationaryDiffusionEquation::setDirichletBoundaryCondition : The boundary field is not based on the correct boundary mesh. Use mesh::getBoundaryMesh");
 
-    int nBoundaryCells = dirichletBoundaryUMesh->getNumberOfCells();
+    int nBoundaryCells = dirichletBoundaryUMesh->getNumberOfCells();//Boundary cells that support the boundary field (subpart of the total boundary)
     std::map<int,double>::iterator it;
     long int iCell_global;
     if(!_FECalculation)//Finite volume simulation
@@ -1247,26 +1252,21 @@ void StationaryDiffusionEquation::setDirichletBoundaryCondition(string groupName
         {
             arr->getTuple(i,&iCell_global);
             it=_dirichletBoundaryValues.find(iCell_global);
-            if( it == _dirichletBoundaryValues.end() )//Aucune valeur limite est associée au noeud
+            if( it == _dirichletBoundaryValues.end() )//Aucune valeur limite n'est associée au noeud
                 it->second = bc_field[i];
         }
-    long int inode, length;
+    long int inode_global, length;
     if(_FECalculation)
     {
-        const MEDCoupling::DataArrayIdType *nodal  = dirichletBoundaryUMesh->getNodalConnectivity() ;
-        const MEDCoupling::DataArrayIdType *nodalI = dirichletBoundaryUMesh->getNodalConnectivityIndex() ;
-
-        /*longueur du tableau de connectivité */
-        nodalI->getTuple(nBoundaryCells,&length);
-        for(int i=0; i<length; i++)
+        const MEDCoupling::DataArrayIdType *globalNodeId  = dirichletBoundaryUMesh->computeFetchedNodeIds();
+        for(int i=0; i<bc_field.getNumberOfElements(); i++)
         {
-            nodal->getTuple(i,&inode);
-            it=_neumannBoundaryValues.find(inode);
-            if( it == _neumannBoundaryValues.end() )//Aucune valeur limite est associée au noeud
+            globalNodeId->getTuple(i,&inode_global);
+            it=_dirichletBoundaryValues.find(inode_global);
+            if( it == _dirichletBoundaryValues.end() )//Aucune valeur limite n'est associée au noeud
                 it->second = bc_field[i];  
         }
-        nodal->decrRef();
-        nodalI->decrRef();
+        globalNodeId->decrRef();
     }
     arr->decrRef();
 };
