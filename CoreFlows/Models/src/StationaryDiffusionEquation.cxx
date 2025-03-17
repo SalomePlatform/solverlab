@@ -1192,11 +1192,11 @@ StationaryDiffusionEquation::setHeatPowerField(Field heatPower){
 }
 
 void 
-StationaryDiffusionEquation::setHeatPowerField(string fileName, string fieldName, int iteration, int order, int meshLevel){
+StationaryDiffusionEquation::setHeatPowerField(string fileName, string fieldName, EntityType field_support_type, int iteration, int order, int meshLevel){
     if(!_meshSet)
         throw CdmathException("!!!!!!!! StationaryDiffusionEquation::setHeatPowerField set initial field first");
 
-    _heatPowerField=Field(fileName, CELLS,fieldName, iteration, order, meshLevel);
+    _heatPowerField=Field(fileName, field_support_type,fieldName, iteration, order, meshLevel);
     _heatPowerField.getMesh().checkFastEquivalWith(_mesh);
     _heatPowerFieldSet=true;
 }
