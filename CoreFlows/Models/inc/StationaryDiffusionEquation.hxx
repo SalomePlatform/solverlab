@@ -60,6 +60,14 @@ public :
     
     //Linear system and spectrum
     void setLinearSolver(linearSolver kspType, preconditioner pcType);
+	/** \fn setPrecision
+	 * \brief met à jour _precision (la précision du calcul)
+	 * \details
+	 * \param [in] double
+	 * \param [out] void
+	 *  */
+	void setPrecision(double precision){ _precision=precision; }
+
 	/** \fn setPetscOptions
 	 * \brief sets the options used in PETSc global database
 	 * @param Any available option in PETSc (See PETSc documentation)
