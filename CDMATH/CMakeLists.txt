@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Project name
 project (CDMATH)
 set (CDMATH_VERSION_MAJOR 9)
-set (CDMATH_VERSION_MINOR 14)
+set (CDMATH_VERSION_MINOR 15)
 
 # CDMATH project options (deprecated, see SOLVERLAB options)
 set (CDMATH_WITH_PETSC ${SOLVERLAB_WITH_PETSC} CACHE STRING "Compile CDMATH with PETSc linking")
