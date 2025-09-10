@@ -23,7 +23,7 @@
 
 
 import SOLVERLABGUI_ORB__POA
-import SALOME_ComponentPy
+from salome.kernel import SALOME_ComponentPy
 import SALOME_DriverPy
 
 from SOLVERLABGUI_utils import *

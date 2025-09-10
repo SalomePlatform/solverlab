@@ -26,7 +26,7 @@ __all__ = [
 from omniORB import CORBA
 from SALOME_NamingServicePy import SALOME_NamingServicePy_i
 from LifeCycleCORBA import LifeCycleCORBA
-import SALOMEDS
+from salome.kernel import SALOMEDS
 import SALOMEDS_Attributes_idl
 #import SOLVERLABGUI_ORB
 

@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import *
 from SOLVERLABDesktop import SOLVERLABDesktop as Desktop
 import SOLVERLAB_utils as MUT # as Module_UTils
 
-import salome
+from salome.kernel import salome
 # Get SALOME PyQt interface
 import SalomePyQt
 import libSALOME_Swig

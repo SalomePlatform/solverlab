@@ -19,7 +19,7 @@ except ImportError:
 
 original_stdout = sys.stdout
 
-import salome
+from salome.kernel import salome
 # salome.salome_init()
 # from salome.shaper import model
 # import SHAPERSTUDY
@@ -38,7 +38,7 @@ except:
 
 from salome.shaper import model
 import SHAPERSTUDY
-import SMESH, SALOMEDS
+from salome.kernel import SMESH, SALOMEDS
 from salome.smesh import smeshBuilder
 
 sys.stdout = original_stdout

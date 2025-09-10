@@ -30,7 +30,7 @@ try:
 except ImportError:
     withJupyter = False
 
-import salome
+from salome.kernel import salome
 
 try:
     from pvsimple import *
@@ -63,7 +63,7 @@ Sphere_1_1, = SHAPERSTUDY.shape(model.featureStringId(Sphere_1))
 
 
 # Create the mesh from the geometry
-import  SMESH, SALOMEDS
+from salome.kernel import SMESH, SALOMEDS
 from salome.smesh import smeshBuilder
 
 smesh = smeshBuilder.New()

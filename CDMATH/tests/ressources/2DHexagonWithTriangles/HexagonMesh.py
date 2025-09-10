@@ -7,7 +7,7 @@ import sys
 import os
 
 from math import pi, cos, sin
-import SMESH
+from salome.kernel import SMESH
 
 geompy = geomBuilder.New()
 smesh = smeshBuilder.New()
