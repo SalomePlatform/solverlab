@@ -2,7 +2,7 @@
 #-*- coding:utf-8 -*-
 
 # %% LICENSE_SALOME_CEA_BEGIN
-# Copyright (C) 2008-2025  CEA
+# Copyright (C) 2008-2026  CEA
 # 
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
