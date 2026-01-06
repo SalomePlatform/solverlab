@@ -10,7 +10,7 @@
 #  guide the detection and indicate a root directory to look into.
 #
 ############################################################################
-# Copyright (C) 2007-2025  CEA, EDF, OPEN CASCADE
+# Copyright (C) 2007-2026  CEA, EDF, OPEN CASCADE
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
