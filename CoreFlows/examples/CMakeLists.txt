@@ -35,9 +35,7 @@ add_custom_target (StationaryDiffusionEquation COMMAND ctest -R StationaryDiffus
 add_custom_target (convergence COMMAND ctest -R convergence)# may be replace ctest -R with ctest -L
 
 add_custom_target (fv_tests         COMMAND ctest -R FV)# may be replace ctest -R with ctest -L
-add_custom_target (FV_tests         COMMAND ctest -R FV)# may be replace ctest -R with ctest -L
 add_custom_target (fe_tests         COMMAND ctest -R FE)# may be replace ctest -R with ctest -L
-add_custom_target (FE_tests         COMMAND ctest -R FE)# may be replace ctest -R with ctest -L
 add_custom_target (1D_tests         COMMAND ctest -R 1D)# may be replace ctest -R with ctest -L
 add_custom_target (2D_tests         COMMAND ctest -R 2D)# may be replace ctest -R with ctest -L
 add_custom_target (3D_tests         COMMAND ctest -R 3D)# may be replace ctest -R with ctest -L

@@ -61,6 +61,11 @@ else (CDMATH_WITH_PETSC)
   SWIG_LINK_LIBRARIES(cdmath ${Python_LIBRARIES} base mesh ${medloader} ${medcoupling} )
 endif (CDMATH_WITH_PETSC)
 
+IF(APPLE)
+  # Python only imports extension modules named *.so on macOS (not *.dylib)
+  SET_TARGET_PROPERTIES(${SWIG_MODULE_cdmath_REAL_NAME} PROPERTIES SUFFIX ".so")
+ENDIF(APPLE)
+
 INSTALL(TARGETS _cdmath DESTINATION lib/cdmath)
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/cdmath.py DESTINATION bin/cdmath)
 

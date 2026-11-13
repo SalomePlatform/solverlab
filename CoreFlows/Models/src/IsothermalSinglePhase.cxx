@@ -4,7 +4,14 @@
  *  Created on: July 7 2022
  */
 
-#include<bits/stdc++.h>
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <cstdlib>
+#include <iostream>
+#include <map>
+#include <string>
+#include <vector>
 #include "IsothermalSinglePhase.hxx"
 
 using namespace std;
