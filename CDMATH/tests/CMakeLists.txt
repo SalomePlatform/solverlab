@@ -65,7 +65,12 @@ if (CDMATH_WITH_PYTHON AND CDMATH_WITH_PETSC AND CDMATH_WITH_POSTPRO)
 
   add_custom_target (CDMATH COMMAND ctest -O testsCDMATH.log)
 
-  add_custom_target (cdmath COMMAND ctest -R TestsCDMATH)
+  if(APPLE)
+    # The default file system of macOS is case-insensitive: "cdmath" collides with "CDMATH"
+    add_custom_target (cdmathtests COMMAND ctest -R TestsCDMATH)
+  else(APPLE)
+    add_custom_target (cdmath COMMAND ctest -R TestsCDMATH)
+  endif(APPLE)
   add_custom_target (medcouplingtests COMMAND ctest -R MEDCoupling)
   add_custom_target (check COMMAND ctest -E 'validation|Example')# may be replace ctest -E with ctest -LE
   add_custom_target (vtk COMMAND ctest -R VTK)

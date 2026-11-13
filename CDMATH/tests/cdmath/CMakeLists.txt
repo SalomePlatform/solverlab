@@ -33,5 +33,9 @@ else (CDMATH_WITH_PETSC)
     ADD_LIBRARY(TestMesh SHARED ${TestMesh_SOURCES})
     TARGET_LINK_LIBRARIES(TestMesh base mesh medloader medcoupling med)
 endif (CDMATH_WITH_PETSC) 
+if(APPLE)
+  # The macOS linker rejects undefined symbols in a shared library
+  TARGET_LINK_LIBRARIES(TestMesh ${CPPUNIT_LIBS})
+endif(APPLE)
 
 INSTALL(TARGETS TestMesh DESTINATION bin/unit_tests)

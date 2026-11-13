@@ -1296,7 +1296,11 @@ void StationaryDiffusionEquation::setDirichletBoundaryCondition(string groupName
 
     int nBoundaryCells = dirichletBoundaryUMesh->getNumberOfCells();//Boundary cells that support the boundary field (subpart of the total boundary)
     std::map<int,double>::iterator it;
+#if defined(__APPLE__)
+    mcIdType iCell_global; // getTuple() expects a mcIdType* ("long long" on macOS)
+#else
     long int iCell_global;
+#endif
     if(!_FECalculation)//Finite volume simulation
         for(int i=0; i<nBoundaryCells ; i++)
         {
@@ -1305,7 +1309,11 @@ void StationaryDiffusionEquation::setDirichletBoundaryCondition(string groupName
             if( it == _dirichletBoundaryValues.end() )//Aucune valeur limite n'est associée au noeud
                 it->second = bc_field[i];
         }
+#if defined(__APPLE__)
+    mcIdType inode_global;
+#else
     long int inode_global, length;
+#endif
     if(_FECalculation)
     {
         const MEDCoupling::DataArrayIdType *globalNodeId  = dirichletBoundaryUMesh->computeFetchedNodeIds();
