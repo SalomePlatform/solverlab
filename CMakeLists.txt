@@ -88,11 +88,18 @@ if   ( MPI_ROOT_DIR )
 endif( MPI_ROOT_DIR )
 
 # Definition of SOLVERLAB_WITH_MPI
+# Extension of the shared libraries whose path is set below: ".dylib" on macOS
+if(APPLE)
+  set(SOLVERLAB_SHARED_LIBRARY_SUFFIX ${CMAKE_SHARED_LIBRARY_SUFFIX})
+else(APPLE)
+  set(SOLVERLAB_SHARED_LIBRARY_SUFFIX .so)
+endif(APPLE)
+
 if(    DEFINED ENV{MPI_HOME} OR MPI_HOME )
   set(SOLVERLAB_WITH_MPI ON)
   find_package(MPI)
   if(   ${MPI_LIBRARY} STREQUAL "MPI_LIBRARY-NOTFOUND")
-    set ( MPI_LIBRARY ${MPI_HOME}/lib/libmpi${CMAKE_SHARED_LIBRARY_SUFFIX} )
+    set ( MPI_LIBRARY ${MPI_HOME}/lib/libmpi${SOLVERLAB_SHARED_LIBRARY_SUFFIX} )
   endif(${MPI_LIBRARY} STREQUAL "MPI_LIBRARY-NOTFOUND")
   message ( STATUS "MPI executable is ${MPIEXEC}" )
   if   (NOT DEFINED CMAKE_CXX_COMPILER)
@@ -163,9 +170,9 @@ endif( DEFINED ENV{HDF5_ROOT_DIR} OR DEFINED HDF5_ROOT_DIR )
     endif( NOT SLEPC_DIR)
 
     message ( STATUS "Checking variable SLEPC_DIR" )
-    if ( IS_DIRECTORY ${SLEPC_DIR}/include AND EXISTS ${SLEPC_DIR}/lib/libslepc${CMAKE_SHARED_LIBRARY_SUFFIX})
+    if ( IS_DIRECTORY ${SLEPC_DIR}/include AND EXISTS ${SLEPC_DIR}/lib/libslepc${SOLVERLAB_SHARED_LIBRARY_SUFFIX})
       set(SLEPC_INCLUDES  ${SLEPC_DIR}/include)
-      set(SLEPC_LIBRARIES ${SLEPC_DIR}/lib/libslepc${CMAKE_SHARED_LIBRARY_SUFFIX})
+      set(SLEPC_LIBRARIES ${SLEPC_DIR}/lib/libslepc${SOLVERLAB_SHARED_LIBRARY_SUFFIX})
       message( STATUS "SLEPc found at ${SLEPC_DIR}" )
     else()
       message( FATAL_ERROR "SLEPc not found at ${SLEPC_DIR}" )
@@ -233,7 +240,7 @@ endif( DEFINED ENV{HDF5_ROOT_DIR} OR DEFINED HDF5_ROOT_DIR )
         message( STATUS "SLEPc library  found in /usr/lib64/slepc/" )
         set(SLEPC_DIR /usr/)
         set(SLEPC_INCLUDES  ${SLEPC_DIR}/include)
-        set(SLEPC_LIBRARIES ${SLEPC_DIR}/lib/libslepc${CMAKE_SHARED_LIBRARY_SUFFIX})
+        set(SLEPC_LIBRARIES ${SLEPC_DIR}/lib/libslepc${SOLVERLAB_SHARED_LIBRARY_SUFFIX})
         file(STRINGS /usr/include/slepc/slepcversion.h slepcversion_file)
         FOREACH(line ${slepcversion_file})
           string(FIND "${line}" "#define SLEPC_VERSION_MAJOR      " pos)
@@ -341,7 +348,7 @@ endif( DEFINED ENV{HDF5_ROOT_DIR} OR DEFINED HDF5_ROOT_DIR )
       message( STATUS "PETSc version ${PETSC_VERSION}  will be installed" )
 
       set(PETSC_INCLUDES  ${PETSC_DIR}/${PETSC_ARCH}/include ${PETSC_DIR}/include)
-      set(PETSC_LIBRARIES ${PETSC_DIR}/${PETSC_ARCH}/lib/libpetsc${CMAKE_SHARED_LIBRARY_SUFFIX})
+      set(PETSC_LIBRARIES ${PETSC_DIR}/${PETSC_ARCH}/lib/libpetsc${SOLVERLAB_SHARED_LIBRARY_SUFFIX})
 
       #extract slepc tarball name
       string(LENGTH "${DOWNLOAD_SLEPC}" tarball_url_length)#length of the tarball
@@ -442,9 +449,9 @@ else( MEDFILE_ROOT_DIR OR DEFINED ENV{MEDFILE_ROOT_DIR})
 endif( MEDFILE_ROOT_DIR OR DEFINED ENV{MEDFILE_ROOT_DIR})
 
 add_library(med   SHARED IMPORTED)
-set_property(TARGET med  PROPERTY IMPORTED_LOCATION ${MEDFILE_ROOT_DIR}/lib/libmed${CMAKE_SHARED_LIBRARY_SUFFIX})
+set_property(TARGET med  PROPERTY IMPORTED_LOCATION ${MEDFILE_ROOT_DIR}/lib/libmed${SOLVERLAB_SHARED_LIBRARY_SUFFIX})
 add_library(medC   SHARED IMPORTED)
-set_property(TARGET medC PROPERTY IMPORTED_LOCATION ${MEDFILE_ROOT_DIR}/lib/libmedC${CMAKE_SHARED_LIBRARY_SUFFIX})
+set_property(TARGET medC PROPERTY IMPORTED_LOCATION ${MEDFILE_ROOT_DIR}/lib/libmedC${SOLVERLAB_SHARED_LIBRARY_SUFFIX})
 
 string(REPLACE ";" ":"  MEDFILE_LIBRARIES_INSTALL "${MEDFILE_LIBRARIES}")# use colon instead of semicolon in environment file env_SOLVERLAB.sh
 
@@ -496,7 +503,7 @@ else( MEDCOUPLING_ROOT_DIR OR DEFINED ENV{MEDCOUPLING_ROOT_DIR})
   )
 
   add_library(medloader   SHARED IMPORTED )
-  set_property(TARGET medloader   PROPERTY IMPORTED_LOCATION ${MEDCOUPLING_ROOT_DIR}/lib/libmedloader${CMAKE_SHARED_LIBRARY_SUFFIX})
+  set_property(TARGET medloader   PROPERTY IMPORTED_LOCATION ${MEDCOUPLING_ROOT_DIR}/lib/libmedloader${SOLVERLAB_SHARED_LIBRARY_SUFFIX})
 
   SET(MEDCOUPLING_USE_64BIT_IDS  ON)
 
@@ -506,7 +513,7 @@ set(MEDCOUPLING_INCLUDE_DIR ${MEDCOUPLING_ROOT_DIR}/include)
 set(MEDCOUPLING_LIBRARIES   ${MEDCOUPLING_ROOT_DIR}/lib    )#for environment file env_SOLVERLAB.sh
 
 add_library(medcoupling SHARED IMPORTED )
-set_property(TARGET medcoupling PROPERTY IMPORTED_LOCATION ${MEDCOUPLING_ROOT_DIR}/lib/libmedcoupling${CMAKE_SHARED_LIBRARY_SUFFIX})
+set_property(TARGET medcoupling PROPERTY IMPORTED_LOCATION ${MEDCOUPLING_ROOT_DIR}/lib/libmedcoupling${SOLVERLAB_SHARED_LIBRARY_SUFFIX})
 
 if   ( ${MEDCoupling_VERSION} VERSION_GREATER 9.4 )
   add_definitions(-DMEDCoupling_VERSION_VERSION_GREATER_9_4)

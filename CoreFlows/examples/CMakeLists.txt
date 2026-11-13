@@ -36,6 +36,11 @@ add_custom_target (convergence COMMAND ctest -R convergence)# may be replace cte
 
 add_custom_target (fv_tests         COMMAND ctest -R FV)# may be replace ctest -R with ctest -L
 add_custom_target (fe_tests         COMMAND ctest -R FE)# may be replace ctest -R with ctest -L
+if(NOT APPLE)
+  # The default file system of macOS is case-insensitive: FV_tests and FE_tests collide with fv_tests and fe_tests
+  add_custom_target (FV_tests         COMMAND ctest -R FV)# may be replace ctest -R with ctest -L
+  add_custom_target (FE_tests         COMMAND ctest -R FE)# may be replace ctest -R with ctest -L
+endif(NOT APPLE)
 add_custom_target (1D_tests         COMMAND ctest -R 1D)# may be replace ctest -R with ctest -L
 add_custom_target (2D_tests         COMMAND ctest -R 2D)# may be replace ctest -R with ctest -L
 add_custom_target (3D_tests         COMMAND ctest -R 3D)# may be replace ctest -R with ctest -L

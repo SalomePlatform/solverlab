@@ -4,6 +4,8 @@
  *  Created on: July 7 2022
  */
 
+#if defined(__APPLE__)
+// <bits/stdc++.h> is an internal header of libstdc++, not provided by libc++
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -12,6 +14,9 @@
 #include <map>
 #include <string>
 #include <vector>
+#else
+#include<bits/stdc++.h>
+#endif
 #include "IsothermalSinglePhase.hxx"
 
 using namespace std;
